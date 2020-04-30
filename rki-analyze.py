@@ -297,22 +297,49 @@ def unmakeIndex(daysAndValues):
         values.append(daysAndValues[d])
     return days, values
 
-def redistributed(ohneErkBeg, mitErkBeg, backDistribution):
-    result = copy.deepcopy(mitErkBeg)
+def redistributed(ohneErkBeg, mitErkBeg, backDistribution, cutOffDay=None):
+    #result = copy.deepcopy(mitErkBeg)
+    result = {}
+
+    for d in sorted (mitErkBeg.keys()):
+        if cutOffDay != None:
+            if d > cutOffDay:
+                break
+        result[d]=mitErkBeg[d]
+
     for d in sorted (ohneErkBeg.keys()):
+        if cutOffDay != None:
+            if d > cutOffDay:
+                return result
         for back, dist in enumerate(backDistribution):
             destDay = d - back
             if destDay in result:
                 result[destDay] = result[destDay] + ohneErkBeg[d] * dist
     return result
 
+def adjustForFuture(Erkrankte, backDistribution, lastDay):
+    result = copy.deepcopy(Erkrankte)
+    cumBins = np.cumsum(backDistribution)
+    #print(cumBins)
+
+    for back, dist in enumerate(cumBins):
+        destDay = lastDay - back
+        if destDay in result:
+            #print(dist)
+            result[destDay] = result[destDay] / dist
+    return result
+
 byMeldedatum = byDate(allRecords,'Meldedatum',includePos)
+lastDay = sorted(byMeldedatum.keys())[-1]
 byRefdatum = byDate(allRecords,'Refdatum',includePosNoErkbeginn)
 byErkdatum = byDate(allRecords,'Refdatum',includePosErkbeginn)
 
 dayList, deadList, caseList = extractLists(byMeldedatum)
 dayListR, deadListR, caseListR = extractLists(byRefdatum)
 dayListE, deadListE, caseListE = extractLists(byErkdatum)
+
+########################################################
+# redistribute cases with unknown erk-date
 
 ohneErkBeg = makeIndex(dayListR, caseListR)
 mitErkBeg = makeIndex(dayListE, caseListE)
@@ -322,8 +349,23 @@ allDelays = [item for sublist in delayList for item in sublist]
 
 num_bins = 24
 allBins = np.histogram(allDelays, bins=num_bins, range=(0, num_bins), density=1)
+
+delays24days = [item for sublist in delayList[lastDay - 24:lastDay] for item in sublist]
+last24bins = np.histogram(delays24days, bins=num_bins, range=(0, num_bins), density=1)
+
 erkrankungen = redistributed(ohneErkBeg, mitErkBeg, allBins[0])
 compErkDays, compErkValues = unmakeIndex(erkrankungen)
+
+futureErk = adjustForFuture(erkrankungen, last24bins[0], lastDay)
+futErkDays, futErkValues = unmakeIndex(futureErk)
+
+print("erkrankungen")
+print(makeIndex(compErkDays[-num_bins:], compErkValues[-num_bins:]))
+print("futureErk")
+print(makeIndex(futErkDays[-num_bins:], futErkValues[-num_bins:]))
+
+print("last24bins[0]")
+print(last24bins[0])
 
 totalCases = np.sum(caseList)
 totalCompErk = np.sum(compErkValues)
@@ -334,66 +376,81 @@ print("Meldungen {}, Errechnete Erkranungen {}".format(totalCases, totalCompErk)
 fig = plt.figure(figsize=(16, 10))
 
 ######################################################################
-ax = plt.subplot(311)
+ax = plt.subplot(221)
 
 plt.ylim(0,7000)
 
-data = {
+ax_data = {
     "Gemeldete Infektionen":[dayList,caseList],
     "Ohne Erkrankungsdatum":[dayListR,caseListR],
     "Erkrankt am":[dayListE, caseListE],
 }
 
-colors = ['royalblue', 'firebrick', 'darkorange']
+ax_colors = ['royalblue', 'firebrick', 'darkorange']
 ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
-ax_bargroups = bar_plot(ax,data,colors=colors)
+ax_bargroups = bar_plot(ax,ax_data,colors=ax_colors)
 
 ######################################################################
-axb = plt.subplot(312)
+axb = plt.subplot(222)
 
 plt.ylim(0,7000)
 
-data = {
+axb_data = {
 #    "Gemeldete Infektionen":[dayList,caseList],
 #    "Ohne Erkrankungsdatum":[dayListR,caseListR],
     "Erkrankt am":[dayListE, caseListE],
     "Berechnet Erkrankt am": [compErkDays, compErkValues],
+    "Hochrechnung ausstehende Erkrankte":[futErkDays, futErkValues],
 }
 
-colors = ['darkorange','darkseagreen']
+axb_colors = ['darkorange','darkseagreen','silver']
 axb.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
-bargroups = bar_plot(axb,data,colors=colors)
+bargroups = bar_plot(axb,axb_data,colors=axb_colors)
 
 ######################################################################
 # second histogram plot
-axh = plt.subplot(313)
+axh = plt.subplot(223)
 
 plt.ylim(0,0.3)
 n, bins, patches = axh.hist([allDelays,allDelays,allDelays], bins=num_bins,range=(0,num_bins),density=1)
 ######################################################################
+axd = plt.subplot(224)
+plt.ylim(0,1.1)
+
+axd_data = {
+    "erfasst":[range(lastDay),[0.5]*lastDay],
+    "erfasstAnTag":[range(lastDay),[0.6]*lastDay],
+}
+axd_colors = ['darkorange','darkseagreen']
+
+axd_bargroups = bar_plot(axd,axd_data,colors=axd_colors)
+######################################################################
+
+def setBarValues(bargroups, valueLists):
+    for vi, values in enumerate(valueLists):
+        for i, b in enumerate(bargroups[vi]):
+            if i < len(values):
+                b[0].set_height(values[i])
+            else:
+                b[0].set_height(0)
+
+ratiosOfFinalList = {}
+
+ratiosOfFinalAvrg = []
 
 def animate(frame):
+    global ratiosOfFinalAvrg
+
     print("Updating frame {}".format(frame))
     dayList, deadList, caseList = extractListsPartial(byMeldedatum,frame)
     dayListR, deadListR, caseListR = extractListsPartial(byRefdatum,frame)
     dayListE, deadListE, caseListE = extractListsPartial(byErkdatum,frame)
 
-    for i, b in enumerate(ax_bargroups[0]):
-        b[0].set_height(caseList[i])
-    for i, b in enumerate(ax_bargroups[1]):
-        b[0].set_height(caseListR[i])
-    for i, b in enumerate(ax_bargroups[2]):
-        b[0].set_height(caseListE[i])
+    setBarValues(ax_bargroups, [caseList, caseListR,caseListE])
 
-    # for i, b in enumerate(bargroups[0]):
-    #     b[0].set_height(caseList[i])
-    # for i, b in enumerate(bargroups[1]):
-    #     b[0].set_height(caseListR[i])
-    # for i, b in enumerate(bargroups[2]):
-    #     b[0].set_height(caseListE[i])
-
+    #################
 
     delays7days = [item for sublist in delayList[frame-7:frame] for item in sublist]
     curbins=np.histogram(delays7days,bins=num_bins, range=(0,num_bins),density=1)
@@ -406,6 +463,41 @@ def animate(frame):
 
     for i, p in enumerate(patches[1]):
         p.set_height(curbins24[0][i])
+
+    #################
+
+    erkrankungenC = redistributed(ohneErkBeg, mitErkBeg, allBins[0],cutOffDay=frame)
+    compErkDaysC, compErkValuesC = unmakeIndex(erkrankungenC)
+
+    futureErkC = adjustForFuture(erkrankungenC, ratiosOfFinalAvrg, frame)
+    #futureErkC = adjustForFuture(erkrankungenC, curbins24[0], frame)
+    futErkDaysC, futErkValuesC = unmakeIndex(futureErkC)
+
+    setBarValues(bargroups, [compErkValues, compErkValuesC,futErkValuesC])
+
+    #################
+
+    ratiosOfFinal = np.array(compErkValuesC) / compErkValues[:len(compErkValuesC)]
+    ratiosOfFinal = np.flip(ratiosOfFinal)
+
+    print("ratiosOfFinal")
+    print(ratiosOfFinal)
+    print("ratiosOfFinalAvrg")
+    print(ratiosOfFinalAvrg)
+
+    ratiosOfFinalList[frame]=ratiosOfFinal
+
+    filt = 0.9
+    if len(ratiosOfFinalAvrg):
+        overLen = len(ratiosOfFinal) - len(ratiosOfFinalAvrg)
+        if overLen>0:
+            ratiosOfFinalAvrg = np.concatenate((ratiosOfFinalAvrg, ratiosOfFinal[-overLen:]))
+        ratiosOfFinalAvrg = ratiosOfFinalAvrg * filt + ratiosOfFinal*(1-filt)
+    else:
+        ratiosOfFinalAvrg = ratiosOfFinal
+
+    setBarValues(axd_bargroups, [ratiosOfFinal, ratiosOfFinalAvrg])
+
 
 anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(10,dayList[-1]+2), interval=1)
 #anim.save('rki-data-inflow.gif', writer=ImageMagickWriter(fps=5))
