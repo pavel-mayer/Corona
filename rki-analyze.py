@@ -59,24 +59,34 @@ def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True
     bar_width = total_width / n_bars
 
     # List containing handles for the drawn bars, used for the legend
-    bars = []
+    bargroups = []
+    barsR = []
 
     # Iterate over all data
     for i, (name, values) in enumerate(data.items()):
         # The offset in x direction of that bar
         x_offset = (i - n_bars / 2) * bar_width + bar_width / 2
 
-        # Draw a bar for every value of that type
-        for x, y in enumerate(values):
-            bar = ax.bar(x + x_offset, y, width=bar_width * single_width, color=colors[i % len(colors)])
+        bars = []
+        #print(name)
+        #print(values[0])
+        #print(values[1])
+        for j, day in enumerate(values[0]):
+            #print(j,day)
 
+            bar = ax.bar(day + x_offset, values[1][j], width=bar_width * single_width, color=colors[i % len(colors)])
+            bars.append(bar)
+        bargroups.append(bars)
+        # Draw a bar for every value of that type
+        #for x, y in enumerate(values):
+        #    bar = ax.bar(x + x_offset, y, width=bar_width * single_width, color=colors[i % len(colors)])
         # Add a handle to the last drawn bar, which we'll need for the legend
-        bars.append(bar[0])
+        barsR.append(bar[0])
 
     # Draw legend if we need
     if legend:
-        ax.legend(bars, data.keys())
-    return bars
+        ax.legend(barsR, data.keys())
+    return bargroups
 
 
 # if __name__ == "__main__":
@@ -282,7 +292,10 @@ dayList, deadList, caseList = extractLists(byMeldedatum)
 dayListR, deadListR, caseListR = extractLists(byRefdatum)
 dayListE, deadListE, caseListE = extractLists(byErkdatum)
 
-fig, (ax,axh,axb) = plt.subplots(3,1,figsize=(16, 10))
+fig = plt.figure(figsize=(16, 10))
+
+#fig, (ax,axh,axb) = plt.subplots(3,1,figsize=(16, 10))
+ax = plt.subplot(311)
 
 ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
@@ -290,22 +303,28 @@ Mbars=ax.bar(np.array(dayList, dtype=np.float64) + 0.15, caseList, align="edge",
 Rbars=ax.bar(np.array(dayListR, dtype=np.float64) - 0.15, caseListR, align="edge", width=-0.3, color='firebrick')
 Ebars=ax.bar(dayListE, caseListE, align="center", width=0.3, color='darkorange')
 
-data = {
-    "Gemeldete Infektionen":caseList,
-    "Ohne Erkrankungsdatum":caseListR,
-    "Erkrankt am":caseListE,
-}
-plt.ylim(0,6000)
-
-bars = bar_plot(axb,data)
-
-colors = {'Gemeldete Infektionen':'royalblue', 'Ohne Erkrankungsdatum':'firebrick', 'Erkrankt am':'darkorange'}
-labels = list(colors.keys())
-handles = [plt.Rectangle((0,0),1,1, color=colors[label]) for label in labels]
+labelColors = {'Gemeldete Infektionen':'royalblue', 'Ohne Erkrankungsdatum':'firebrick', 'Erkrankt am':'darkorange'}
+labels = list(labelColors.keys())
+handles = [plt.Rectangle((0,0),1,1, color=labelColors[label]) for label in labels]
 
 ax.legend(handles, labels)
 
+axb = plt.subplot(312)
+
+data = {
+    "Gemeldete Infektionen":[dayList,caseList],
+    "Ohne Erkrankungsdatum":[dayListR,caseListR],
+    "Erkrankt am":[dayListE, caseListE],
+}
+
+colors = ['royalblue', 'firebrick', 'darkorange']
+axb.xaxis.set_major_locator(ticker.MultipleLocator(7))
+
+bargroups = bar_plot(axb,data,colors=colors)
+
 # second histogram plot
+axh = plt.subplot(313)
+
 delayList = extractDelays(byErkdatum, 100)
 allDelays = [item for sublist in delayList for item in sublist]
 print(delayList)
@@ -313,7 +332,7 @@ print(delayList)
 num_bins = 24
 # the histogram of the data
 plt.ylim(0,0.3)
-xx = np.random.randn(1000, 3)
+#xx = np.random.randn(1000, 3)
 #n, bins, patches = axh.hist(allDelays, num_bins,2, range=(0,num_bins),density=1)
 n, bins, patches = axh.hist([allDelays,allDelays], bins=num_bins,range=(0,num_bins),density=1)
 
@@ -326,12 +345,21 @@ def animate(frame):
     dayList, deadList, caseList = extractListsPartial(byMeldedatum,frame)
     dayListR, deadListR, caseListR = extractListsPartial(byRefdatum,frame)
     dayListE, deadListE, caseListE = extractListsPartial(byErkdatum,frame)
+    #print(Mbars)
     for i, b in enumerate(Mbars):
         b.set_height(caseList[i])
     for i, b in enumerate(Rbars):
         b.set_height(caseListR[i])
     for i, b in enumerate(Ebars):
         b.set_height(caseListE[i])
+
+    #print(bargroups[0])
+    for i, b in enumerate(bargroups[0]):
+        b[0].set_height(caseList[i])
+    for i, b in enumerate(bargroups[1]):
+        b[0].set_height(caseListR[i])
+    for i, b in enumerate(bargroups[2]):
+        b[0].set_height(caseListE[i])
     #print("delayList[frame]")
     #print(delayList[frame])
     delays7days = [item for sublist in delayList[frame-7:frame] for item in sublist]
@@ -346,7 +374,7 @@ def animate(frame):
         #p[1].set_height(curbins2[0][i])
 
 
-anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(10,len(dayList)), interval=1)
+anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(10,dayList[-1]+1), interval=1)
 #anim.save('rki-data-inflow.gif', writer=ImageMagickWriter(fps=5))
 #anim.save('rki-data-inflow.mp4',writer=FFMpegWriter(fps=5))
 plt.show()
