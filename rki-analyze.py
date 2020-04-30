@@ -2,6 +2,7 @@ import csv
 import json
 import urllib.request
 import time
+import copy
 from datetime import timedelta
 from datetime import datetime, date
 import numpy as np
@@ -283,6 +284,27 @@ def extractDelays(records, beforeDay):
         delayList.append(delays)
     return delayList
 
+def makeIndex(days, values):
+    result = {}
+    for i, day in enumerate(days):
+        result[day] = values[i]
+    return result
+
+def unmakeIndex(daysAndValues):
+    days = sorted(daysAndValues.keys())
+    values = []
+    for d in days:
+        values.append(daysAndValues[d])
+    return days, values
+
+def redistributed(ohneErkBeg, mitErkBeg, backDistribution):
+    result = copy.deepcopy(mitErkBeg)
+    for d in sorted (ohneErkBeg.keys()):
+        for back, dist in enumerate(backDistribution):
+            destDay = d - back
+            if destDay in result:
+                result[destDay] = result[destDay] + ohneErkBeg[d] * dist
+    return result
 
 byMeldedatum = byDate(allRecords,'Meldedatum',includePos)
 byRefdatum = byDate(allRecords,'Refdatum',includePosNoErkbeginn)
@@ -292,24 +314,29 @@ dayList, deadList, caseList = extractLists(byMeldedatum)
 dayListR, deadListR, caseListR = extractLists(byRefdatum)
 dayListE, deadListE, caseListE = extractLists(byErkdatum)
 
+ohneErkBeg = makeIndex(dayListR, caseListR)
+mitErkBeg = makeIndex(dayListE, caseListE)
+
+delayList = extractDelays(byErkdatum, 100)
+allDelays = [item for sublist in delayList for item in sublist]
+
+num_bins = 24
+allBins = np.histogram(allDelays, bins=num_bins, range=(0, num_bins), density=1)
+erkrankungen = redistributed(ohneErkBeg, mitErkBeg, allBins[0])
+compErkDays, compErkValues = unmakeIndex(erkrankungen)
+
+totalCases = np.sum(caseList)
+totalCompErk = np.sum(compErkValues)
+
+print("Meldungen {}, Errechnete Erkranungen {}".format(totalCases, totalCompErk))
+
+######################################################################
 fig = plt.figure(figsize=(16, 10))
 
-#fig, (ax,axh,axb) = plt.subplots(3,1,figsize=(16, 10))
+######################################################################
 ax = plt.subplot(311)
 
-ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
-
-Mbars=ax.bar(np.array(dayList, dtype=np.float64) + 0.15, caseList, align="edge", width=0.3, color='royalblue')
-Rbars=ax.bar(np.array(dayListR, dtype=np.float64) - 0.15, caseListR, align="edge", width=-0.3, color='firebrick')
-Ebars=ax.bar(dayListE, caseListE, align="center", width=0.3, color='darkorange')
-
-labelColors = {'Gemeldete Infektionen':'royalblue', 'Ohne Erkrankungsdatum':'firebrick', 'Erkrankt am':'darkorange'}
-labels = list(labelColors.keys())
-handles = [plt.Rectangle((0,0),1,1, color=labelColors[label]) for label in labels]
-
-ax.legend(handles, labels)
-
-axb = plt.subplot(312)
+plt.ylim(0,7000)
 
 data = {
     "Gemeldete Infektionen":[dayList,caseList],
@@ -318,63 +345,69 @@ data = {
 }
 
 colors = ['royalblue', 'firebrick', 'darkorange']
+ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
+
+ax_bargroups = bar_plot(ax,data,colors=colors)
+
+######################################################################
+axb = plt.subplot(312)
+
+plt.ylim(0,7000)
+
+data = {
+#    "Gemeldete Infektionen":[dayList,caseList],
+#    "Ohne Erkrankungsdatum":[dayListR,caseListR],
+    "Erkrankt am":[dayListE, caseListE],
+    "Berechnet Erkrankt am": [compErkDays, compErkValues],
+}
+
+colors = ['darkorange','darkseagreen']
 axb.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
 bargroups = bar_plot(axb,data,colors=colors)
 
+######################################################################
 # second histogram plot
 axh = plt.subplot(313)
 
-delayList = extractDelays(byErkdatum, 100)
-allDelays = [item for sublist in delayList for item in sublist]
-print(delayList)
-
-num_bins = 24
-# the histogram of the data
 plt.ylim(0,0.3)
-#xx = np.random.randn(1000, 3)
-#n, bins, patches = axh.hist(allDelays, num_bins,2, range=(0,num_bins),density=1)
-n, bins, patches = axh.hist([allDelays,allDelays], bins=num_bins,range=(0,num_bins),density=1)
-
-print(n)
-print(bins)
-print(patches)
+n, bins, patches = axh.hist([allDelays,allDelays,allDelays], bins=num_bins,range=(0,num_bins),density=1)
+######################################################################
 
 def animate(frame):
     print("Updating frame {}".format(frame))
     dayList, deadList, caseList = extractListsPartial(byMeldedatum,frame)
     dayListR, deadListR, caseListR = extractListsPartial(byRefdatum,frame)
     dayListE, deadListE, caseListE = extractListsPartial(byErkdatum,frame)
-    #print(Mbars)
-    for i, b in enumerate(Mbars):
-        b.set_height(caseList[i])
-    for i, b in enumerate(Rbars):
-        b.set_height(caseListR[i])
-    for i, b in enumerate(Ebars):
-        b.set_height(caseListE[i])
 
-    #print(bargroups[0])
-    for i, b in enumerate(bargroups[0]):
+    for i, b in enumerate(ax_bargroups[0]):
         b[0].set_height(caseList[i])
-    for i, b in enumerate(bargroups[1]):
+    for i, b in enumerate(ax_bargroups[1]):
         b[0].set_height(caseListR[i])
-    for i, b in enumerate(bargroups[2]):
+    for i, b in enumerate(ax_bargroups[2]):
         b[0].set_height(caseListE[i])
-    #print("delayList[frame]")
-    #print(delayList[frame])
+
+    # for i, b in enumerate(bargroups[0]):
+    #     b[0].set_height(caseList[i])
+    # for i, b in enumerate(bargroups[1]):
+    #     b[0].set_height(caseListR[i])
+    # for i, b in enumerate(bargroups[2]):
+    #     b[0].set_height(caseListE[i])
+
+
     delays7days = [item for sublist in delayList[frame-7:frame] for item in sublist]
-
     curbins=np.histogram(delays7days,bins=num_bins, range=(0,num_bins),density=1)
-    #curbins2=np.histogram(allDelays,bins=num_bins, range=(0,num_bins),density=1)
-    #print("curbins")
-    #print(curbins[0])
-    for i, p in enumerate(patches[0]):
-        #print(i)
+
+    for i, p in enumerate(patches[2]):
         p.set_height(curbins[0][i])
-        #p[1].set_height(curbins2[0][i])
 
+    delays24days = [item for sublist in delayList[frame-24:frame] for item in sublist]
+    curbins24=np.histogram(delays24days,bins=num_bins, range=(0,num_bins),density=1)
 
-anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(10,dayList[-1]+1), interval=1)
+    for i, p in enumerate(patches[1]):
+        p.set_height(curbins24[0][i])
+
+anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(10,dayList[-1]+2), interval=1)
 #anim.save('rki-data-inflow.gif', writer=ImageMagickWriter(fps=5))
 #anim.save('rki-data-inflow.mp4',writer=FFMpegWriter(fps=5))
 plt.show()
