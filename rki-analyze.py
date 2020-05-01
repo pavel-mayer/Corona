@@ -13,7 +13,7 @@ from matplotlib.animation import FFMpegWriter
 from matplotlib.animation import ImageMagickWriter
 
 
-def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True):
+def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True, legend_loc='upper left'):
     """Draws a bar plot with multiple bars per data point.
 
     Parameters
@@ -86,7 +86,8 @@ def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True
 
     # Draw legend if we need
     if legend:
-        ax.legend(barsR, data.keys())
+        ax.legend(barsR, data.keys(),loc=legend_loc)
+
     return bargroups
 
 
@@ -121,7 +122,7 @@ def retrieveRecords(offset, length):
 def retrieveAllRecords():
     ready = 0
     offset = 0
-    chunksize = 3000
+    chunksize = 5000
     records = []
     while ready == 0:
         chunk = retrieveRecords(offset, chunksize)
@@ -244,9 +245,12 @@ cases = sumField(allRecords, "AnzahlFall")
 femaleCases = sumFieldIf(allRecords,"AnzahlFall","Geschlecht","W")
 maleCases = sumFieldIf(allRecords,"AnzahlFall","Geschlecht","M")
 
+datenStand = allRecords[0]["attributes"]["Datenstand"]
+
+print("Datenstand {}".format(datenStand))
 print("Cases {} male {} female {} sum {}, dead {}".format(cases, maleCases, femaleCases, maleCases+femaleCases,dead))
 
-pretty(allRecords[0:100])
+# pretty(allRecords[0:100])
 
 def extractLists(records):
     dayList = []
@@ -376,19 +380,25 @@ print("Meldungen {}, Errechnete Erkranungen {}".format(totalCases, totalCompErk)
 scale='log'
 scale='linear'
 
+title_pos_y = 1
+title_loc = "left"
+
 fig = plt.figure(figsize=(16, 10))
 gs = fig.add_gridspec(3, 2)
+fig.suptitle('Visualisierung der Meldeverzögerung von COVID-19 Daten in Deutschland (Stand {})'.format(datenStand),
+             fontsize=16, horizontalalignment="left", x=0.05)
 ######################################################################
 #ax = plt.subplot(311)
 ax = fig.add_subplot(gs[0, :])
 
+plt.title("Meldungseingänge ({} Fälle)".format(cases), y=title_pos_y, loc=title_loc)
 plt.ylim(1,7000)
 plt.yscale(scale)
 
 ax_data = {
     "Gemeldete Infektionen":[dayList,caseList],
     "Ohne Erkrankungsdatum":[dayListR,caseListR],
-    "Erkrankt am":[dayListE, caseListE],
+    "Erkrankt":[dayListE, caseListE],
 }
 
 ax_colors = ['royalblue', 'firebrick', 'darkorange']
@@ -396,18 +406,23 @@ ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
 ax_bargroups = bar_plot(ax,ax_data,colors=ax_colors)
 
+dateText = ax.text(1, 1, 'Tag {} ({})'.format(0, dateFromDay(0)),
+        verticalalignment='top', horizontalalignment='right',
+        transform=ax.transAxes, fontsize=12,bbox=dict(boxstyle='square,pad=1', fc='yellow', ec='none'))
+
 ######################################################################
 axb = fig.add_subplot(gs[1, :])
 
+plt.title("Erkrankungen (Fälle ohne Erkrankungsdatum umverteilt nach Verspätungswahrscheinlichkeit)", y=title_pos_y, loc=title_loc)
 plt.ylim(1,7000)
 plt.yscale(scale)
 
 axb_data = {
 #    "Gemeldete Infektionen":[dayList,caseList],
 #    "Ohne Erkrankungsdatum":[dayListR,caseListR],
-    "Am Ende erkrankt am":[dayListE, caseListE],
-    "Berechnet Erkrankt am": [compErkDays, compErkValues],
-    "Hochrechnung ausstehende Erkrankte":[futErkDays, futErkValues],
+    "Berechnete Erkrankte (Stand heute)":[dayListE, [0]*len(caseListE)],
+    "Berechnete Erkrankte": [compErkDays, [0]*len(compErkValues)],
+    "Erwartete Erkrankte (Hochrechnung)":[futErkDays, [0]*len(futErkValues)],
 }
 
 axb_colors = ['tomato','green','cornflowerblue']
@@ -416,27 +431,44 @@ axb.xaxis.set_major_locator(ticker.MultipleLocator(7))
 bargroups = bar_plot(axb,axb_data,colors=axb_colors)
 
 ######################################################################
-# second histogram plot
+#  histogram plot
 axh = fig.add_subplot(gs[2, 0])
 
+plt.title("Dauer Erkrankung bis Meldung (Verspätungswahrscheinlichkeit in Tagen)", y=title_pos_y, loc=title_loc)
 plt.ylim(0,0.3)
 plt.yscale('linear')
+axh.xaxis.set_major_locator(ticker.MultipleLocator(1))
+
 
 n, bins, patches = axh.hist([allDelays,allDelays,allDelays], bins=num_bins,range=(0,num_bins),density=1)
+axh.legend(["im Gesamtzeitraum","in letzten 24 Tagen","in letzte 7 Tagen"], loc='upper right')
+
 ######################################################################
 #axd = plt.subplot(224)
 axd = fig.add_subplot(gs[2, 1:])
 
+plt.title("Vollständigkeit Erkrankungszahlen nach Tagen", y=title_pos_y, loc=title_loc)
 plt.ylim(0,1.1)
 plt.yscale('linear')
 
+num_bars = 48
 axd_data = {
-    "erfasst":[range(lastDay),[0]*lastDay],
-    "erfasstAnTag":[range(lastDay),[0]*lastDay],
+    "Aktuelle Vollständigkeit nach Tagen":[range(num_bars),[0]*num_bars],
+    "Gleitender Durchscnhitt (bis 24 Tage vor Ende)":[range(num_bars),[0]*num_bars],
 }
 axd_colors = ['plum','lime']
 
-axd_bargroups = bar_plot(axd,axd_data,colors=axd_colors)
+axd_bargroups = bar_plot(axd,axd_data,colors=axd_colors,legend_loc='lower right')
+######################################################################
+plt.subplots_adjust(left = 0.05, # the left side of the subplots of the figure
+                    right = 0.95,  # the right side of the subplots of the figure
+                    bottom = 0.05, # the bottom of the subplots of the figure
+                    top = 0.925,    # the top of the subplots of the figure
+                    wspace = 0.1, # the amount of width reserved for space between subplots,
+                                  # expressed as a fraction of the average axis width
+                    hspace = 0.3  # the amount of height reserved for space between subplots,
+                                  # expressed as a fraction of the average axis height)
+                    )
 ######################################################################
 
 def setBarValues(bargroups, valueLists):
@@ -455,6 +487,10 @@ def animate(frame):
     global ratiosOfFinalAvrg
 
     print("Updating frame {}".format(frame))
+
+    dateText.set_text('Tag {} ({})'.format(frame, dateFromDay(frame)),)
+    #################
+    # Meldungseingänge
     dayList, deadList, caseList = extractListsPartial(byMeldedatum,frame)
     dayListR, deadListR, caseListR = extractListsPartial(byRefdatum,frame)
     dayListE, deadListE, caseListE = extractListsPartial(byErkdatum,frame)
@@ -462,6 +498,7 @@ def animate(frame):
     setBarValues(ax_bargroups, [caseList, caseListR,caseListE])
 
     #################
+    # Verzögerungshistogramme
 
     delays7days = [item for sublist in delayList[frame-7:frame] for item in sublist]
     curbins=np.histogram(delays7days,bins=num_bins, range=(0,num_bins),density=1)
@@ -476,6 +513,7 @@ def animate(frame):
         p.set_height(curbins24[0][i])
 
     #################
+    # Erkrankungen
 
     erkrankungenC = redistributed(ohneErkBeg, mitErkBeg, allBins[0],cutOffDay=frame)
     compErkDaysC, compErkValuesC = unmakeIndex(erkrankungenC)
@@ -487,6 +525,7 @@ def animate(frame):
     setBarValues(bargroups, [compErkValues, compErkValuesC,futErkValuesC])
 
     #################
+    # Meldungsvollständigkeit
 
     ratiosOfFinal = np.array(compErkValuesC) / compErkValues[:len(compErkValuesC)]
     ratiosOfFinal = np.flip(ratiosOfFinal)
@@ -513,7 +552,7 @@ def animate(frame):
 
 anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(10,dayList[-1]+2), interval=1)
 #anim.save('rki-data-inflow.gif', writer=ImageMagickWriter(fps=5))
-anim.save('rki-data-inflow.mp4',writer=FFMpegWriter(fps=2))
+#anim.save('rki-data-inflow.mp4',writer=FFMpegWriter(fps=2))
 plt.show()
 
 def loadcsv():
