@@ -319,10 +319,10 @@ def redistributed(ohneErkBeg, mitErkBeg, backDistribution, cutOffDay=None):
 
 def adjustForFuture(Erkrankte, backDistribution, lastDay):
     result = copy.deepcopy(Erkrankte)
-    cumBins = np.cumsum(backDistribution)
+    #cumBins = np.cumsum(backDistribution)
     #print(cumBins)
 
-    for back, dist in enumerate(cumBins):
+    for back, dist in enumerate(backDistribution):
         destDay = lastDay - back
         if destDay in result:
             #print(dist)
@@ -373,12 +373,17 @@ totalCompErk = np.sum(compErkValues)
 print("Meldungen {}, Errechnete Erkranungen {}".format(totalCases, totalCompErk))
 
 ######################################################################
+scale='log'
+scale='linear'
+
 fig = plt.figure(figsize=(16, 10))
-
+gs = fig.add_gridspec(3, 2)
 ######################################################################
-ax = plt.subplot(221)
+#ax = plt.subplot(311)
+ax = fig.add_subplot(gs[0, :])
 
-plt.ylim(0,7000)
+plt.ylim(1,7000)
+plt.yscale(scale)
 
 ax_data = {
     "Gemeldete Infektionen":[dayList,caseList],
@@ -392,38 +397,44 @@ ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
 ax_bargroups = bar_plot(ax,ax_data,colors=ax_colors)
 
 ######################################################################
-axb = plt.subplot(222)
+axb = fig.add_subplot(gs[1, :])
 
-plt.ylim(0,7000)
+plt.ylim(1,7000)
+plt.yscale(scale)
 
 axb_data = {
 #    "Gemeldete Infektionen":[dayList,caseList],
 #    "Ohne Erkrankungsdatum":[dayListR,caseListR],
-    "Erkrankt am":[dayListE, caseListE],
+    "Am Ende erkrankt am":[dayListE, caseListE],
     "Berechnet Erkrankt am": [compErkDays, compErkValues],
     "Hochrechnung ausstehende Erkrankte":[futErkDays, futErkValues],
 }
 
-axb_colors = ['darkorange','darkseagreen','silver']
+axb_colors = ['tomato','green','cornflowerblue']
 axb.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
 bargroups = bar_plot(axb,axb_data,colors=axb_colors)
 
 ######################################################################
 # second histogram plot
-axh = plt.subplot(223)
+axh = fig.add_subplot(gs[2, 0])
 
 plt.ylim(0,0.3)
+plt.yscale('linear')
+
 n, bins, patches = axh.hist([allDelays,allDelays,allDelays], bins=num_bins,range=(0,num_bins),density=1)
 ######################################################################
-axd = plt.subplot(224)
+#axd = plt.subplot(224)
+axd = fig.add_subplot(gs[2, 1:])
+
 plt.ylim(0,1.1)
+plt.yscale('linear')
 
 axd_data = {
-    "erfasst":[range(lastDay),[0.5]*lastDay],
-    "erfasstAnTag":[range(lastDay),[0.6]*lastDay],
+    "erfasst":[range(lastDay),[0]*lastDay],
+    "erfasstAnTag":[range(lastDay),[0]*lastDay],
 }
-axd_colors = ['darkorange','darkseagreen']
+axd_colors = ['plum','lime']
 
 axd_bargroups = bar_plot(axd,axd_data,colors=axd_colors)
 ######################################################################
@@ -480,28 +491,29 @@ def animate(frame):
     ratiosOfFinal = np.array(compErkValuesC) / compErkValues[:len(compErkValuesC)]
     ratiosOfFinal = np.flip(ratiosOfFinal)
 
-    print("ratiosOfFinal")
-    print(ratiosOfFinal)
-    print("ratiosOfFinalAvrg")
-    print(ratiosOfFinalAvrg)
+    # print("ratiosOfFinal")
+    # print(ratiosOfFinal)
+    # print("ratiosOfFinalAvrg")
+    # print(ratiosOfFinalAvrg)
 
     ratiosOfFinalList[frame]=ratiosOfFinal
 
-    filt = 0.9
-    if len(ratiosOfFinalAvrg):
-        overLen = len(ratiosOfFinal) - len(ratiosOfFinalAvrg)
-        if overLen>0:
-            ratiosOfFinalAvrg = np.concatenate((ratiosOfFinalAvrg, ratiosOfFinal[-overLen:]))
-        ratiosOfFinalAvrg = ratiosOfFinalAvrg * filt + ratiosOfFinal*(1-filt)
-    else:
-        ratiosOfFinalAvrg = ratiosOfFinal
+    if frame<lastDay-24:
+        filt = 0.8
+        if len(ratiosOfFinalAvrg):
+            overLen = len(ratiosOfFinal) - len(ratiosOfFinalAvrg)
+            if overLen>0:
+                ratiosOfFinalAvrg = np.concatenate((ratiosOfFinalAvrg, ratiosOfFinal[-overLen:]))
+            ratiosOfFinalAvrg = ratiosOfFinalAvrg * filt + ratiosOfFinal*(1-filt)
+        else:
+            ratiosOfFinalAvrg = ratiosOfFinal
 
     setBarValues(axd_bargroups, [ratiosOfFinal, ratiosOfFinalAvrg])
 
 
 anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(10,dayList[-1]+2), interval=1)
 #anim.save('rki-data-inflow.gif', writer=ImageMagickWriter(fps=5))
-#anim.save('rki-data-inflow.mp4',writer=FFMpegWriter(fps=5))
+anim.save('rki-data-inflow.mp4',writer=FFMpegWriter(fps=2))
 plt.show()
 
 def loadcsv():
