@@ -147,25 +147,71 @@ def saveJson(fileName, objectToSave):
     with open(fileName, 'w') as outfile:
         json.dump(objectToSave, outfile)
 
-day0 = time.strptime("22.2.2020", "%d.%m.%Y")
-#day0 = time.strptime("22.4.2020", "%d.%m.%Y")
-day0t = time.mktime(day0)
-day0d = datetime.fromtimestamp(day0t)
+day0 = time.strptime("22.2.2020", "%d.%m.%Y") # struct_time
+day0t = time.mktime(day0) # float timestamp since epoch
+day0d = datetime.fromtimestamp(day0t) # datetime.datetime
 
-def dateFromClock(c):
+def dateFromClock(c) -> time.struct_time:
     t = time.gmtime(int(c)/1000)
     return "{}.{}.{}".format(t.tm_mday, t.tm_mon,t.tm_year)
 
-def dateFromDay(day):
-    result = day0d + timedelta(day)
-    #t = time.gmtime(int(c)/1000)
-    return "{}.{}.{}".format(result.day, result.month, result.year)
-    #t.tm_mday, t.tm_mon,t.tm_year)
+def dateFromDay(day) -> datetime:
+    return day0d + timedelta(day)
 
-def dayFromStampStr(s):
+def dateStrFromDay(day) -> str:
+    result = dateFromDay(day)
+    return "{}.{}.{}".format(result.day, result.month, result.year)
+
+def dayFromDate(date) -> int:
+    delta = date - day0d
+    return delta.days
+
+def dayFromTime(t) -> int:
+    return dayFromDate(datetime.fromtimestamp(time.mktime(t)))
+
+def dayFromStampStr(s) -> int:
     d = datetime.fromtimestamp(int(s) / 1000)
     delta = d - day0d
     return delta.days
+
+FeiertagDates = ["10.4.2020", "13.4.2020", "1.5.2020"]
+Feiertage = [dayFromTime(time.strptime(f, "%d.%m.%Y")) for f in FeiertagDates]
+
+print("Feiertage",Feiertage)
+
+def daysWorkedOrNot(fromDay, toDay) -> ([bool], [int]):
+    workDays = []
+    consecutiveDays = []
+
+    for day in range(fromDay,toDay):
+        date = dateFromDay(day)
+        dayOfWeek = date.weekday() # 0=Mo, 6= So
+        isFeiertag = day in Feiertage
+        isAWorkDay = dayOfWeek>=0 and dayOfWeek <=4 and not isFeiertag
+        workDays.append(isAWorkDay)
+
+    if workDays[0]:
+        consecutiveDay = dateFromDay(0).weekday()
+    else:
+        consecutiveDay = dateFromDay(0).weekday() - 5
+
+    wasWorkDay = workDays[0]
+    consecutiveDays.append(consecutiveDay)
+    for day in range(fromDay+1,toDay):
+        if workDays[day] == wasWorkDay:
+            consecutiveDay = consecutiveDay + 1
+        else:
+            wasWorkDay = workDays[day]
+            consecutiveDay = 0
+        consecutiveDays.append(consecutiveDay)
+
+    return (workDays, consecutiveDays)
+
+def kindOfDayIndex(day, workDays, consecutiveDays):
+    if workDays[day]:
+        return consecutiveDays[day]
+    else:
+        return consecutiveDays[day]+5
 
 def sumField(records,fieldName):
     result = 0
@@ -204,6 +250,10 @@ def includeAll(day,attrs):
 
 def includePos(day,attrs):
     return day >= 0
+
+def includePosErkbeginnDiffers(day,attrs):
+    mDay = dayFromStampStr(attrs['Meldedatum'])
+    return day >= 0 and int(attrs['IstErkrankungsbeginn']) == 1 and mDay != day
 
 def includePosErkbeginn(day,attrs):
     return day >= 0 and int(attrs['IstErkrankungsbeginn']) == 1
@@ -250,7 +300,7 @@ datenStand = allRecords[0]["attributes"]["Datenstand"]
 print("Datenstand {}".format(datenStand))
 print("Cases {} male {} female {} sum {}, dead {}".format(cases, maleCases, femaleCases, maleCases+femaleCases,dead))
 
-# pretty(allRecords[0:100])
+#pretty(allRecords[0:100])
 
 def extractLists(records):
     dayList = []
@@ -288,6 +338,24 @@ def extractDelays(records, beforeDay):
         delayList.append(delays)
     return delayList
 
+# returns an array of length 9 containing lists of delays for each day category
+def extractDelaysBinned(records, beforeDay, kindOfDay):
+    delayBins = {}
+
+    for d in sorted(records.keys()):
+        for r in records[d]:
+            attrs = r['attributes']
+            meldedatum = dayFromStampStr(attrs["Meldedatum"])
+            if meldedatum < beforeDay:
+                erkdatum = dayFromStampStr(attrs["Refdatum"])
+                bod = kindOfDay[meldedatum]
+                delay = meldedatum - erkdatum
+                if bod in delayBins:
+                    delayBins[bod].append(delay)
+                else:
+                    delayBins[bod] = [delay]
+    return delayBins
+
 def makeIndex(days, values):
     result = {}
     for i, day in enumerate(days):
@@ -305,16 +373,39 @@ def redistributed(ohneErkBeg, mitErkBeg, backDistribution, cutOffDay=None):
     #result = copy.deepcopy(mitErkBeg)
     result = {}
 
+    # copy all Erkrankungen with date into result
     for d in sorted (mitErkBeg.keys()):
         if cutOffDay != None:
-            if d > cutOffDay:
+            if d >= cutOffDay:
                 break
         result[d]=mitErkBeg[d]
 
     for d in sorted (ohneErkBeg.keys()):
         if cutOffDay != None:
-            if d > cutOffDay:
+            if d >= cutOffDay:
                 return result
+        for back, dist in enumerate(backDistribution):
+            destDay = d - back
+            if destDay in result:
+                result[destDay] = result[destDay] + ohneErkBeg[d] * dist
+    return result
+
+def redistributedByDayKind(ohneErkBeg, mitErkBeg, backDistributions, kindOfDay, cutOffDay=None):
+    result = {}
+
+    print("backDistributions",backDistributions)
+    # copy all Erkrankungen with date into result
+    for d in sorted (mitErkBeg.keys()):
+        if cutOffDay != None:
+            if d >= cutOffDay:
+                break
+        result[d]=mitErkBeg[d]
+
+    for d in sorted (ohneErkBeg.keys()):
+        if cutOffDay != None:
+            if d >= cutOffDay:
+                return result
+        backDistribution = backDistributions[kindOfDay[d]]
         for back, dist in enumerate(backDistribution):
             destDay = d - back
             if destDay in result:
@@ -337,21 +428,47 @@ byMeldedatum = byDate(allRecords,'Meldedatum',includePos)
 lastDay = sorted(byMeldedatum.keys())[-1]
 byRefdatum = byDate(allRecords,'Refdatum',includePosNoErkbeginn)
 byErkdatum = byDate(allRecords,'Refdatum',includePosErkbeginn)
+#byErkdatum = byDate(allRecords,'Refdatum',includePosErkbeginnDiffers)
 
 dayList, deadList, caseList = extractLists(byMeldedatum)
 dayListR, deadListR, caseListR = extractLists(byRefdatum)
 dayListE, deadListE, caseListE = extractLists(byErkdatum)
 
 ########################################################
+def normalized(a, axis=-1, order=2):
+    l2 = np.atleast_1d(np.linalg.norm(a, order, axis))
+    l2[l2==0] = 1
+    return a / np.expand_dims(l2, axis)
+
+num_bins = 24
+
+workDays, consecutiveDays = daysWorkedOrNot(0, lastDay+1)
+
+print(tuple(zip(workDays, consecutiveDays)))
+
+kindOfDay = [kindOfDayIndex(day, workDays, consecutiveDays) for day in range(len(workDays))]
+print(kindOfDay)
+
+dayCategoryNames = ["w0","w1","w2","w3","w4","h0","h1","h2","h3"]
+
+binnedDelaysDict = extractDelaysBinned(byErkdatum, 1000, kindOfDay)
+delaysByDayKind=[]
+delaysByDayKindHist=[]
+for d in range(9):
+    bd = binnedDelaysDict[d]
+    bdh = np.histogram(bd, bins=num_bins, range=(0, num_bins), density=1)
+    delaysByDayKind.append(bd)
+    delaysByDayKindHist.append(bdh[0])
+    print("{}: avrg={} count={}".format(dayCategoryNames[d],np.average(bd), len(bd)))
+
+########################################################
 # redistribute cases with unknown erk-date
+delayList = extractDelays(byErkdatum, 1000)
+allDelays = [item for sublist in delayList for item in sublist]
 
 ohneErkBeg = makeIndex(dayListR, caseListR)
 mitErkBeg = makeIndex(dayListE, caseListE)
 
-delayList = extractDelays(byErkdatum, 100)
-allDelays = [item for sublist in delayList for item in sublist]
-
-num_bins = 24
 allBins = np.histogram(allDelays, bins=num_bins, range=(0, num_bins), density=1)
 
 delays24days = [item for sublist in delayList[lastDay - 24:lastDay] for item in sublist]
@@ -359,6 +476,9 @@ last24bins = np.histogram(delays24days, bins=num_bins, range=(0, num_bins), dens
 
 erkrankungen = redistributed(ohneErkBeg, mitErkBeg, allBins[0])
 compErkDays, compErkValues = unmakeIndex(erkrankungen)
+
+erkrankungen2 = redistributedByDayKind(ohneErkBeg, mitErkBeg, delaysByDayKindHist, kindOfDay)
+compErkDays2, compErkValues2 = unmakeIndex(erkrankungen2)
 
 futureErk = adjustForFuture(erkrankungen, last24bins[0], lastDay)
 futErkDays, futErkValues = unmakeIndex(futureErk)
@@ -384,7 +504,7 @@ title_pos_y = 1
 title_loc = "left"
 
 fig = plt.figure(figsize=(16, 10))
-gs = fig.add_gridspec(3, 2)
+gs = fig.add_gridspec(4, 2)
 fig.suptitle('Visualisierung der Meldeverzögerung von COVID-19 Daten in Deutschland (Stand {})'.format(datenStand),
              fontsize=16, horizontalalignment="left", x=0.05)
 ######################################################################
@@ -406,9 +526,9 @@ ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
 ax_bargroups = bar_plot(ax,ax_data,colors=ax_colors)
 
-dateText = ax.text(1, 1, 'Tag {} ({})'.format(0, dateFromDay(0)),
-        verticalalignment='top', horizontalalignment='right',
-        transform=ax.transAxes, fontsize=12,bbox=dict(boxstyle='square,pad=1', fc='yellow', ec='none'))
+dateText = ax.text(1, 1, 'Tag {} ({})'.format(0, dateStrFromDay(0)),
+                   verticalalignment='top', horizontalalignment='right',
+                   transform=ax.transAxes, fontsize=12, bbox=dict(boxstyle='square,pad=1', fc='yellow', ec='none'))
 
 ######################################################################
 axb = fig.add_subplot(gs[1, :])
@@ -420,12 +540,14 @@ plt.yscale(scale)
 axb_data = {
 #    "Gemeldete Infektionen":[dayList,caseList],
 #    "Ohne Erkrankungsdatum":[dayListR,caseListR],
-    "Berechnete Erkrankte (Stand heute)":[dayListE, [0]*len(caseListE)],
+    "Berechnete Erkrankte (Stand heute)":[compErkDays, compErkValues],
+    "Berechnete Erkrankte 2 (Stand heute)":[compErkDays2, compErkValues2],
     "Berechnete Erkrankte": [compErkDays, [0]*len(compErkValues)],
     "Erwartete Erkrankte (Hochrechnung)":[futErkDays, [0]*len(futErkValues)],
 }
+print("compErkValues2",compErkValues2)
 
-axb_colors = ['tomato','green','cornflowerblue']
+axb_colors = ['tomato','green','cornflowerblue','yellow']
 axb.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
 bargroups = bar_plot(axb,axb_data,colors=axb_colors)
@@ -442,9 +564,20 @@ axh.xaxis.set_major_locator(ticker.MultipleLocator(1))
 
 n, bins, patches = axh.hist([allDelays,allDelays,allDelays], bins=num_bins,range=(0,num_bins),density=1)
 axh.legend(["im Gesamtzeitraum","in letzten 24 Tagen","in letzte 7 Tagen"], loc='upper right')
+######################################################################
+#  histogram plot 2
+axbd = fig.add_subplot(gs[3, :])
+
+plt.title("Dauer Erkrankung bis Meldung (Verspätungswahrscheinlichkeit in Tagen) nach Tagesart", y=title_pos_y, loc=title_loc)
+plt.ylim(0,0.15)
+plt.yscale('linear')
+axbd.xaxis.set_major_locator(ticker.MultipleLocator(1))
+
+
+nbd, binsbd, patchesbd = axbd.hist(delaysByDayKind, bins=num_bins, range=(0, num_bins), density=1)
+axbd.legend(dayCategoryNames, loc='upper right')
 
 ######################################################################
-#axd = plt.subplot(224)
 axd = fig.add_subplot(gs[2, 1:])
 
 plt.title("Vollständigkeit Erkrankungszahlen nach Tagen", y=title_pos_y, loc=title_loc)
@@ -483,12 +616,16 @@ ratiosOfFinalList = {}
 
 ratiosOfFinalAvrg = []
 
+def initAnimation():
+    global ratiosOfFinalAvrg
+    ratiosOfFinalAvrg = []
+
 def animate(frame):
     global ratiosOfFinalAvrg
 
     print("Updating frame {}".format(frame))
 
-    dateText.set_text('Tag {} ({})'.format(frame, dateFromDay(frame)),)
+    dateText.set_text('Tag {} ({})'.format(frame, dateStrFromDay(frame)), )
     #################
     # Meldungseingänge
     dayList, deadList, caseList = extractListsPartial(byMeldedatum,frame)
@@ -521,8 +658,9 @@ def animate(frame):
     futureErkC = adjustForFuture(erkrankungenC, ratiosOfFinalAvrg, frame)
     #futureErkC = adjustForFuture(erkrankungenC, curbins24[0], frame)
     futErkDaysC, futErkValuesC = unmakeIndex(futureErkC)
+    print("futErkValuesC", futErkValuesC[-7:])
 
-    setBarValues(bargroups, [compErkValues, compErkValuesC,futErkValuesC])
+    setBarValues(bargroups, [compErkValues, compErkValues2, compErkValuesC,futErkValuesC])
 
     #################
     # Meldungsvollständigkeit
@@ -550,9 +688,12 @@ def animate(frame):
     setBarValues(axd_bargroups, [ratiosOfFinal, ratiosOfFinalAvrg])
 
 
-anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(10,dayList[-1]+2), interval=1)
-#anim.save('rki-data-inflow.gif', writer=ImageMagickWriter(fps=5))
-#anim.save('rki-data-inflow.mp4',writer=FFMpegWriter(fps=2))
+anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(1,dayList[-1]+2), interval=1, init_func=initAnimation)
+#anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(10,dayList[-1]+2), interval=1)
+#anim=FuncAnimation(fig,animate,repeat=False,blit=False,frames=range(0,1), interval=1)
+
+#anim.save('rki-data-inflow-'+scale+'.gif', writer=ImageMagickWriter(fps=1))
+#anim.save('rki-data-inflow.mp4',writer=FFMpegWriter(fps=1))
 plt.show()
 
 def loadcsv():
