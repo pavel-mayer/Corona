@@ -162,6 +162,12 @@ def dateStrFromDay(day) -> str:
     result = dateFromDay(day)
     return "{}.{}.{}".format(result.day, result.month, result.year)
 
+
+def dateStrWDMFromDay(day) -> str:
+    weekDay = ["Mo","Di","Mi","Do","Fr","Sa","So"]
+    result = dateFromDay(day)
+    return "{}, {}.{}".format(weekDay[result.weekday()],result.day, result.month, result.year)
+
 def dayFromDate(date) -> int:
     delta = date - day0d
     return delta.days
@@ -235,6 +241,20 @@ def sumFieldIfDateBefore(records,fieldToSum, dateField, beforeDay):
             result = result + int(attrs[fieldToSum])
     return result
 
+def sumFieldbyDayKind(records, fieldToSum, dateField, kindOfDay, dateRange=None, filter=None):
+    result = [0]*9
+    for r in records:
+        attrs = r['attributes']
+        day = dayFromStampStr(attrs[dateField])
+        #print("day", day)
+        if day in range(len(kindOfDay)):
+            #print("day1",day)
+            if dateRange is None or day in dateRange:
+                #print("day2", day)
+                if filter is None or filter(day, attrs):
+                    result[kindOfDay[day]] = result[kindOfDay[day]] + int(attrs[fieldToSum])
+    return result
+
 def delaysList(records,beforeDay):
     result = []
     for r in records:
@@ -251,14 +271,14 @@ def includeAll(day,attrs):
 def includePos(day,attrs):
     return day >= 0
 
-def includePosErkbeginnDiffers(day,attrs):
+def onlyeErkBeginDiffers(day, attrs):
     mDay = dayFromStampStr(attrs['Meldedatum'])
     return day >= 0 and int(attrs['IstErkrankungsbeginn']) == 1 and mDay != day
 
-def includePosErkbeginn(day,attrs):
+def onlyErkBegin(day, attrs):
     return day >= 0 and int(attrs['IstErkrankungsbeginn']) == 1
 
-def includePosNoErkbeginn(day,attrs):
+def onlyNoErkBegin(day, attrs):
     return day >= 0 and int(attrs['IstErkrankungsbeginn']) == 0
 
 def byDate(records, whichDate, filterFunc):
@@ -393,7 +413,7 @@ def redistributed(ohneErkBeg, mitErkBeg, backDistribution, cutOffDay=None):
 def redistributedByDayKind(ohneErkBeg, mitErkBeg, backDistributions, kindOfDay, cutOffDay=None):
     result = {}
 
-    print("backDistributions",backDistributions)
+    #print("backDistributions",backDistributions)
     # copy all Erkrankungen with date into result
     for d in sorted (mitErkBeg.keys()):
         if cutOffDay != None:
@@ -426,8 +446,8 @@ def adjustForFuture(Erkrankte, backDistribution, lastDay):
 
 byMeldedatum = byDate(allRecords,'Meldedatum',includePos)
 lastDay = sorted(byMeldedatum.keys())[-1]
-byRefdatum = byDate(allRecords,'Refdatum',includePosNoErkbeginn)
-byErkdatum = byDate(allRecords,'Refdatum',includePosErkbeginn)
+byRefdatum = byDate(allRecords,'Refdatum', onlyNoErkBegin)
+byErkdatum = byDate(allRecords,'Refdatum', onlyErkBegin)
 #byErkdatum = byDate(allRecords,'Refdatum',includePosErkbeginnDiffers)
 
 dayList, deadList, caseList = extractLists(byMeldedatum)
@@ -444,13 +464,42 @@ num_bins = 24
 
 workDays, consecutiveDays = daysWorkedOrNot(0, lastDay+1)
 
-print(tuple(zip(workDays, consecutiveDays)))
+#print(tuple(zip(workDays, consecutiveDays)))
 
 kindOfDay = [kindOfDayIndex(day, workDays, consecutiveDays) for day in range(len(workDays))]
-print(kindOfDay)
+
+occuranceOfKindOfDay= [0]*9
+for day in range(len(workDays)):
+    occuranceOfKindOfDay[kindOfDay[day]] = occuranceOfKindOfDay[kindOfDay[day]]+1
 
 dayCategoryNames = ["w0","w1","w2","w3","w4","h0","h1","h2","h3"]
 
+def relativeOccurence(records,occurenceField,dateField,filter=None):
+    occByDayOfWeek = sumFieldbyDayKind(records, occurenceField, dateField, kindOfDay, filter=filter)
+    #print(tuple(zip(dayCategoryNames, occByDayOfWeek)))
+
+    occByDayOfWeekRel = np.divide(occByDayOfWeek, occuranceOfKindOfDay)
+    result = occByDayOfWeekRel / np.sum(occByDayOfWeekRel)
+    #print("relativeOccurence", result)
+    return result
+
+casesByDayOfWeekDistr=relativeOccurence(allRecords,"AnzahlFall","Meldedatum")
+erkByDayOfWeekDistr=relativeOccurence(allRecords,"AnzahlFall","Refdatum", onlyErkBegin)
+noErkByDayOfWeekDistr=relativeOccurence(allRecords,"AnzahlFall","Refdatum", onlyNoErkBegin)
+
+def equalize(days,cases,occurences):
+    result = []
+    for i, d in enumerate(days):
+        occurence = occurences[kindOfDay[d]]
+        factor = (1/9) / occurence
+        #print(d,len(days),len(cases))
+        result.append(cases[i]*factor)
+    return result
+
+caseListREq=equalize(dayListR,caseListR,noErkByDayOfWeekDistr)
+ohneErkBegEq=makeIndex(dayListR, caseListREq)
+
+########################################################
 binnedDelaysDict = extractDelaysBinned(byErkdatum, 1000, kindOfDay)
 delaysByDayKind=[]
 delaysByDayKindHist=[]
@@ -471,13 +520,15 @@ mitErkBeg = makeIndex(dayListE, caseListE)
 
 allBins = np.histogram(allDelays, bins=num_bins, range=(0, num_bins), density=1)
 
-delays24days = [item for sublist in delayList[lastDay - 24:lastDay] for item in sublist]
+delays24days = [item for sublist in delayList[lastDay - 31:lastDay-24] for item in sublist]
 last24bins = np.histogram(delays24days, bins=num_bins, range=(0, num_bins), density=1)
 
-erkrankungen = redistributed(ohneErkBeg, mitErkBeg, allBins[0])
+#erkrankungen = redistributed(ohneErkBeg, mitErkBeg, allBins[0])
+erkrankungen = redistributed(ohneErkBegEq, mitErkBeg, last24bins[0])
 compErkDays, compErkValues = unmakeIndex(erkrankungen)
 
-erkrankungen2 = redistributedByDayKind(ohneErkBeg, mitErkBeg, delaysByDayKindHist, kindOfDay)
+#erkrankungen2 = redistributedByDayKind(ohneErkBeg, mitErkBeg, delaysByDayKindHist, kindOfDay)
+erkrankungen2 = redistributed(ohneErkBegEq, mitErkBeg, last24bins[0])
 compErkDays2, compErkValues2 = unmakeIndex(erkrankungen2)
 
 futureErk = adjustForFuture(erkrankungen, last24bins[0], lastDay)
@@ -494,7 +545,7 @@ print(last24bins[0])
 totalCases = np.sum(caseList)
 totalCompErk = np.sum(compErkValues)
 
-print("Meldungen {}, Errechnete Erkranungen {}".format(totalCases, totalCompErk))
+print("Meldungen {}, Errechnete Erkrankungen {}".format(totalCases, totalCompErk))
 
 ######################################################################
 scale='log'
@@ -518,11 +569,18 @@ plt.yscale(scale)
 ax_data = {
     "Gemeldete Infektionen":[dayList,caseList],
     "Ohne Erkrankungsdatum":[dayListR,caseListR],
+    "Ohne Erk.datum eq.": [dayListR, caseListREq],
     "Erkrankt":[dayListE, caseListE],
 }
 
-ax_colors = ['royalblue', 'firebrick', 'darkorange']
+ax_colors = ['royalblue', 'firebrick', 'darkgreen','darkorange']
 ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
+
+dateRange = range(0,lastDay+7,7)
+dates = [dateStrWDMFromDay(day) for day in dateRange]
+print(dates)
+
+plt.xticks(dateRange, dates)
 
 ax_bargroups = bar_plot(ax,ax_data,colors=ax_colors)
 
@@ -545,7 +603,7 @@ axb_data = {
     "Berechnete Erkrankte": [compErkDays, [0]*len(compErkValues)],
     "Erwartete Erkrankte (Hochrechnung)":[futErkDays, [0]*len(futErkValues)],
 }
-print("compErkValues2",compErkValues2)
+#print("compErkValues2",compErkValues2)
 
 axb_colors = ['tomato','green','cornflowerblue','yellow']
 axb.xaxis.set_major_locator(ticker.MultipleLocator(7))
@@ -566,7 +624,7 @@ n, bins, patches = axh.hist([allDelays,allDelays,allDelays], bins=num_bins,range
 axh.legend(["im Gesamtzeitraum","in letzten 24 Tagen","in letzte 7 Tagen"], loc='upper right')
 ######################################################################
 #  histogram plot 2
-axbd = fig.add_subplot(gs[3, :])
+axbd = fig.add_subplot(gs[3, 0])
 
 plt.title("Dauer Erkrankung bis Meldung (Verspätungswahrscheinlichkeit in Tagen) nach Tagesart", y=title_pos_y, loc=title_loc)
 plt.ylim(0,0.15)
@@ -576,6 +634,28 @@ axbd.xaxis.set_major_locator(ticker.MultipleLocator(1))
 
 nbd, binsbd, patchesbd = axbd.hist(delaysByDayKind, bins=num_bins, range=(0, num_bins), density=1)
 axbd.legend(dayCategoryNames, loc='upper right')
+######################################################################
+#  histogram plot 3 / wochentagsverteilung
+axw = fig.add_subplot(gs[3, 1:])
+
+plt.title("Häufigkeit nach Tagesart", y=title_pos_y, loc=title_loc)
+plt.ylim(0,0.15)
+plt.yscale('linear')
+
+axw_data = {
+    "Fälle":[range(0,9), casesByDayOfWeekDistr],
+    "Erkrankungen":[range(9), erkByDayOfWeekDistr],
+    "ohne Erkr.datum": [range(9), noErkByDayOfWeekDistr],
+}
+
+axw_colors = ['tomato','green','cornflowerblue']
+#axw.xaxis.set_major_locator(ticker.MultipleLocator(1))
+#axw.xaxis.set_major_locator(ticker.MaxNLocator(9))
+#axw.set_xticklabels(dayCategoryNames)
+
+plt.xticks(range(9), dayCategoryNames)
+
+axw_bargroups = bar_plot(axw,axw_data,colors=axw_colors,legend_loc='lower right')
 
 ######################################################################
 axd = fig.add_subplot(gs[2, 1:])
@@ -632,7 +712,10 @@ def animate(frame):
     dayListR, deadListR, caseListR = extractListsPartial(byRefdatum,frame)
     dayListE, deadListE, caseListE = extractListsPartial(byErkdatum,frame)
 
-    setBarValues(ax_bargroups, [caseList, caseListR,caseListE])
+    caseListREqN = equalize(dayListR, caseListR, noErkByDayOfWeekDistr)
+    print("caseListREqN",caseListREqN)
+    setBarValues(ax_bargroups, [caseList, caseListR, caseListREqN, caseListE])
+    #setBarValues(ax_bargroups, [caseList, caseListR, caseListR, caseListE])
 
     #################
     # Verzögerungshistogramme
@@ -652,7 +735,8 @@ def animate(frame):
     #################
     # Erkrankungen
 
-    erkrankungenC = redistributed(ohneErkBeg, mitErkBeg, allBins[0],cutOffDay=frame)
+    erkrankungenC = redistributed(ohneErkBegEq, mitErkBeg, last24bins[0],cutOffDay=frame)
+    #erkrankungenC = redistributed(ohneErkBeg, mitErkBeg, allBins[0],cutOffDay=frame)
     compErkDaysC, compErkValuesC = unmakeIndex(erkrankungenC)
 
     futureErkC = adjustForFuture(erkrankungenC, ratiosOfFinalAvrg, frame)
