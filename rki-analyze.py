@@ -12,8 +12,48 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.animation import FFMpegWriter
 from matplotlib.animation import ImageMagickWriter
 
+def autolabel(ax, bars, color, label_range):
+    """
+    Attach a text label above each bar displaying its height
+    """
+    labels = []
+    for i, bar in enumerate(bars):
+        rect = bar[0]
+        if i in label_range:
+            height = rect.get_height()
+            labels.append(ax.text(rect.get_x() + rect.get_width()/2., 1.00*height,
+                    '  %d' % int(height),
+                    ha='center', va='bottom', fontsize=5, rotation=90, color = color))
+        else:
+            labels.append(None)
+    return labels
 
-def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True, legend_loc='upper left'):
+def update_labels(bargroups, labelgroups, valueLists):
+    for vi, values in enumerate(valueLists):
+        labels = labelgroups[vi]
+        if labels is not None:
+            for i, b in enumerate(bargroups[vi]):
+                if i < len(labels) and labels[i] is not None and i < len(values):
+                    height = b[0].get_height()
+                    labels[i].set_text('  %d' % values[i])
+                    xpos = b[0].get_x() + b[0].get_width()/2.0
+                    ypos = 1.00*height
+                    labels[i].set_position((xpos, ypos))
+                    b[0].set_height(values[i])
+                else:
+                    b[0].set_height(0)
+
+def setBarValuesAndLabels(bargroups, labelgroups, valueLists):
+    for vi, values in enumerate(valueLists):
+        for i, b in enumerate(bargroups[vi]):
+            if i < len(values):
+                b[0].set_height(values[i])
+            else:
+                b[0].set_height(0)
+    update_labels(bargroups, labelgroups, valueLists)
+
+
+def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True, legend_loc='upper left', label_groups_range=None, label_range=None):
     """Draws a bar plot with multiple bars per data point.
 
     Parameters
@@ -62,6 +102,7 @@ def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True
     # List containing handles for the drawn bars, used for the legend
     bargroups = []
     barsR = []
+    label_groups = []
 
     # Iterate over all data
     for i, (name, values) in enumerate(data.items()):
@@ -74,9 +115,13 @@ def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True
         #print(values[1])
         for j, day in enumerate(values[0]):
             #print(j,day)
-
-            bar = ax.bar(day + x_offset, values[1][j], width=bar_width * single_width, color=colors[i % len(colors)])
+            color = colors[i % len(colors)]
+            bar = ax.bar(day + x_offset, values[1][j], width=bar_width * single_width, color=color)
             bars.append(bar)
+        if label_groups_range is not None and i in label_groups_range:
+            label_groups.append(autolabel(ax, bars, color, label_range))
+        else:
+            label_groups.append(None)
         bargroups.append(bars)
         # Draw a bar for every value of that type
         #for x, y in enumerate(values):
@@ -88,7 +133,7 @@ def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True
     if legend:
         ax.legend(barsR, data.keys(),loc=legend_loc)
 
-    return bargroups
+    return bargroups, label_groups
 
 
 # if __name__ == "__main__":
@@ -106,6 +151,25 @@ def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True
 #     bar_plot(ax, data, total_width=.8, single_width=.9)
 #     plt.show()
 
+def saveCsv(filename, records):
+    print("saveCsv: Saving "+filename)
+    csv_columns = list(records[0]["attributes"].keys())
+    for data in records:
+        record = data["attributes"]
+        for attr in record:
+            if not attr in csv_columns:
+                csv_columns.append(attr)
+    #print(csv_columns)
+
+    try:
+        with open(filename, 'w') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
+            writer.writeheader()
+            for data in records:
+                record = data["attributes"]
+                writer.writerow(record)
+    except IOError:
+        print("I/O error")
 
 def pretty(jsonmap):
     print(json.dumps(jsonmap, sort_keys=False, indent=4, separators=(',', ': ')))
@@ -139,11 +203,13 @@ def retrieveAllRecords():
     return records
 
 def loadJson(fileName):
+    print("loadJson: Loading "+fileName)
     with open(fileName, 'r') as openfile:
         json_object = json.load(openfile)
         return json_object
 
 def saveJson(fileName, objectToSave):
+    print("saveJson: Saving "+fileName)
     with open(fileName, 'w') as outfile:
         json.dump(objectToSave, outfile)
 
@@ -151,9 +217,15 @@ day0 = time.strptime("22.2.2020", "%d.%m.%Y") # struct_time
 day0t = time.mktime(day0) # float timestamp since epoch
 day0d = datetime.fromtimestamp(day0t) # datetime.datetime
 
-def dateFromClock(c) -> time.struct_time:
-    t = time.gmtime(int(c)/1000)
+weekDay = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+def dateStrFromStampStr(s) -> str:
+    t = time.gmtime(int(s)/1000) #time.struct_time
     return "{}.{}.{}".format(t.tm_mday, t.tm_mon,t.tm_year)
+
+def dateTimeStrFromStampStr(s) -> str:
+    t = time.gmtime(int(s)/1000) #time.struct_time
+    return "{0},{1:02d}.{2:02d}.{3} {4:02d}:{5:02d}".format(weekDay[t.tm_wday], t.tm_mday, t.tm_mon,t.tm_year,t.tm_hour, t.tm_min)
 
 def dateFromDay(day) -> datetime:
     return day0d + timedelta(day)
@@ -162,9 +234,15 @@ def dateStrFromDay(day) -> str:
     result = dateFromDay(day)
     return "{}.{}.{}".format(result.day, result.month, result.year)
 
+def dateStrYMDFromDay(day) -> str:
+    result = dateFromDay(day)
+    return "{0:04d}-{1:02d}-{2:02d}".format(result.year, result.month, result.day)
+
+def dateStrDMFromDay(day) -> str:
+    result = dateFromDay(day)
+    return "{}.{}".format(result.day,result.month)
 
 def dateStrWDMFromDay(day) -> str:
-    weekDay = ["Mo","Di","Mi","Do","Fr","Sa","So"]
     result = dateFromDay(day)
     return "{}, {}.{}".format(weekDay[result.weekday()],result.day, result.month, result.year)
 
@@ -179,6 +257,9 @@ def dayFromStampStr(s) -> int:
     d = datetime.fromtimestamp(int(s) / 1000)
     delta = d - day0d
     return delta.days
+
+def todayDay():
+    return dayFromTime(time.localtime())
 
 FeiertagDates = ["10.4.2020", "13.4.2020", "1.5.2020"]
 Feiertage = [dayFromTime(time.strptime(f, "%d.%m.%Y")) for f in FeiertagDates]
@@ -219,6 +300,28 @@ def kindOfDayIndex(day, workDays, consecutiveDays):
     else:
         return consecutiveDays[day]+5
 
+def addDates(records):
+    cases = 0
+    dead = 0
+    sameDay = 0
+    for data in records:
+        record = data["attributes"]
+        record["RefdatumKlar"] = dateTimeStrFromStampStr(record["Refdatum"])
+        record["RefdatumTag"] = dayFromStampStr(record["Refdatum"])
+        record["MeldedatumKlar"] = dateTimeStrFromStampStr(record["Meldedatum"])
+        record["MeldedatumTag"] = dayFromStampStr(record["Meldedatum"])
+        cases = cases + int(record["AnzahlFall"])
+        dead = dead + int(record["AnzahlTodesfall"])
+        record["AnzahlFallLfd"] = cases
+        record["AnzahlTodesfallLfd"] = dead
+        if int(record["IstErkrankungsbeginn"]):
+            if record["RefdatumTag"] == record["MeldedatumTag"]:
+                print(record)
+                sameDay = sameDay + 1
+
+    print("sameDay", sameDay)
+    return records
+
 def sumField(records,fieldName):
     result = 0
     for r in records:
@@ -229,8 +332,9 @@ def sumFieldIf(records,fieldToSum, ifField, ifFieldIs):
     result = 0
     for r in records:
         attrs = r['attributes']
-        if attrs[ifField] == ifFieldIs:
-            result = result + int(attrs[fieldToSum])
+        if ifField in attrs:
+            if attrs[ifField] == ifFieldIs:
+                result = result + int(attrs[fieldToSum])
     return result
 
 def sumFieldIfDateBefore(records,fieldToSum, dateField, beforeDay):
@@ -297,15 +401,165 @@ def byDate(records, whichDate, filterFunc):
 
 print("day0={} {}".format(day0, day0t))
 
+# def cleanup(jsondump):
+#     records = []
+#     for chunk in jsondump:
+#         newRecords = chunk['features']
+#         records = records + newRecords
+#     return records
+#
+# f1=cleanup(loadJson("archive/api_raw_2020-05-03-02-30.json"))
+# pretty(f1[:10])
+# saveJson("archive/rki-3.5.json",f1)
+# f2=cleanup(loadJson("archive/api_raw_2020-05-01-08-34.json"))
+# saveJson("archive/rki-1.5.json",f2)
+
+def archiveFilename(day):
+    return "archive/NPGEO-RKI-{}.json".format(dateStrYMDFromDay(day))
+
+def deltaJsonFilename(day):
+    return "delta/NPGEO-RKI-delta-{}.json".format(dateStrYMDFromDay(day))
+
+def csvFilename(day,kind,dir):
+    return "{}/NPGEO-RKI-{}-{}.csv".format(dir, dateStrYMDFromDay(day),kind)
+
 allRecords = []
 
 update = False
-fileName = "latest-rki.json"
 if update:
     allRecords = retrieveAllRecords()
-    saveJson(fileName, allRecords)
-else:
-    allRecords = loadJson(fileName)
+    saveJson("dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json", allRecords)
+    saveJson(archiveFilename(todayDay()), allRecords)
+
+
+
+def dateRecords(currentRecords, currentDay, globalID):
+    totalCases = 0
+    totalNewCases = 0
+    totalDeaths = 0
+    totalNewDeaths = 0
+    newRecords = []
+    oldRecords = []
+    newCaseRecords = []
+    oldCaseRecords = []
+    newDeathRecords = []
+    oldDeathRecords = []
+
+    for record in currentRecords:
+        attrs = record['attributes']
+        attrs['globalID']=globalID
+        globalID = globalID + 1
+        attrs['RefDay']=dayFromStampStr(attrs["Refdatum"])
+        attrs['MeldeDay']=dayFromStampStr(attrs["Meldedatum"])
+        if int(attrs["IstErkrankungsbeginn"]):
+            attrs['ErkDay'] = dayFromStampStr(attrs["Refdatum"])
+
+        neuerFall = int(attrs['NeuerFall'])
+        neuerFallNurHeute = neuerFall == 1
+        neuerFallNurGestern = neuerFall == -1
+        neuerFallGesternUndHeute = neuerFall == 0
+        cases = int(attrs['AnzahlFall'])
+        if neuerFallNurHeute or neuerFallGesternUndHeute:
+            totalCases = totalCases+cases
+
+        if neuerFallNurHeute or neuerFallNurGestern:
+            totalNewCases = totalNewCases+cases
+            newCaseRecords.append(record)
+            newRecords.append(record)
+
+        if neuerFallGesternUndHeute:
+            # assume this is an old case
+            attrs['newBeforeDay'] = currentDay - 1
+            oldCaseRecords.append(record)
+            oldRecords.append(record)
+
+        if neuerFallNurHeute:
+            attrs['newOnDay'] = currentDay
+
+        if neuerFallNurGestern:
+            attrs['newOnDay'] = currentDay - 1
+
+        neuerTodesfall = int(attrs['NeuerTodesfall'])
+        neuerTodesfallNurHeute = neuerTodesfall == 1
+        neuerTodesfallNurGestern = neuerTodesfall == -1
+        neuerTodesfallGesternUndHeute = neuerTodesfall == 0
+        keinTodesfall = neuerTodesfall == -9
+        deaths = int(attrs['AnzahlTodesfall'])
+
+        if neuerTodesfallNurHeute or neuerTodesfallGesternUndHeute:
+            totalDeaths = totalDeaths+deaths
+        if neuerTodesfallNurHeute or neuerTodesfallNurGestern:
+            totalNewDeaths = totalNewDeaths+deaths
+            newDeathRecords.append(record)
+            if newRecords[-1] != record:
+                newRecords.append(record)
+        if neuerTodesfallGesternUndHeute:
+            attrs['newDeathBeforeDay'] = currentDay - 1
+            oldDeathRecords.append(record)
+            if oldRecords[-1] != record:
+                oldRecords.append(record)
+        if neuerTodesfallNurHeute:
+            attrs['newDeathOnDay'] = currentDay
+        if neuerTodesfallNurGestern:
+            attrs['newDeathOnDay'] = currentDay - 1
+
+    print("Day {}, {}, cases={}, newCases={}, deaths={}, newDeaths={} newRecords={}".format(
+        currentDay, dateStrFromDay(currentDay),totalCases,totalNewCases,totalDeaths,totalNewDeaths,len(newCaseRecords)))
+
+    print("Day {}, {}, oldRecords={} newRecords={} oldCaseRecords={} newCaseRecords={} oldDeathRecords={} newDeathRecords={}".format(
+        currentDay, dateStrFromDay(currentDay), len(oldRecords),len(newRecords), len(oldCaseRecords),len(newCaseRecords),
+        len(oldDeathRecords),len(newDeathRecords)))
+
+    return globalID, oldRecords, newRecords, oldCaseRecords, newCaseRecords, oldDeathRecords, newDeathRecords
+
+
+def loadRecords():
+    firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
+    lastRecordTime = time.localtime()  # struct_time
+    firstRecordDay = dayFromTime(firstRecordTime)
+    lastRecordDay = dayFromTime(lastRecordTime)
+
+    allDatedRecords = []
+    globalID = 1
+    for day in range(firstRecordDay, lastRecordDay+1):
+        currentRecords = loadJson(archiveFilename(day))
+        globalID, oldRecords, newRecords, oldCaseRecords, newCaseRecords, oldDeathRecords, newDeathRecords =\
+            dateRecords(currentRecords, day, globalID)
+        print("newRecords {} allDatedRecords {}".format(len(newRecords), len(allDatedRecords)))
+
+        if day == firstRecordDay:
+            allDatedRecords = allDatedRecords + currentRecords
+        else:
+            allDatedRecords = allDatedRecords + newRecords
+
+        # saveCsv(csvFilename(day,"old","debug"),oldRecords)
+        # saveCsv(csvFilename(day, "new", "debug"), newRecords)
+        # saveCsv(csvFilename(day, "oldDeaths", "debug"), oldDeathRecords)
+        # saveCsv(csvFilename(day, "newDeaths", "debug"), newDeathRecords)
+        casesinResult = sumField(newRecords, "AnzahlFall")
+        casesinResultToday = sumFieldIf(newRecords, "AnzahlFall","newOnDay",day)
+        casesinResultYesterday = sumFieldIf(newRecords, "AnzahlFall","newOnDay",day-1)
+        deadinResult = sumField(newDeathRecords, "AnzahlTodesfall")
+        deadinResultToday = sumFieldIf(newDeathRecords, "AnzahlTodesfall","newDeathOnDay",day)
+        deadinResultYesterday = sumFieldIf(newDeathRecords, "AnzahlTodesfall","newDeathOnDay",day-1)
+        print("In result: Cases {} today {} yday {}, dead {} today {} yday {} allDatedRecords {}".format(
+            casesinResult, casesinResultToday, casesinResultYesterday, deadinResult,
+            deadinResultToday,deadinResultYesterday,len(allDatedRecords)))
+    return allDatedRecords
+
+allRecords =loadRecords()
+saveJson("full-latest.json",allRecords)
+saveCsv("full-latest.csv", allRecords)
+
+casesinResult = sumField(allRecords, "AnzahlFall")
+deadinResult = sumField(allRecords, "AnzahlTodesfall")
+
+print("In allRecords: Cases {} dead {} records {}".format(casesinResult, deadinResult, len(allRecords)))
+
+exit(0)
+
+addDates(allRecords)
+save_csv(allRecords, "latest-rki.csv")
 
 print("Loaded {} records".format(len(allRecords)))
 
@@ -314,11 +568,12 @@ cases = sumField(allRecords, "AnzahlFall")
 
 femaleCases = sumFieldIf(allRecords,"AnzahlFall","Geschlecht","W")
 maleCases = sumFieldIf(allRecords,"AnzahlFall","Geschlecht","M")
+genderUnknownCases = sumFieldIf(allRecords,"AnzahlFall","Geschlecht","unbekannt")
 
 datenStand = allRecords[0]["attributes"]["Datenstand"]
 
 print("Datenstand {}".format(datenStand))
-print("Cases {} male {} female {} sum {}, dead {}".format(cases, maleCases, femaleCases, maleCases+femaleCases,dead))
+print("Cases {} male {} female {} gender-unknown {} sum {}, dead {}".format(cases, maleCases, femaleCases, genderUnknownCases, maleCases+femaleCases+genderUnknownCases,dead))
 
 #pretty(allRecords[0:100])
 
@@ -563,7 +818,7 @@ fig.suptitle('Visualisierung der Meldeverzögerung von COVID-19 Daten in Deutsch
 ax = fig.add_subplot(gs[0, :])
 
 plt.title("Meldungseingänge ({} Fälle)".format(cases), y=title_pos_y, loc=title_loc)
-plt.ylim(1,7000)
+plt.ylim(1,8000)
 plt.yscale(scale)
 
 ax_data = {
@@ -582,7 +837,7 @@ print(dates)
 
 plt.xticks(dateRange, dates)
 
-ax_bargroups = bar_plot(ax,ax_data,colors=ax_colors)
+ax_bargroups, ax_labelgroups = bar_plot(ax,ax_data,colors=ax_colors,label_groups_range=[0,3], label_range=range(lastDay+1))
 
 dateText = ax.text(1, 1, 'Tag {} ({})'.format(0, dateStrFromDay(0)),
                    verticalalignment='top', horizontalalignment='right',
@@ -592,23 +847,23 @@ dateText = ax.text(1, 1, 'Tag {} ({})'.format(0, dateStrFromDay(0)),
 axb = fig.add_subplot(gs[1, :])
 
 plt.title("Erkrankungen (Fälle ohne Erkrankungsdatum umverteilt nach Verspätungswahrscheinlichkeit)", y=title_pos_y, loc=title_loc)
-plt.ylim(1,7000)
+plt.ylim(1,8000)
 plt.yscale(scale)
 
 axb_data = {
 #    "Gemeldete Infektionen":[dayList,caseList],
 #    "Ohne Erkrankungsdatum":[dayListR,caseListR],
-    "Berechnete Erkrankte (Stand heute)":[compErkDays, compErkValues],
+#    "Berechnete Erkrankte (Stand heute)":[compErkDays, compErkValues],
     "Berechnete Erkrankte 2 (Stand heute)":[compErkDays2, compErkValues2],
     "Berechnete Erkrankte": [compErkDays, [0]*len(compErkValues)],
     "Erwartete Erkrankte (Hochrechnung)":[futErkDays, [0]*len(futErkValues)],
 }
 #print("compErkValues2",compErkValues2)
 
-axb_colors = ['tomato','green','cornflowerblue','yellow']
+axb_colors = ['tomato','green','cornflowerblue']
 axb.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
-bargroups = bar_plot(axb,axb_data,colors=axb_colors)
+bargroups, labelgroups = bar_plot(axb,axb_data,colors=axb_colors, label_groups_range=[2], label_range=range(lastDay+1))
 
 ######################################################################
 #  histogram plot
@@ -618,7 +873,6 @@ plt.title("Dauer Erkrankung bis Meldung (Verspätungswahrscheinlichkeit in Tagen
 plt.ylim(0,0.3)
 plt.yscale('linear')
 axh.xaxis.set_major_locator(ticker.MultipleLocator(1))
-
 
 n, bins, patches = axh.hist([allDelays,allDelays,allDelays], bins=num_bins,range=(0,num_bins),density=1)
 axh.legend(["im Gesamtzeitraum","in letzten 24 Tagen","in letzte 7 Tagen"], loc='upper right')
@@ -631,7 +885,6 @@ plt.ylim(0,0.15)
 plt.yscale('linear')
 axbd.xaxis.set_major_locator(ticker.MultipleLocator(1))
 
-
 nbd, binsbd, patchesbd = axbd.hist(delaysByDayKind, bins=num_bins, range=(0, num_bins), density=1)
 axbd.legend(dayCategoryNames, loc='upper right')
 ######################################################################
@@ -639,7 +892,7 @@ axbd.legend(dayCategoryNames, loc='upper right')
 axw = fig.add_subplot(gs[3, 1:])
 
 plt.title("Häufigkeit nach Tagesart", y=title_pos_y, loc=title_loc)
-plt.ylim(0,0.15)
+plt.ylim(0,0.18)
 plt.yscale('linear')
 
 axw_data = {
@@ -655,7 +908,7 @@ axw_colors = ['tomato','green','cornflowerblue']
 
 plt.xticks(range(9), dayCategoryNames)
 
-axw_bargroups = bar_plot(axw,axw_data,colors=axw_colors,legend_loc='lower right')
+axw_bargroups, axw_labelgroups= bar_plot(axw,axw_data,colors=axw_colors,legend_loc='lower right')
 
 ######################################################################
 axd = fig.add_subplot(gs[2, 1:])
@@ -671,7 +924,7 @@ axd_data = {
 }
 axd_colors = ['plum','lime']
 
-axd_bargroups = bar_plot(axd,axd_data,colors=axd_colors,legend_loc='lower right')
+axd_bargroups, axd_labelgroups  = bar_plot(axd,axd_data,colors=axd_colors,legend_loc='lower right')
 ######################################################################
 plt.subplots_adjust(left = 0.05, # the left side of the subplots of the figure
                     right = 0.95,  # the right side of the subplots of the figure
@@ -714,7 +967,7 @@ def animate(frame):
 
     caseListREqN = equalize(dayListR, caseListR, noErkByDayOfWeekDistr)
     print("caseListREqN",caseListREqN)
-    setBarValues(ax_bargroups, [caseList, caseListR, caseListREqN, caseListE])
+    setBarValuesAndLabels(ax_bargroups, ax_labelgroups, [caseList, caseListR, caseListREqN, caseListE])
     #setBarValues(ax_bargroups, [caseList, caseListR, caseListR, caseListE])
 
     #################
@@ -744,7 +997,7 @@ def animate(frame):
     futErkDaysC, futErkValuesC = unmakeIndex(futureErkC)
     print("futErkValuesC", futErkValuesC[-7:])
 
-    setBarValues(bargroups, [compErkValues, compErkValues2, compErkValuesC,futErkValuesC])
+    setBarValuesAndLabels(bargroups, labelgroups, [compErkValues2, compErkValuesC,futErkValuesC])
 
     #################
     # Meldungsvollständigkeit
