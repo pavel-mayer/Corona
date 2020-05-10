@@ -38,11 +38,9 @@ last7days=fullTable[dt.f.newCaseOnDay>lastDay-7,:][:,
    dt.by(dt.f.Landkreis)]
 last7days.names=["Landkreis","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage","TodesfaellePro100kLetzte7Tage"]
 
-Landkreise = last7days[:,'Landkreis'].to_list()[0]
-#print(Landkreise)
-Faelle = last7days[:,'AnzahlFallLetzte7Tage'].to_list()[0]
-
-last7daysDict=dict(zip(Landkreise, Faelle))
+last7Landkreise = last7days[:, 'Landkreis'].to_list()[0]
+last7Faelle = last7days[:, 'AnzahlFallLetzte7Tage'].to_list()[0]
+last7daysDict=dict(zip(last7Landkreise, last7Faelle))
 
 pretty(last7daysDict)
 
