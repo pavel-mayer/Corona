@@ -321,6 +321,47 @@ def addDates(records):
     # print("sameDay", sameDay)
     return records
 
+def loadLandkreisBeveolkerung(fileName="Landkreise-Bevoelkerung.csv"):
+    result = {}
+    with open(fileName, newline='') as csvfile:
+        reader = csv.DictReader(csvfile, delimiter=';')
+        for i, row in enumerate(reader):
+            #print(row)
+            LandkreisID = int(row['LandkreisID'])
+            BevoelkerungStr = row['Bevoelkerung']
+            if BevoelkerungStr != "-":
+                result[LandkreisID] = int(BevoelkerungStr)
+    return result
+
+def addLandkreisData(records):
+    Bevoelkerung = loadLandkreisBeveolkerung()
+    print(Bevoelkerung)
+    missingIds = []
+    missingNames = []
+    for data in records:
+        record = data["attributes"]
+        Landkreis = record["Landkreis"]
+        IdLandkreis = int(record["IdLandkreis"])
+        #print(record)
+        #print(record["IdLandkreis"])
+        if IdLandkreis in Bevoelkerung:
+            KreisBevoelkerung = Bevoelkerung[IdLandkreis]
+            record["Bevoelkerung"] = KreisBevoelkerung
+            record["FaellePro100k"] = record["AnzahlFall"]*100000/KreisBevoelkerung
+            record["TodesfaellePro100k"] = record["AnzahlTodesfall"]*100000/KreisBevoelkerung
+            isStadt = Landkreis[:2] != "LK"
+            record["isStadt"] = int(isStadt)
+
+        else:
+            if IdLandkreis not in missingIds:
+                missingIds.append(IdLandkreis)
+                missingNames.append(Landkreis)
+    #print(missingIds)
+    #print(missingNames)
+    return records
+
+Bevoelkerung = loadLandkreisBeveolkerung()
+
 def sumField(records,fieldName):
     result = 0
     for r in records:
@@ -424,13 +465,11 @@ def csvFilename(day,kind,dir):
 
 allRecords = []
 
-update = False
-if update:
+UPDATE = False
+if UPDATE:
     allRecords = retrieveAllRecords()
     saveJson("dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json", allRecords)
     saveJson(archiveFilename(todayDay()), allRecords)
-
-
 
 def dateRecords(currentRecords, currentDay, globalID):
     totalCases = 0
@@ -514,7 +553,7 @@ def dateRecords(currentRecords, currentDay, globalID):
 
 def loadRecords():
     firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
-    lastRecordTime = time.strptime("9.5.2020", "%d.%m.%Y")  # struct_time
+    lastRecordTime = time.strptime("10.5.2020", "%d.%m.%Y")  # struct_time
     #lastRecordTime = time.localtime()  # struct_time
     firstRecordDay = dayFromTime(firstRecordTime)
     lastRecordDay = dayFromTime(lastRecordTime)
@@ -547,15 +586,19 @@ def loadRecords():
             deadinResultToday,deadinResultYesterday,len(allDatedRecords)))
     return allDatedRecords
 
-REFRESH=False
+REFRESH= False or UPDATE
 if REFRESH:
     allRecords = loadRecords()
     addDates(allRecords)
+    addLandkreisData(allRecords)
 
     saveJson("full-latest.json",allRecords)
     saveCsv("full-latest.csv", allRecords)
 else:
     allRecords = loadJson("full-latest.json")
+
+addLandkreisData(allRecords)
+saveCsv("full-latest.csv", allRecords)
 
 casesinResult = sumField(allRecords, "AnzahlFall")
 deadinResult = sumField(allRecords, "AnzahlTodesfall")
