@@ -11,6 +11,7 @@ import matplotlib.ticker as ticker
 from matplotlib.animation import FuncAnimation
 from matplotlib.animation import FFMpegWriter
 from matplotlib.animation import ImageMagickWriter
+import datatable as dt
 
 def autolabel(ax, bars, color, label_range):
     """
@@ -307,19 +308,17 @@ def addDates(records):
     for data in records:
         record = data["attributes"]
         record["RefdatumKlar"] = dateTimeStrFromStampStr(record["Refdatum"])
-        record["RefdatumTag"] = dayFromStampStr(record["Refdatum"])
         record["MeldedatumKlar"] = dateTimeStrFromStampStr(record["Meldedatum"])
-        record["MeldedatumTag"] = dayFromStampStr(record["Meldedatum"])
         cases = cases + int(record["AnzahlFall"])
         dead = dead + int(record["AnzahlTodesfall"])
         record["AnzahlFallLfd"] = cases
         record["AnzahlTodesfallLfd"] = dead
-        if int(record["IstErkrankungsbeginn"]):
-            if record["RefdatumTag"] == record["MeldedatumTag"]:
-                print(record)
-                sameDay = sameDay + 1
-
-    print("sameDay", sameDay)
+    #     if int(record["IstErkrankungsbeginn"]):
+    #         if record["RefdatumTag"] == record["MeldedatumTag"]:
+    #             print(record)
+    #             sameDay = sameDay + 1
+    #
+    # print("sameDay", sameDay)
     return records
 
 def sumField(records,fieldName):
@@ -469,15 +468,15 @@ def dateRecords(currentRecords, currentDay, globalID):
 
         if neuerFallGesternUndHeute:
             # assume this is an old case
-            attrs['newBeforeDay'] = currentDay - 1
+            attrs['newCaseBeforeDay'] = currentDay - 1
             oldCaseRecords.append(record)
             oldRecords.append(record)
 
         if neuerFallNurHeute:
-            attrs['newOnDay'] = currentDay
+            attrs['newCaseOnDay'] = currentDay
 
         if neuerFallNurGestern:
-            attrs['newOnDay'] = currentDay - 1
+            attrs['newCaseOnDay'] = currentDay - 1
 
         neuerTodesfall = int(attrs['NeuerTodesfall'])
         neuerTodesfallNurHeute = neuerTodesfall == 1
@@ -515,7 +514,8 @@ def dateRecords(currentRecords, currentDay, globalID):
 
 def loadRecords():
     firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
-    lastRecordTime = time.localtime()  # struct_time
+    lastRecordTime = time.strptime("9.5.2020", "%d.%m.%Y")  # struct_time
+    #lastRecordTime = time.localtime()  # struct_time
     firstRecordDay = dayFromTime(firstRecordTime)
     lastRecordDay = dayFromTime(lastRecordTime)
 
@@ -537,8 +537,8 @@ def loadRecords():
         # saveCsv(csvFilename(day, "oldDeaths", "debug"), oldDeathRecords)
         # saveCsv(csvFilename(day, "newDeaths", "debug"), newDeathRecords)
         casesinResult = sumField(newRecords, "AnzahlFall")
-        casesinResultToday = sumFieldIf(newRecords, "AnzahlFall","newOnDay",day)
-        casesinResultYesterday = sumFieldIf(newRecords, "AnzahlFall","newOnDay",day-1)
+        casesinResultToday = sumFieldIf(newRecords, "AnzahlFall","newCaseOnDay",day)
+        casesinResultYesterday = sumFieldIf(newRecords, "AnzahlFall","newCaseOnDay",day-1)
         deadinResult = sumField(newDeathRecords, "AnzahlTodesfall")
         deadinResultToday = sumFieldIf(newDeathRecords, "AnzahlTodesfall","newDeathOnDay",day)
         deadinResultYesterday = sumFieldIf(newDeathRecords, "AnzahlTodesfall","newDeathOnDay",day-1)
@@ -547,19 +547,20 @@ def loadRecords():
             deadinResultToday,deadinResultYesterday,len(allDatedRecords)))
     return allDatedRecords
 
-allRecords =loadRecords()
-saveJson("full-latest.json",allRecords)
-saveCsv("full-latest.csv", allRecords)
+REFRESH=False
+if REFRESH:
+    allRecords = loadRecords()
+    addDates(allRecords)
+
+    saveJson("full-latest.json",allRecords)
+    saveCsv("full-latest.csv", allRecords)
+else:
+    allRecords = loadJson("full-latest.json")
 
 casesinResult = sumField(allRecords, "AnzahlFall")
 deadinResult = sumField(allRecords, "AnzahlTodesfall")
 
 print("In allRecords: Cases {} dead {} records {}".format(casesinResult, deadinResult, len(allRecords)))
-
-exit(0)
-
-addDates(allRecords)
-save_csv(allRecords, "latest-rki.csv")
 
 print("Loaded {} records".format(len(allRecords)))
 
@@ -574,8 +575,25 @@ datenStand = allRecords[0]["attributes"]["Datenstand"]
 
 print("Datenstand {}".format(datenStand))
 print("Cases {} male {} female {} gender-unknown {} sum {}, dead {}".format(cases, maleCases, femaleCases, genderUnknownCases, maleCases+femaleCases+genderUnknownCases,dead))
-
 #pretty(allRecords[0:100])
+##########################################################
+
+fullTable = dt.fread("full-latest.csv")
+print(fullTable.keys())
+cases = fullTable[:,'AnzahlFall'].sum()
+dead = fullTable[:,'AnzahlTodesfall'].sum()
+
+newTable=fullTable[:,dt.f[:].extend({"erkMeldeDelay": dt.f.MeldeDay-dt.f.RefDay})]
+print(newTable.keys())
+
+slices = fullTable[:,['AnzahlFall','AnzahlTodesfall']].sum()
+print(slices)
+slices2 = fullTable[dt.f.MeldeDay>=0,:][:,dt.sum(dt.f.AnzahlFall),dt.by(dt.f.MeldeDay)]
+print(slices2)
+print(slices2.to_dict())
+
+
+##########################################################
 
 def extractLists(records):
     dayList = []
