@@ -40,24 +40,23 @@ last7days.names=["Landkreis","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage",
 
 def merge(largerTable, smallerTable, keyFieldName):
     keys = smallerTable[:, keyFieldName].to_list()[0]
-    last7Faelle = last7days[:, 'AnzahlFallLetzte7Tage'].to_list()[0]
-    last7daysDict = dict(zip(keys, last7Faelle))
+    extTable = largerTable.copy()
+    for colName in smallerTable.names:
+        if colName != keyFieldName:
+            values = smallerTable[:, colName].to_list()[0]
+            valuesDict = dict(zip(keys, values))
 
-    extTable = largerTable[:, dt.f[:].extend({"AnzahlFallLetzte7Tage": 0})]
+            extTable = extTable[:, dt.f[:].extend({colName: 0.0})]
 
-    for i, lk in enumerate(extTable[:,keyFieldName].to_list()[0]):
-        if lk in last7daysDict:
-            extTable[i,"AnzahlFallLetzte7Tage"] = last7daysDict[lk]
-        print("lk",lk)
+            for i, lk in enumerate(extTable[:,keyFieldName].to_list()[0]):
+                if lk in valuesDict:
+                    extTable[i,colName] = valuesDict[lk]
+                print("lk",lk)
     return extTable
 
-# last7Landkreise = last7days[:, 'Landkreis'].to_list()[0]
-# last7Faelle = last7days[:, 'AnzahlFallLetzte7Tage'].to_list()[0]
-# last7daysDict=dict(zip(last7Landkreise, last7Faelle))
-
-
-
-#pretty(last7daysDict)
+def reorder(desiredOrder):
+    result = 0
+    return result
 
 lastWeek7days=fullTable[(dt.f.newCaseOnDay > lastDay-14) & (dt.f.newCaseOnDay<=lastDay-7),:][:,
           [dt.sum(dt.f.AnzahlFall),
@@ -67,20 +66,9 @@ lastWeek7days=fullTable[(dt.f.newCaseOnDay > lastDay-14) & (dt.f.newCaseOnDay<=l
    dt.by(dt.f.Landkreis)]
 lastWeek7days.names=["Landkreis","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor","AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
 
-allDaysExt = merge(alldays, last7days, "Landkreis")
+allDaysExt0 = merge(alldays, last7days, "Landkreis")
+allDaysExt = merge(allDaysExt0, lastWeek7days, "Landkreis")
 
-# allDaysExt = alldays[:,dt.f[:].extend(last7days)]
-#
-# #allDaysExt = alldays[:,dt.f[:].extend({"AnzahlFallLetzte7Tage": last7daysDict[dt.f.Landkreis] if dt.f.Landkreis in last7daysDict.keys() else 0})]
-# allDaysExt = alldays[:,dt.f[:].extend({"AnzahlFallLetzte7Tage": 0})]
-#
-# for i, lk in enumerate(alldays[:,'Landkreis'].to_list()[0]):
-#     if lk in last7daysDict:
-#         allDaysExt[i,"AnzahlFallLetzte7Tage"] = last7daysDict[lk]
-#     print("lk",lk)
-#
-# print(last7days)
-# print(alldays)
 
 fig = go.Figure(data=[go.Table(
     header=dict(values=allDaysExt.keys(),
