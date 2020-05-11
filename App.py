@@ -73,32 +73,32 @@ def loadAndProcessData(dataFilename):
 
     #dt.by(dt.f.Bundesland)]
     alldays=fullTable[:,
-              [dt.sum(dt.f.AnzahlFall),
+              [dt.sum(dt.f.AnzahlFallPos),
                dt.sum(dt.f.FaellePro100k),
-               dt.sum(dt.f.AnzahlTodesfall),
+               dt.sum(dt.f.AnzahlTodesfallPos),
                dt.sum(dt.f.TodesfaellePro100k),
                dt.mean(dt.f.Bevoelkerung)],
-       dt.by(dt.f.Landkreis)]
+       dt.by(dt.f.LandkreisName)]
 
     last7days=fullTable[dt.f.newCaseOnDay>lastDay-7,:][:,
-              [dt.sum(dt.f.AnzahlFall),
+              [dt.sum(dt.f.AnzahlFallPos),
                dt.sum(dt.f.FaellePro100k),
-               dt.sum(dt.f.AnzahlTodesfall),
+               dt.sum(dt.f.AnzahlTodesfallPos),
                dt.sum(dt.f.TodesfaellePro100k)],
-       dt.by(dt.f.Landkreis)]
-    last7days.names=["Landkreis","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage","TodesfaellePro100kLetzte7Tage"]
+       dt.by(dt.f.LandkreisName)]
+    last7days.names=["LandkreisName","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage","TodesfaellePro100kLetzte7Tage"]
 
     ## todo: increase when more data here
     lastWeek7days=fullTable[(dt.f.newCaseOnDay > lastDay-13) & (dt.f.newCaseOnDay<=lastDay-6),:][:,
-              [dt.sum(dt.f.AnzahlFall),
+              [dt.sum(dt.f.AnzahlFallPos),
                dt.sum(dt.f.FaellePro100k),
-               dt.sum(dt.f.AnzahlTodesfall),
+               dt.sum(dt.f.AnzahlTodesfallPos),
                dt.sum(dt.f.TodesfaellePro100k)],
-       dt.by(dt.f.Landkreis)]
-    lastWeek7days.names=["Landkreis","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor","AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
+       dt.by(dt.f.LandkreisName)]
+    lastWeek7days.names=["LandkreisName","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor","AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
 
-    allDaysExt0 = merge(alldays, last7days, "Landkreis")
-    allDaysExt1 = merge(allDaysExt0, lastWeek7days, "Landkreis")
+    allDaysExt0 = merge(alldays, last7days, "LandkreisName")
+    allDaysExt1 = merge(allDaysExt0, lastWeek7days, "LandkreisName")
 
     Rw = dt.f.AnzahlFallLetzte7Tage/dt.f.AnzahlFallLetzte7TageDavor
 
@@ -108,16 +108,22 @@ def loadAndProcessData(dataFilename):
 
     allDaysExt=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/6.25/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
 
-    # print(list(enumerate(allDaysExt.names)))
+    print("Column names frame order:",list(enumerate(allDaysExt.names)))
 
     data=allDaysExt.to_pandas()
     return data
 
+# [(0, 'Landkreis'), (1, 'AnzahlFall'), (2, 'FaellePro100k'), (3, 'AnzahlTodesfall'), (4, 'TodesfaellePro100k'),
+# (5, 'Bevoelkerung'), (6, 'AnzahlFallLetzte7Tage'), (7, 'FaellePro100kLetzte7Tage'), (8, 'AnzahlTodesfallLetzte7Tage'),
+# (9, 'TodesfaellePro100kLetzte7Tage'), (10, 'AnzahlFallLetzte7TageDavor'), (11, 'FaellePro100kLetzte7TageDavor'),
+# (12, 'AnzahlTodesfallLetzte7TageDavor'),(13, 'TodesfaellePro100kLetzte7TageDavor'), (14, 'AnzahlFallTrend'),
+# (15, 'FaellePro100kTrend'), (16, 'TodesfaellePro100kTrend'), (17, 'Kontaktrisiko')]
+
 def makeColumns():
-    desiredOrder = [(0, 'Landkreis', ['Kreis','Name'],'text',Format()),
+    desiredOrder = [(0, 'LandkreisName', ['Kreis','Name'],'text',Format()),
                     (5, 'Bevoelkerung', ['Kreis','Einwohner'],'numeric',FormatInt),
                     (17, 'Kontaktrisiko', ['Kreis','Risiko 1:N'],'numeric',FormatInt),
-                    (1, 'AnzahlFall', ['Fälle','total'],'numeric',FormatInt),
+                    (1, 'AnzahlFallPos', ['Fälle','total'],'numeric',FormatInt),
                     (6, 'AnzahlFallLetzte7Tage', ['Fälle','letzte Woche'] ,'numeric',FormatInt),
                     (14, 'AnzahlFallTrend', ['Fälle','R'] ,'numeric',FormatFixed2),
                     (10, 'AnzahlFallLetzte7TageDavor',['Fälle','vorletzte Woche'],'numeric',FormatInt),
@@ -125,7 +131,7 @@ def makeColumns():
                     (15, 'FaellePro100kTrend',['Fälle je 100000','Differenz'] ,'numeric',FormatFixed1),
                     (7, 'FaellePro100kLetzte7Tage',['Fälle je 100000','letzte Woche'] ,'numeric',FormatFixed1),
                     (11, 'FaellePro100kLetzte7TageDavor', ['Fälle je 100000','vorletzte Woche'],'numeric',FormatFixed1),
-                    (3, 'AnzahlTodesfall', ['Todesfälle','total'],'numeric',FormatInt),
+                    (3, 'AnzahlTodesfallPos', ['Todesfälle','total'],'numeric',FormatInt),
                     (8, 'AnzahlTodesfallLetzte7Tage', ['Todesfälle','letzte Woche'],'numeric',FormatInt),
                     (12, 'AnzahlTodesfallLetzte7TageDavor', ['Todesfälle','vorletzte Woche'],'numeric',FormatInt),
                     (4, 'TodesfaellePro100k', ['Todesfälle je 100000','total'],'numeric',FormatFixed2),
@@ -157,7 +163,9 @@ app = dash.Dash(
 fullTableFilename = "full-latest.csv"
 cacheFilename = "data-cached.feather"
 
-if not os.path.isfile(cacheFilename) or os.path.getmtime(fullTableFilename) > os.path.getmtime(cacheFilename):
+FORCE_REFRESH_CACHE = True
+
+if FORCE_REFRESH_CACHE or not os.path.isfile(cacheFilename) or os.path.getmtime(fullTableFilename) > os.path.getmtime(cacheFilename) :
     dframe = loadAndProcessData(fullTableFilename)
     dframe.to_feather(cacheFilename)
 else:
@@ -174,6 +182,7 @@ app.layout = dash_table.DataTable(
     data=data,
     sort_action='native',
     page_size= 500,
+    sort_by = [{"column_id": "Kontaktrisiko", "direction": "asc"}],
 #    fixed_rows={ 'headers': True, 'data': 0 },
     style_cell={'textAlign': 'right',
                 'padding': '5px',
@@ -182,7 +191,7 @@ app.layout = dash_table.DataTable(
     },
     style_cell_conditional=[
         {
-            'if': {'column_id': 'Landkreis'},
+            'if': {'column_id': 'LandkreisName'},
             'textAlign': 'left'
         }
     ],
@@ -195,7 +204,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{FaellePro100kLetzte7Tage} < 1',
-                'column_id': ['FaellePro100kLetzte7Tage', 'Landkreis']
+                'column_id': ['FaellePro100kLetzte7Tage', 'LandkreisName']
             },
             'backgroundColor': 'green',
             'fontWeight': 'bold',
@@ -204,7 +213,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{FaellePro100kLetzte7Tage} >= 1 && {FaellePro100kLetzte7Tage} < 5',
-                'column_id': ['FaellePro100kLetzte7Tage', 'Landkreis']
+                'column_id': ['FaellePro100kLetzte7Tage', 'LandkreisName']
             },
             #            'backgroundColor': 'tomato',
             'fontWeight': 'bold',
@@ -213,7 +222,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{FaellePro100kLetzte7Tage} > 10 && {FaellePro100kLetzte7Tage} < 20',
-                'column_id': ['FaellePro100kLetzte7Tage','Landkreis']
+                'column_id': ['FaellePro100kLetzte7Tage','LandkreisName']
             },
             #            'backgroundColor': 'tomato',
             'fontWeight': 'bold',
@@ -222,7 +231,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{FaellePro100kLetzte7Tage} > 20 && {FaellePro100kLetzte7Tage} < 50',
-                'column_id': ['FaellePro100kLetzte7Tage','Landkreis']
+                'column_id': ['FaellePro100kLetzte7Tage','LandkreisName']
             },
             #            'backgroundColor': 'tomato',
             'fontWeight': 'bold',
@@ -231,7 +240,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{FaellePro100kLetzte7Tage} > 50',
-                'column_id': ['FaellePro100kLetzte7Tage','Landkreis']
+                'column_id': ['FaellePro100kLetzte7Tage','LandkreisName']
             },
             'fontWeight': 'bold',
             'backgroundColor': 'firebrick',
@@ -281,7 +290,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{Kontaktrisiko} > 0 && {Kontaktrisiko} < 100',
-                'column_id': ['Kontaktrisiko','Landkreis']
+                'column_id': ['Kontaktrisiko','LandkreisName']
             },
             'fontWeight': 'bold',
             'backgroundColor': 'firebrick',
@@ -290,7 +299,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{Kontaktrisiko} >= 100 && {Kontaktrisiko} < 1000',
-                'column_id': ['Kontaktrisiko','Landkreis']
+                'column_id': ['Kontaktrisiko','LandkreisName']
             },
             'fontWeight': 'bold',
             # 'backgroundColor': 'tomato',
@@ -299,7 +308,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{Kontaktrisiko} >= 1000 && {Kontaktrisiko} < 2500',
-                'column_id': ['Kontaktrisiko','Landkreis']
+                'column_id': ['Kontaktrisiko','LandkreisName']
             },
             'fontWeight': 'bold',
             # 'backgroundColor': 'tomato',
@@ -308,7 +317,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{Kontaktrisiko} >= 5000 && {Kontaktrisiko} < 10000',
-                'column_id': ['Kontaktrisiko','Landkreis']
+                'column_id': ['Kontaktrisiko','LandkreisName']
             },
             'fontWeight': 'bold',
             # 'backgroundColor': 'tomato',
@@ -317,7 +326,7 @@ app.layout = dash_table.DataTable(
         {
             'if': {
                 'filter_query': '{Kontaktrisiko} > 10000',
-                'column_id': ['Kontaktrisiko','Landkreis']
+                'column_id': ['Kontaktrisiko','LandkreisName']
             },
             'fontWeight': 'bold',
             'backgroundColor': 'green',

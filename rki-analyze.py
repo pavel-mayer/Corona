@@ -13,6 +13,9 @@ from matplotlib.animation import FFMpegWriter
 from matplotlib.animation import ImageMagickWriter
 import datatable as dt
 
+UPDATE = False # fetch new data
+REFRESH= True or UPDATE # recreate enriched, consolidated dump
+
 def autolabel(ax, bars, color, label_range):
     """
     Attach a text label above each bar displaying its height
@@ -347,8 +350,8 @@ def addLandkreisData(records):
         if IdLandkreis in Bevoelkerung:
             KreisBevoelkerung = Bevoelkerung[IdLandkreis]
             record["Bevoelkerung"] = KreisBevoelkerung
-            record["FaellePro100k"] = record["AnzahlFall"]*100000/KreisBevoelkerung
-            record["TodesfaellePro100k"] = record["AnzahlTodesfall"]*100000/KreisBevoelkerung
+            record["FaellePro100k"] = record["AnzahlFallPos"]*100000/KreisBevoelkerung
+            record["TodesfaellePro100k"] = record["AnzahlTodesfallPos"]*100000/KreisBevoelkerung
             isStadt = Landkreis[:2] != "LK"
             record["isStadt"] = int(isStadt)
 
@@ -465,13 +468,121 @@ def csvFilename(day,kind,dir):
 
 allRecords = []
 
-UPDATE = True
 if UPDATE:
     allRecords = retrieveAllRecords()
     saveJson("dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json", allRecords)
     saveJson(archiveFilename(todayDay()), allRecords)
 
-def dateRecords(currentRecords, currentDay, globalID):
+def findOldRecords(currentRecords, likeRecord):
+    results = []
+    n = 0
+    likeAttrs=likeRecord['attributes']
+    for record in currentRecords:
+        attrs = record['attributes']
+        if attrs["Landkreis"] == likeAttrs["Landkreis"] and\
+            attrs["Altersgruppe"] == likeAttrs["Altersgruppe"] and\
+            attrs["Geschlecht"] == likeAttrs["Geschlecht"] and\
+            attrs["Meldedatum"] == likeAttrs["Meldedatum"] and\
+            (attrs["IstErkrankungsbeginn"] == 0 or attrs["Refdatum"] == likeAttrs["Refdatum"]):
+
+            if n==0:
+                print()
+                print("While looking for candidate one was found found for record #{}".format(likeAttrs['globalID']))
+                print(record)
+                msgGiven = True
+            if attrs["globalID"] == likeAttrs["globalID"]:
+                print("Found myself, id=".format(n, attrs['globalID']))
+                break
+            else:
+                n = n + 1
+                results.append(record)
+                print("Candidate {} found for record #{}".format(n, likeAttrs['globalID']))
+                print(record)
+    print("Returning {} candidates for record #{}".format(len(results),likeAttrs['globalID']))
+    return results
+
+def hashBase(record):
+    attrs = record['attributes']
+    baseString = attrs["Landkreis"]+ attrs["Altersgruppe"]+attrs["Geschlecht"]+str(attrs["Meldedatum"])
+    if  attrs["IstErkrankungsbeginn"] != 0:
+        baseString = baseString + str(attrs["Refdatum"])
+    return baseString
+
+def caseHash(record):
+    return hash(hashBase(record))
+
+def msgHash(record):
+    attrs = record['attributes']
+    baseString = hashBase(record) + str(attrs["NeuerFall"])+ str(attrs["NeuerTodesfall"])+str(attrs["AnzahlFall"])+str(attrs["AnzahlTodesfall"])
+    return hash(baseString)
+
+def collisionStats(hashedMessages):
+    colStat = {}
+    for hash in hashedMessages.keys():
+        hashGroup = hashedMessages[hash]
+        hl = len(hashGroup)
+        if hl > 1:
+            if hl not in colStat:
+                colStat[hl] = 1
+            else:
+                colStat[hl] = colStat[hl]+1
+
+    return colStat
+
+def stampRecords(currentRecords, globalID):
+    hashedCases = {}
+    hashedMessages = {}
+    for record in currentRecords:
+        attrs = record['attributes']
+
+        attrs['globalID']=globalID
+        globalID = globalID + 1
+
+        ch = caseHash(record)
+        attrs['caseHash'] = ch
+        mh = msgHash(record)
+        attrs['msgHash'] = mh
+
+        if ch in hashedCases:
+            hashedCases[ch].append(record)
+        else:
+            hashedCases[ch] = [record]
+
+        if mh in hashedMessages:
+            hashedMessages[mh].append(record)
+ #           print("Hash collision on {} messages:".format(len(hashedMessages[mh])),hashedMessages[mh])
+        else:
+            hashedMessages[mh] = [record]
+
+    return globalID, hashedCases, hashedMessages
+
+def compareRecords(oldMsgHashes, newMsgHashes):
+    addedMessageCount = 0
+    removedMessageCount = 0
+    sameMessageCount = 0
+
+    removedMessages = []
+    addedMessages = []
+
+    for key in newMsgHashes.keys():
+        if key in oldMsgHashes:
+            inNew = len(newMsgHashes[key])
+            inOld = len(oldMsgHashes[key])
+            if inNew > inOld:
+                addedMessageCount = addedMessageCount + inNew - inOld
+                sameMessageCount = sameMessageCount + inOld
+                addedMessages.append((inNew - inOld, key))
+            if inNew < inOld:
+                removedMessageCount = removedMessageCount - inNew + inOld
+                sameMessageCount = sameMessageCount + inNew
+                removedMessages.append((- inNew + inOld, key))
+            if inNew == inOld:
+                sameMessageCount = sameMessageCount + inNew
+
+    return addedMessages, removedMessages, addedMessageCount, removedMessageCount,sameMessageCount
+
+
+def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
     totalCases = 0
     totalNewCases = 0
     totalDeaths = 0
@@ -483,25 +594,36 @@ def dateRecords(currentRecords, currentDay, globalID):
     newDeathRecords = []
     oldDeathRecords = []
 
+    totalCompensated = 0
+    totalNotCompensated = 0
+
     for record in currentRecords:
         attrs = record['attributes']
-        attrs['globalID']=globalID
-        globalID = globalID + 1
+
         attrs['RefDay']=dayFromStampStr(attrs["Refdatum"])
         attrs['MeldeDay']=dayFromStampStr(attrs["Meldedatum"])
+        attrs['LandkreisName']=attrs["Landkreis"][2:]
+        attrs['LandkreisTyp']=attrs["Landkreis"][:2]
         if int(attrs["IstErkrankungsbeginn"]):
             attrs['ErkDay'] = dayFromStampStr(attrs["Refdatum"])
 
         neuerFall = int(attrs['NeuerFall'])
         neuerFallNurHeute = neuerFall == 1
-        neuerFallNurGestern = neuerFall == -1
+        neuerFallNurGestern = neuerFall == -1 # In diesem Fall ist Anzahlfall negativ!
         neuerFallGesternUndHeute = neuerFall == 0
         cases = int(attrs['AnzahlFall'])
+        if cases >= 0:
+            attrs['AnzahlFallPos'] = cases
+        else:
+            attrs['AnzahlFallPos'] = 0
+
         if neuerFallNurHeute or neuerFallGesternUndHeute:
             totalCases = totalCases+cases
+            if int(attrs['AnzahlFall']) < 0:
+                print("(1) AnzahlFall unerwartert < 0", pretty(record))
 
         if neuerFallNurHeute or neuerFallNurGestern:
-            totalNewCases = totalNewCases+cases
+            totalNewCases = totalNewCases+cases # hier werden u.U. Fälle abgezogen
             newCaseRecords.append(record)
             newRecords.append(record)
 
@@ -515,6 +637,32 @@ def dateRecords(currentRecords, currentDay, globalID):
             attrs['newCaseOnDay'] = currentDay
 
         if neuerFallNurGestern:
+            # wird fuer heute abgezogen die Fallzahl, weil gestern gezählt
+            # Suche die Ursprungsmeldung
+            candidates = caseHashes[attrs["caseHash"]]
+            compensationPossible = False
+            amountToCompensate = -int(attrs["AnzahlFall"])
+            for cr in candidates:
+                if cr != record:
+                    cr_attrs = cr['attributes']
+                    if attrs["msgHash"] != cr_attrs["msgHash"]:
+
+                        if int(cr_attrs["AnzahlFall"])>0:
+                            canCompensate = int(cr_attrs["AnzahlFall"])
+                            if amountToCompensate <= canCompensate:
+                                wouldCompensate = amountToCompensate
+                            else:
+                                wouldCompensate = canCompensate
+                            #print("amountToCompensate={}, wouldCompensate={}, canCompensate={}".format(amountToCompensate, wouldCompensate, canCompensate))
+                            amountToCompensate = amountToCompensate - wouldCompensate
+                            totalCompensated = totalCompensated + wouldCompensate
+                            if amountToCompensate == 0:
+                                break
+
+            if amountToCompensate > 0:
+                totalNotCompensated = totalNotCompensated + amountToCompensate
+                #print("No compensation possible missing {} cases".format(amountToCompensate))
+                #print(record)
             attrs['newCaseOnDay'] = currentDay - 1
 
         neuerTodesfall = int(attrs['NeuerTodesfall'])
@@ -523,6 +671,10 @@ def dateRecords(currentRecords, currentDay, globalID):
         neuerTodesfallGesternUndHeute = neuerTodesfall == 0
         keinTodesfall = neuerTodesfall == -9
         deaths = int(attrs['AnzahlTodesfall'])
+        if deaths >= 0:
+            attrs['AnzahlTodesfallPos'] = deaths
+        else:
+            attrs['AnzahlTodesfallPos'] = 0
 
         if neuerTodesfallNurHeute or neuerTodesfallGesternUndHeute:
             totalDeaths = totalDeaths+deaths
@@ -547,23 +699,43 @@ def dateRecords(currentRecords, currentDay, globalID):
     print("Day {}, {}, oldRecords={} newRecords={} oldCaseRecords={} newCaseRecords={} oldDeathRecords={} newDeathRecords={}".format(
         currentDay, dateStrFromDay(currentDay), len(oldRecords),len(newRecords), len(oldCaseRecords),len(newCaseRecords),
         len(oldDeathRecords),len(newDeathRecords)))
+    print("Day {}, {}, totalCompensated={} totalNotCompensated={}".format(currentDay, dateStrFromDay(currentDay), totalCompensated, totalNotCompensated))
+
 
     return globalID, oldRecords, newRecords, oldCaseRecords, newCaseRecords, oldDeathRecords, newDeathRecords
 
 
 def loadRecords():
     firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
-    lastRecordTime = time.strptime("10.5.2020", "%d.%m.%Y")  # struct_time
-    #lastRecordTime = time.localtime()  # struct_time
+    #lastRecordTime = time.strptime("10.5.2020", "%d.%m.%Y")  # struct_time
+    lastRecordTime = time.localtime()  # struct_time
     firstRecordDay = dayFromTime(firstRecordTime)
     lastRecordDay = dayFromTime(lastRecordTime)
 
     allDatedRecords = []
+    previousMsgHashes = None
     globalID = 1
     for day in range(firstRecordDay, lastRecordDay+1):
         currentRecords = loadJson(archiveFilename(day))
+        globalID, currentcaseHashes, currentMsgHashes = stampRecords(currentRecords, globalID)
+
+        caseCols = collisionStats(currentcaseHashes)
+        print("caseCols",caseCols)
+        msgCols = collisionStats(currentMsgHashes)
+        print("msgCols",msgCols)
+
+        if previousMsgHashes is not None:
+            addedMessages, removedMessages, addedMessageCount, removedMessageCount, sameMessageCount = compareRecords(previousMsgHashes, currentMsgHashes)
+            print("Message sets day {}, {}  added={}, removed={}, same={}".format(day, dateStrDMFromDay(day), addedMessageCount, removedMessageCount, sameMessageCount))
+            for msg in removedMessages:
+                (n, hash) = msg
+                anExampleRecord = previousMsgHashes[hash][0]
+                print("Removed {} times : {}".format(n,anExampleRecord))
+
+        previousMsgHashes = currentMsgHashes
+
         globalID, oldRecords, newRecords, oldCaseRecords, newCaseRecords, oldDeathRecords, newDeathRecords =\
-            dateRecords(currentRecords, day, globalID)
+            enhanceRecords(currentRecords, day, globalID,currentcaseHashes)
         print("newRecords {} allDatedRecords {}".format(len(newRecords), len(allDatedRecords)))
 
         if day == firstRecordDay:
@@ -586,7 +758,6 @@ def loadRecords():
             deadinResultToday,deadinResultYesterday,len(allDatedRecords)))
     return allDatedRecords
 
-REFRESH= False or UPDATE
 if REFRESH:
     allRecords = loadRecords()
     addDates(allRecords)
@@ -596,9 +767,6 @@ if REFRESH:
     saveCsv("full-latest.csv", allRecords)
 else:
     allRecords = loadJson("full-latest.json")
-
-addLandkreisData(allRecords)
-saveCsv("full-latest.csv", allRecords)
 
 casesinResult = sumField(allRecords, "AnzahlFall")
 deadinResult = sumField(allRecords, "AnzahlTodesfall")
@@ -618,6 +786,7 @@ datenStand = allRecords[0]["attributes"]["Datenstand"]
 
 print("Datenstand {}".format(datenStand))
 print("Cases {} male {} female {} gender-unknown {} sum {}, dead {}".format(cases, maleCases, femaleCases, genderUnknownCases, maleCases+femaleCases+genderUnknownCases,dead))
+
 #pretty(allRecords[0:100])
 ##########################################################
 
