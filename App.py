@@ -69,9 +69,13 @@ lastWeek7days.names=["Landkreis","AnzahlFallLetzte7TageDavor","FaellePro100kLetz
 allDaysExt0 = merge(alldays, last7days, "Landkreis")
 allDaysExt1 = merge(allDaysExt0, lastWeek7days, "Landkreis")
 
-allDaysExt2=allDaysExt1[:,dt.f[:].extend({"AnzahlFallTrend":  dt.f.AnzahlFallLetzte7Tage-dt.f.AnzahlFallLetzte7TageDavor})]
+Rw = dt.f.AnzahlFallLetzte7Tage/dt.f.AnzahlFallLetzte7TageDavor
+
+allDaysExt2=allDaysExt1[:,dt.f[:].extend({"AnzahlFallTrend":  Rw})]
 allDaysExt3=allDaysExt2[:,dt.f[:].extend({"FaellePro100kTrend": dt.f.FaellePro100kLetzte7Tage-dt.f.FaellePro100kLetzte7TageDavor})]
-allDaysExt=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
+allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
+
+allDaysExt=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/6.25/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
 
 print(list(enumerate(allDaysExt.names)))
 
@@ -96,22 +100,24 @@ FormatInt = Format(
 #FormatFixed1=FormatTemplate.money(0)
 (15, 'TodesfaellePro100kTrend')
 
-desiredOrder = [(0, 'Landkreis', ['','Kreis'],'text',Format()),
+desiredOrder = [(0, 'Landkreis', ['Kreis','Name'],'text',Format()),
+                (5, 'Bevoelkerung', ['Kreis','Einwohner'],'numeric',FormatInt),
+                (17, 'Kontaktrisiko', ['Kreis','Risiko 1:N'],'numeric',FormatInt),
                 (1, 'AnzahlFall', ['Fälle','total'],'numeric',FormatInt),
-                (5, 'AnzahlFallLetzte7Tage', ['Fälle','letzte Woche'] ,'numeric',FormatInt),
-                (13, 'AnzahlFallTrend', ['Fälle','Trend'] ,'numeric',FormatInt),
-                (9, 'AnzahlFallLetzte7TageDavor',['Fälle','vorletzte Woche'],'numeric',FormatInt),
+                (6, 'AnzahlFallLetzte7Tage', ['Fälle','letzte Woche'] ,'numeric',FormatInt),
+                (14, 'AnzahlFallTrend', ['Fälle','Trend'] ,'numeric',FormatFixed2),
+                (10, 'AnzahlFallLetzte7TageDavor',['Fälle','vorletzte Woche'],'numeric',FormatInt),
                 (2, 'FaellePro100k',['Fälle je 100000','total'],'numeric',FormatFixed1),
-                (14, 'FaellePro100kTrend',['Fälle je 100000','Trend'] ,'numeric',FormatFixed1),
-                (6, 'FaellePro100kLetzte7Tage',['Fälle je 100000','letzte Woche'] ,'numeric',FormatFixed1),
-                (10, 'FaellePro100kLetzte7TageDavor', ['Fälle je 100000','vorletzte Woche'],'numeric',FormatFixed1),
+                (15, 'FaellePro100kTrend',['Fälle je 100000','Trend'] ,'numeric',FormatFixed1),
+                (7, 'FaellePro100kLetzte7Tage',['Fälle je 100000','letzte Woche'] ,'numeric',FormatFixed1),
+                (11, 'FaellePro100kLetzte7TageDavor', ['Fälle je 100000','vorletzte Woche'],'numeric',FormatFixed1),
                 (3, 'AnzahlTodesfall', ['Todesfälle','total'],'numeric',FormatInt),
-                (7, 'AnzahlTodesfallLetzte7Tage', ['Todesfälle','letzte Woche'],'numeric',FormatInt),
-                (11, 'AnzahlTodesfallLetzte7TageDavor', ['Todesfälle','vorletzte Woche'],'numeric',FormatInt),
+                (8, 'AnzahlTodesfallLetzte7Tage', ['Todesfälle','letzte Woche'],'numeric',FormatInt),
+                (12, 'AnzahlTodesfallLetzte7TageDavor', ['Todesfälle','vorletzte Woche'],'numeric',FormatInt),
                 (4, 'TodesfaellePro100k', ['Todesfälle je 100000','total'],'numeric',FormatFixed2),
-                (8, 'TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000','letzte Woche'],'numeric',FormatFixed2),
-                (15, 'TodesfaellePro100kTrend', ['Todesfälle je 100000','Trend'],'numeric',FormatFixed2),
-                (12, 'TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000','vorletzte Woche'],'numeric',FormatFixed2)]
+                (9, 'TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000','letzte Woche'],'numeric',FormatFixed2),
+                (16, 'TodesfaellePro100kTrend', ['Todesfälle je 100000','Trend'],'numeric',FormatFixed2),
+                (13, 'TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000','vorletzte Woche'],'numeric',FormatFixed2)]
 
 orderedIndices, orderedCols, orderedNames, orderedTypes, orderFormats = zip(*desiredOrder)
 orderedIndices = np.array(orderedIndices)+1
@@ -168,14 +174,55 @@ app.layout = dash_table.DataTable(
             'if': {'row_index': 'odd'},
             'backgroundColor': 'rgb(70, 70, 70)'
         },
+        ############################################################################
+        {
+            'if': {
+                'filter_query': '{FaellePro100kLetzte7Tage} < 1',
+                'column_id': ['FaellePro100kLetzte7Tage', 'Landkreis']
+            },
+            'backgroundColor': 'green',
+            'fontWeight': 'bold',
+            'color': 'white'
+        },
+        {
+            'if': {
+                'filter_query': '{FaellePro100kLetzte7Tage} >= 1 && {FaellePro100kLetzte7Tage} < 5',
+                'column_id': ['FaellePro100kLetzte7Tage', 'Landkreis']
+            },
+            #            'backgroundColor': 'tomato',
+            'fontWeight': 'bold',
+            'color': 'lightgreen'
+        },
         {
             'if': {
                 'filter_query': '{FaellePro100kLetzte7Tage} > 10 && {FaellePro100kLetzte7Tage} < 20',
-                'column_id': 'FaellePro100kLetzte7Tage'
+                'column_id': ['FaellePro100kLetzte7Tage','Landkreis']
             },
-#            'backgroundColor': 'tomato',
+            #            'backgroundColor': 'tomato',
+            'fontWeight': 'bold',
             'color': 'yellow'
         },
+        {
+            'if': {
+                'filter_query': '{FaellePro100kLetzte7Tage} > 20 && {FaellePro100kLetzte7Tage} < 50',
+                'column_id': ['FaellePro100kLetzte7Tage','Landkreis']
+            },
+            #            'backgroundColor': 'tomato',
+            'fontWeight': 'bold',
+            'color': 'tomato'
+        },
+        {
+            'if': {
+                'filter_query': '{FaellePro100kLetzte7Tage} > 50',
+                'column_id': ['FaellePro100kLetzte7Tage','Landkreis']
+            },
+            'fontWeight': 'bold',
+            'backgroundColor': 'firebrick',
+            'color': 'white'
+        },
+
+        ############################################################################
+
         {
             'if': {
                 'filter_query': '{FaellePro100kTrend} > 0',
@@ -185,15 +232,81 @@ app.layout = dash_table.DataTable(
             #'backgroundColor': 'tomato',
             'color': 'tomato'
         },
+        ############################################################################
         {
             'if': {
-                'filter_query': '{AnzahlFallTrend} > 0',
+                'filter_query': '{AnzahlFallTrend} > 1',
                 'column_id': 'AnzahlFallTrend'
             },
             'fontWeight': 'bold',
             #'backgroundColor': 'tomato',
             'color': 'tomato'
         },
+        {
+            'if': {
+                'filter_query': '{AnzahlFallTrend} > 0.9 && {AnzahlFallTrend} <= 1',
+                'column_id': 'AnzahlFallTrend'
+            },
+            'fontWeight': 'bold',
+            # 'backgroundColor': 'tomato',
+            'color': 'yellow'
+        },
+        {
+            'if': {
+                'filter_query': '{AnzahlFallTrend} < 0.7',
+                'column_id': 'AnzahlFallTrend'
+            },
+            'fontWeight': 'bold',
+            # 'backgroundColor': 'tomato',
+            'color': 'lightgreen'
+        },
+        ############################################################################
+        {
+            'if': {
+                'filter_query': '{Kontaktrisiko} > 0 && {Kontaktrisiko} < 100',
+                'column_id': ['Kontaktrisiko','Landkreis']
+            },
+            'fontWeight': 'bold',
+            'backgroundColor': 'firebrick',
+            'color': 'white'
+        },
+        {
+            'if': {
+                'filter_query': '{Kontaktrisiko} >= 100 && {Kontaktrisiko} < 1000',
+                'column_id': ['Kontaktrisiko','Landkreis']
+            },
+            'fontWeight': 'bold',
+            # 'backgroundColor': 'tomato',
+            'color': 'tomato'
+        },
+        {
+            'if': {
+                'filter_query': '{Kontaktrisiko} >= 1000 && {Kontaktrisiko} < 2500',
+                'column_id': ['Kontaktrisiko','Landkreis']
+            },
+            'fontWeight': 'bold',
+            # 'backgroundColor': 'tomato',
+            'color': 'yellow'
+        },
+        {
+            'if': {
+                'filter_query': '{Kontaktrisiko} >= 5000 && {Kontaktrisiko} < 10000',
+                'column_id': ['Kontaktrisiko','Landkreis']
+            },
+            'fontWeight': 'bold',
+            # 'backgroundColor': 'tomato',
+            'color': 'lightgreen'
+        },
+        {
+            'if': {
+                'filter_query': '{Kontaktrisiko} > 10000',
+                'column_id': ['Kontaktrisiko','Landkreis']
+            },
+            'fontWeight': 'bold',
+            'backgroundColor': 'green',
+            'color': 'white'
+        },
+
     ],
 #    style_as_list_view = True,
     style_header={
