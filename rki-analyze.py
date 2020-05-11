@@ -465,7 +465,7 @@ def csvFilename(day,kind,dir):
 
 allRecords = []
 
-UPDATE = False
+UPDATE = True
 if UPDATE:
     allRecords = retrieveAllRecords()
     saveJson("dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json", allRecords)

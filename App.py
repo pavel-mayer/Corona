@@ -1,4 +1,12 @@
 #!/usr/bin/env python3.6
+
+# Quick hack to browse RKI-NPGEO-Data, Pavel Mayer 2020,
+# License: Use freely at your own risk.
+
+# pip install Click==7.0 Flask==1.1.1 itsdangerous==1.1.0 Jinja2==2.10.3 MarkupSafe==1.1.1 uWSGI==2.0.18 Werkzeug==0.16.0
+# pip install: dash pandas datatable feather-format
+
+
 import os
 import flask
 from flask import render_template
@@ -11,8 +19,6 @@ import datatable as dt
 import json
 import dash_table.FormatTemplate as FormatTemplate
 from dash_table.Format import Format, Scheme, Sign, Symbol
-
-#df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/solar.csv')
 
 def pretty(jsonmap):
     print(json.dumps(jsonmap, sort_keys=False, indent=4, separators=(',', ': ')))
@@ -50,18 +56,20 @@ FormatInt = Format(
 #                symbol_suffix=u'˚F'
             )
 
-def loadAndProcessData():
-    fullTable = dt.fread("full-latest.csv")
+def loadAndProcessData(dataFilename):
+    print("Loading "+dataFilename)
+
+    fullTable = dt.fread(dataFilename)
+    print("Loading done loading table from ‘"+dataFilename+"‘, keys:")
     print(fullTable.keys())
     cases = fullTable[:,'AnzahlFall'].sum()[0,0]
     dead = fullTable[:,'AnzahlTodesfall'].sum()[0,0]
 
     lastDay=fullTable[:,'MeldeDay'].max()[0,0]
-    print("lastDay {} cases {} dead {}".format(lastDay, cases, dead))
+    print("File stats: lastDay {} cases {} dead {}".format(lastDay, cases, dead))
 
     newTable=fullTable[:,dt.f[:].extend({"erkMeldeDelay": dt.f.MeldeDay-dt.f.RefDay})]
     #print(newTable.keys())
-
 
     #dt.by(dt.f.Bundesland)]
     alldays=fullTable[:,
@@ -100,8 +108,12 @@ def loadAndProcessData():
 
     allDaysExt=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/6.25/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
 
-    print(list(enumerate(allDaysExt.names)))
+    # print(list(enumerate(allDaysExt.names)))
 
+    data=allDaysExt.to_pandas()
+    return data
+
+def makeColumns():
     desiredOrder = [(0, 'Landkreis', ['Kreis','Name'],'text',Format()),
                     (5, 'Bevoelkerung', ['Kreis','Einwohner'],'numeric',FormatInt),
                     (17, 'Kontaktrisiko', ['Kreis','Risiko 1:N'],'numeric',FormatInt),
@@ -123,19 +135,11 @@ def loadAndProcessData():
 
     orderedIndices, orderedCols, orderedNames, orderedTypes, orderFormats = zip(*desiredOrder)
     orderedIndices = np.array(orderedIndices)+1
-    print(orderedIndices)
+    #print(orderedIndices)
 
-    #pretty(allDaysExt.to_dict())
-
-    print("allDaysExt.names",allDaysExt.names)
-    #print("allDaysExt.to_dict",allDaysExt.to_pandas().to_dict("records"))
-
-    #columns = [{'name': L1, 'id': L2} for (L1,L2) in zip(orderedNames,orderedCols)]
     columns = [{'name': L1, 'id': L2, 'type':L3, 'format':L4} for (L1,L2,L3,L4) in zip(orderedNames,orderedCols,orderedTypes,orderFormats)]
     print("columns=",columns)
-
-    data=allDaysExt.to_pandas().to_dict("records")
-    return data, columns
+    return columns
 
 
 server = flask.Flask(__name__)
@@ -150,7 +154,19 @@ app = dash.Dash(
     routes_pathname_prefix='/covid/'
 )
 
-data, columns = loadAndProcessData()
+fullTableFilename = "full-latest.csv"
+cacheFilename = "data-cached.feather"
+
+if not os.path.isfile(cacheFilename) or os.path.getmtime(fullTableFilename) > os.path.getmtime(cacheFilename):
+    dframe = loadAndProcessData(fullTableFilename)
+    dframe.to_feather(cacheFilename)
+else:
+    print("Loading data cache from ‘"+cacheFilename+"‘")
+    dframe = pd.read_feather(cacheFilename)
+
+data = dframe.to_dict("records")
+columns = makeColumns()
+print("Loading done, creating Datatable")
 
 app.layout = dash_table.DataTable(
     id='table',
