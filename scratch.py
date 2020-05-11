@@ -51,7 +51,6 @@ def merge(largerTable, smallerTable, keyFieldName):
             for i, lk in enumerate(extTable[:,keyFieldName].to_list()[0]):
                 if lk in valuesDict:
                     extTable[i,colName] = valuesDict[lk]
-                print("lk",lk)
     return extTable
 
 def reorder(desiredOrder):
@@ -69,9 +68,29 @@ lastWeek7days.names=["Landkreis","AnzahlFallLetzte7TageDavor","FaellePro100kLetz
 allDaysExt0 = merge(alldays, last7days, "Landkreis")
 allDaysExt = merge(allDaysExt0, lastWeek7days, "Landkreis")
 
+print(list(enumerate(allDaysExt.names)))
+desiredOrder = [(0, 'Landkreis', 'Kreis'),
+                (1, 'AnzahlFall', 'Fälle'),
+                (5, 'AnzahlFallLetzte7Tage', 'Fälle letzte Woche'),
+                (9, 'AnzahlFallLetzte7TageDavor','Fälle vorletze Woche'),
+                (2, 'FaellePro100k','Fälle je 100000'),
+                (6, 'FaellePro100kLetzte7Tage','Fälle je 100000 letzte Woche'),
+                (10, 'FaellePro100kLetzte7TageDavor', 'Fälle je 100000 vorletzte Woche'),
+                (3, 'AnzahlTodesfall', 'Todesfälle'),
+                (7, 'AnzahlTodesfallLetzte7Tage', 'Todesfälle letzte Woche'),
+                (11, 'AnzahlTodesfallLetzte7TageDavor', 'Todesfälle vorletze Woche'),
+                (4, 'TodesfaellePro100k', 'Todesfälle je 100000'),
+                (8, 'TodesfaellePro100kLetzte7Tage', 'Todesfälle je 100000 letzte Woche'),
+                (12, 'TodesfaellePro100kLetzte7TageDavor', 'Todesfälle je 100000 vorletzte Woche')]
 
+orderedIndices, orderedCols, orderedNames = zip(*desiredOrder)
+orderedIndices = np.array(orderedIndices)+1
+print(orderedIndices)
 fig = go.Figure(data=[go.Table(
-    header=dict(values=allDaysExt.keys(),
+    #columnorder=[0,1,5],
+    #columnwidth=[80, 400],
+
+    header=dict(values=orderedNames,
                 line_color='darkslategray',
                 fill_color='lightskyblue',
                 align='left'),
@@ -85,6 +104,7 @@ fig = go.Figure(data=[go.Table(
 fig.show()
 #pframe=last7days.to_pandas()
 #pframe.plot()
+exit(0)
 
 slices = fullTable[:,['AnzahlFall','AnzahlTodesfall']].sum()
 print(slices)
