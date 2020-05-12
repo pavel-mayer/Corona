@@ -13,7 +13,7 @@ from matplotlib.animation import FFMpegWriter
 from matplotlib.animation import ImageMagickWriter
 import datatable as dt
 
-UPDATE = False # fetch new data
+UPDATE = True # fetch new data
 REFRESH= True or UPDATE # recreate enriched, consolidated dump
 
 def autolabel(ax, bars, color, label_range):
