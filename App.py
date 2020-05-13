@@ -6,6 +6,12 @@
 # pip install Click==7.0 Flask==1.1.1 itsdangerous==1.1.0 Jinja2==2.10.3 MarkupSafe==1.1.1 uWSGI==2.0.18 Werkzeug==0.16.0
 # pip install: dash pandas datatable feather-format
 
+import locale
+
+print("Locale:"+str(locale.getlocale()))
+locale.setlocale(locale.LC_ALL, 'de_DE')
+print("Locale set to:"+str(locale.getlocale()))
+
 import cov_dates as cd
 
 import os
@@ -43,19 +49,31 @@ def merge(largerTable, smallerTable, keyFieldName):
                     extTable[i,colName] = valuesDict[lk]
     return extTable
 
-FormatFixed1 = Format(
-                precision=1,
-                scheme=Scheme.fixed,
-                symbol=Symbol.no,
-            )
-FormatFixed2 = Format(
-                precision=2,
-                scheme=Scheme.fixed,
-                symbol=Symbol.no,
-            )
 
+FormatFixed1 = Format(
+    precision=1,
+    scheme=Scheme.fixed,
+    symbol=Symbol.no,
+    decimal_delimiter=',',
+)
+FormatFixed2 = Format(
+    precision=2,
+    scheme=Scheme.fixed,
+    symbol=Symbol.no,
+    decimal_delimiter=',',
+)
+
+FormatInt_EN = Format(
+                precision=0,
+                scheme=Scheme.fixed,
+                symbol=Symbol.no,
+#                symbol_suffix=u'˚F'
+            )
 FormatInt = Format(
                 precision=0,
+                decimal_delimiter=',',
+                group=FormatTemplate.Group.yes,
+                group_delimiter='.',
                 scheme=Scheme.fixed,
                 symbol=Symbol.no,
 #                symbol_suffix=u'˚F'
@@ -127,27 +145,28 @@ def loadAndProcessData(dataFilename):
 # (15, 'FaellePro100kTrend'), (16, 'TodesfaellePro100kTrend'), (17, 'Kontaktrisiko')]
 # Column names frame order: [(0, 'LandkreisName'), (1, 'AnzahlFallPos'), (2, 'FaellePro100k'), (3, 'AnzahlTodesfallPos'), (4, 'TodesfaellePro100k'), (5, 'Bevoelkerung'), (6, 'AnzahlFallLetzte7Tage'), (7, 'FaellePro100kLetzte7Tage'), (8, 'AnzahlTodesfallLetzte7Tage'), (9, 'TodesfaellePro100kLetzte7Tage'), (10, 'AnzahlFallLetzte7TageDavor'), (11, 'FaellePro100kLetzte7TageDavor'), (12, 'AnzahlTodesfallLetzte7TageDavor'), (13, 'TodesfaellePro100kLetzte7TageDavor'), (14, 'AnzahlFallTrend'), (15, 'FaellePro100kTrend'), (16, 'TodesfaellePro100kTrend'), (17, 'Kontaktrisiko')]
 def makeColumns():
-    desiredOrder = [(0, 'LandkreisName', ['Kreis','Name'],'text',Format()),
-                    (5, 'Bevoelkerung', ['Kreis','Einwohner'],'numeric',FormatInt),
-                    (17, 'Kontaktrisiko', ['Kreis','Risiko 1:N'],'numeric',FormatInt),
-                    (1, 'AnzahlFallPos', ['Fälle','total'],'numeric',FormatInt),
-                    (6, 'AnzahlFallLetzte7Tage', ['Fälle','letzte Woche'] ,'numeric',FormatInt),
-                    (14, 'AnzahlFallTrend', ['Fälle','Rw'] ,'numeric',FormatFixed2),
-                    (10, 'AnzahlFallLetzte7TageDavor',['Fälle','vorletzte Woche'],'numeric',FormatInt),
-                    (2, 'FaellePro100k',['Fälle je 100000','total'],'numeric',FormatFixed1),
-                    (15, 'FaellePro100kTrend',['Fälle je 100000','Differenz'] ,'numeric',FormatFixed1),
-                    (7, 'FaellePro100kLetzte7Tage',['Fälle je 100000','letzte Woche'] ,'numeric',FormatFixed1),
-                    (11, 'FaellePro100kLetzte7TageDavor', ['Fälle je 100000','vorletzte Woche'],'numeric',FormatFixed1),
-                    (3, 'AnzahlTodesfallPos', ['Todesfälle','total'],'numeric',FormatInt),
-                    (8, 'AnzahlTodesfallLetzte7Tage', ['Todesfälle','letzte Woche'],'numeric',FormatInt),
-                    (12, 'AnzahlTodesfallLetzte7TageDavor', ['Todesfälle','vorletzte Woche'],'numeric',FormatInt),
-                    (4, 'TodesfaellePro100k', ['Todesfälle je 100000','total'],'numeric',FormatFixed2),
-                    (9, 'TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000','letzte Woche'],'numeric',FormatFixed2),
-                    (16, 'TodesfaellePro100kTrend', ['Todesfälle je 100000','Differenz'],'numeric',FormatFixed2),
-                    (13, 'TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000','vorletzte Woche'],'numeric',FormatFixed2)]
+    desiredOrder = [('LandkreisName', ['Kreis','Name'],'text',Format()),
+                    ('Bevoelkerung', ['Kreis','Einwohner'],'numeric',FormatInt),
+                    ('Kontaktrisiko', ['Kreis','Risiko 1:N'],'numeric',FormatInt),
+                    ('AnzahlFallTrend', ['Fälle','Rw'] ,'numeric',FormatFixed2),
+                    ('AnzahlFallLetzte7Tage', ['Fälle','letzte Woche'] ,'numeric',FormatInt),
+                    ('AnzahlFallLetzte7TageDavor',['Fälle','vorletzte Woche'],'numeric',FormatInt),
+                    ('AnzahlFallPos', ['Fälle','total'],'numeric',FormatInt),
+                    ('FaellePro100kLetzte7Tage',['Fälle je 100000','letzte Woche'] ,'numeric',FormatFixed1),
+                    ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000','vorletzte Woche'],'numeric',FormatFixed1),
+                    ('FaellePro100kTrend',['Fälle je 100000','Differenz'] ,'numeric',FormatFixed1),
+                    ('FaellePro100k',['Fälle je 100000','total'],'numeric',FormatFixed1),
+                    ('AnzahlTodesfallPos', ['Todesfälle','total'],'numeric',FormatInt),
+                    ('AnzahlTodesfallLetzte7Tage', ['Todesfälle','letzte Woche'],'numeric',FormatInt),
+                    ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle','vorletzte Woche'],'numeric',FormatInt),
+                    ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000','letzte Woche'],'numeric',FormatFixed2),
+                    ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000','vorletzte Woche'],'numeric',FormatFixed2),
+                    ('TodesfaellePro100kTrend', ['Todesfälle je 100000','Differenz'],'numeric',FormatFixed2),
+                    ('TodesfaellePro100k', ['Todesfälle je 100000', 'total'], 'numeric', FormatFixed2),
+                    ]
 
-    orderedIndices, orderedCols, orderedNames, orderedTypes, orderFormats = zip(*desiredOrder)
-    orderedIndices = np.array(orderedIndices)+1
+    orderedCols, orderedNames, orderedTypes, orderFormats = zip(*desiredOrder)
+    #orderedIndices = np.array(orderedIndices)+1
     #print(orderedIndices)
 
     columns = [{'name': L1, 'id': L2, 'type':L3, 'format':L4} for (L1,L2,L3,L4) in zip(orderedNames,orderedCols,orderedTypes,orderFormats)]
@@ -191,7 +210,7 @@ data = dframe.to_dict("records")
 columns = makeColumns()
 
 colors = {
-    'background': 'black',
+    'background': 'rgb(50, 50, 50)',
     'text': 'white'
 }
 
@@ -206,11 +225,11 @@ h_table = dash_table.DataTable(
 #    fixed_rows={ 'headers': True, 'data': 0 },
     style_cell={'textAlign': 'right',
                 'padding': '5px',
-                'backgroundColor': 'rgb(50, 50, 50)',
+                'backgroundColor': colors['background'],
                 'color': 'white',
     },
     style_data={
-        'border-bottom': '1px solid rgb(50, 50, 50)',
+        'border-bottom': '1px solid '+colors['background'],
         'border-left': '1px solid rgb(128, 128, 128)',
         'border-right': '1px solid rgb(128, 128, 128)'
 },
@@ -410,13 +429,17 @@ bodyClass="bodyText"
 bodyLink="bodyLink"
 
 h_Hinweis=html.P([
-    html.Span(children="Hinweis:", className=introClass),
-    html.Span(children="Dies ist eine privat betriebene Seite, für die Richtigkeit der Berechnung und der Ergebnisse"
-                             "übernehme ich keine Gewähr. Im Zweifel mit den", className=bodyClass),
-    html.A(children="offiziellen Zahlen des RKI abgleichen.",
-              href="https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4/page/page_1/",
-              className=bodyLink
-              )])
+    html.Span("Hinweis:", className=introClass),
+    html.Span("Dies ist eine privat betriebene Seite, für die Richtigkeit der Berechnung und der Ergebnisse"
+              "übernehme ich keine Gewähr. Im Zweifel mit den ", className=bodyClass),
+    html.A("offiziellen Zahlen des RKI abgleichen.",
+           href="https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4/page/page_1/",
+           className=bodyLink
+           ),
+    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen, inbsondere können hohe Zahlen auch Folge eines "
+              "Ausbruch in einer Klinik, einem Heim oder einer Massenunterkunft sein und nicht repräsentativ für die"
+              "Verteilung in der breiten Bevölkerung. Andererseits ist da noch die Dunkelziffer. ", className=bodyClass),
+])
 
 h_Erlauterung=html.P([
     html.Span(children="Erläuterung:", className=introClass),
@@ -448,7 +471,7 @@ h_RwDef = makeDefinition(h_Rw,
 Dies ist eine Berechnung der Vermehrung oder Abnahme der Fälle einer Woche in der Folgewoche. Sie entspricht nicht genau
 der normalen Corona-Reproduktionszahl und beträgt etwa das doppelte, setzt aber keine Annahme über das serielle Intervall
 voraus und vermeidet wochentagsbedingte Schwankungen. EIn Wert von 2 bedeutet, dass in der letzten Woche doppelt so viele
-Fälle gemeldet wurden wie in der Vorwoche.                
+Fälle gemeldet wurden wie in der Vorwoche, ein Wert von 0,5 dedeutet nur halb so viele neue Fälle.                
 ''')
 
 h_Risiko=makeDefinition("Risiko 1:N",
@@ -459,19 +482,19 @@ Sie berechnet sich wie folgt:
 """)
 
 h_RisikoList=html.Ul([
-    html.Li(["Bevölkerung / 6.25 / ((Anzahl der Fälle in den letzten 2 Wochen) *",h_Rw,")"]),
+    html.Li(["Bevölkerung / Dunkelzifferfaktor / ((Anzahl der Fälle in den letzten 2 Wochen) *",h_Rw,")"]),
+    html.Li("Als Faktor für die Dunkelziffer wurde 6,25 gewählt, also auf 1 gemeldeten Infizierten werden 5,25 weitere vermutet"),
     html.Li("Als grobe Annäherung an die Zahl der Ansteckenden wurde die Summe der Fälle der letzten zwei Wochen gewählt"),
-    html.Li("Als Faktor für die Dunkelziffer wurde 6.25 gewählt"),
     html.Li("Die Zahl der aktuell Ansteckenden wird zudem für die Risikoberechnung hochgerechnet,"
             "indem die Entwicklung von der vorletzen Woche zur letzen Woche prozentual unverändert fortgeschrieben"
             "und damit eher dem Stand am heutigen Tag entspricht."),
-    html.Li("Die Dunkelziffer kann bis 1,5 fach höher sein, die Zahl der Anstecken auch halb so hoch,"
-            "so dass der Risokowerte als nicht allzu übertriebene Obergrenze für den Anteil der Ansteckenden zu sehen ist."),
+    html.Li("Die Dunkelziffer kann bis 2-fach höher sein, die Zahl der Ansteckenden aber nur halb so hoch,"
+            "so dass der Risikowert als nicht allzu übertriebene Obergrenze für den Anteil der Ansteckenden zu sehen ist. Your mileage may vary."),
 ])
 
 h_BedeutungFarbenHead = html.Span(children="Bedeutung der Farben:", className=introClass)
 h_BedeutungFarbenIntro = html.Span(
-    "Was die Farben bedeuten und wie die Schwellwerte gesetzt sind, ist eher subjektive "
+    "Was die Farben bedeuten und wie die Schwellwerte gesetzt sind, ist eher subjektiv "
     "und kann sich ändern. Hier die beabsichtigte Bedeutung der Farben:",
     className=bodyClass)
 
@@ -486,10 +509,14 @@ conditionSerious="conditionSerious"
 conditionGood="conditionGood"
 conditionSafe="conditionSafe"
 
+LiStyle = {#'padding': '10px',
+           'margin-bottom': '0.5em',
+         #'height': 'auto',
+         }
 h_TextFarbenList=html.Ul([
-    html.Li([makeColorSpan("Rot: ",conditionTooHigh), "Zahl ist zu hoch und es müssen dringend Massnahmen getroffen werden, um sie zu senken"]),
-    html.Li([makeColorSpan("Gelb: ",conditionSerious), "Zahl ist zu hoch, um zur Tagesordnung zurückzukehren"]),
-    html.Li([makeColorSpan("Grün: ",conditionGood), "Zahl ist in Ordnung"]),
+    html.Li([makeColorSpan("Rot: ",conditionTooHigh), "Zahl ist zu hoch und es müssen dringend Massnahmen getroffen werden, um sie zu senken"], style=LiStyle),
+    html.Li([makeColorSpan("Gelb: ",conditionSerious), "Zahl ist zu hoch, um zur Tagesordnung zurückzukehren"], style=LiStyle),
+    html.Li([makeColorSpan("Grün: ",conditionGood), "Zahl ist in Ordnung"], style=LiStyle),
 ])
 
 h_TextFarben=html.Div(["Im Text", h_TextFarbenList])
@@ -498,26 +525,42 @@ h_TextFarben=html.Div(["Im Text", h_TextFarbenList])
 h_BgFarbenList=html.Ul([
     html.Li([makeColorSpan("Rot: ",conditionDanger), "Lasset alle Hoffnung fahren. Die Situation ist praktisch ausser Kontrolle."
              "Möglichst zu Hause bleiben und außer Haus bestmögliche Schutzmassnahmen ergreifen. Gegend weiträumig meiden."
-             "Wer kürzlich da war könnte infiziert sein."]),
+             "Wer kürzlich da war könnte infiziert sein."], style=LiStyle),
     html.Li([makeColorSpan("Grün: ",conditionSafe), "Einheimische da könnten völlig entspannt sein, wenn sie keinen "
-             "ungeschützten Kontakt mit Fremden aus anderen Kreisen hätten. Würde da bleiben und niemanden rein lassen."]),
-])
+             "ungeschützten Kontakt mit Fremden aus anderen Kreisen hätten. Würde da bleiben und niemanden rein lassen."], style=LiStyle),
+    ],
+    style = {#'padding': '10px',
+             #'line-height': '2.5em',
+             'height': 'auto',
+             }
+)
 
 h_BgtFarben=html.Div(["Feld mit Farbe hinterlegt", h_BgFarbenList])
 
-h_BedeutungSpaltenDef = html.Ul([html.Li(h_RwDef),
-                                 html.Li([h_Risiko, h_RisikoList]),
-                                 ])
+h_BedeutungSpaltenDef = html.Ul([
+    html.Li(h_RwDef),
+    html.Li([h_Risiko, h_RisikoList]),
+    ],
+    style={"padding-left": "16px", "padding-right": "64px"},
+)
 
-h_BedeutungFarbenDef = html.Ul([html.Li(h_TextFarben),
-                                html.Li([h_BgtFarben]),
-                                ])
+h_BedeutungFarbenDef = html.Ul([
+    html.Li(h_TextFarben),
+    html.Li([h_BgtFarben]),
+    ],
+    style={"padding-left": "16px"},
+
+)
+
+cellStyle = {"border-left": "1px solid #ffffff", "padding-left": "16px"}
+
 h_Bedeutungen = html.Table([
-        html.Tr([html.Th(h_BedeutungSpaltenHead), html.Td(h_BedeutungFarbenHead)]),
-        html.Tr([html.Td(h_BedeutungSpaltenIntro), html.Td(h_BedeutungFarbenIntro)]),
-        html.Tr([html.Td(h_BedeutungSpaltenDef), html.Td(h_BedeutungFarbenDef)])
-],
-    style={'padding': '0 0'}
+        html.Tr([html.Th(h_BedeutungSpaltenHead), html.Td(h_BedeutungFarbenHead,style=cellStyle)]),
+        html.Tr([html.Td(h_BedeutungSpaltenIntro), html.Td(h_BedeutungFarbenIntro,style=cellStyle)]),
+        html.Tr([html.Td(h_RwDef), html.Td(h_TextFarben,style=cellStyle)]),
+        html.Tr([html.Td([h_Risiko, h_RisikoList]), html.Td(h_BgtFarben,style=cellStyle)])
+    ],
+#    style={'padding': '0 0'}
 )
 
 h_BedeutungenVert = html.Div([
@@ -537,10 +580,12 @@ betterExplanation = html.Div([
     h_Bedeutungen
     ],
     style={'padding': '5px',
-           'backgroundColor': 'rgb(50, 50, 50)',
+           'backgroundColor': colors['background'],
            'color': 'white',
-           'text-align': 'left'
-}
+           'text-align': 'left',
+           'line-height':'1.5em',
+           'height': 'auto',
+    }
 )
 
 app.title = "COVID Risiko Deutschland nach Landkreisen"
