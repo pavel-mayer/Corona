@@ -134,42 +134,47 @@ def loadAndProcessData(dataFilename):
     allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
 
     allDaysExt5=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/6.25/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
-    allDaysExt=allDaysExt5[:,dt.f[:].extend({"LetzteMeldung": lastDay - dt.f.MeldeDay})]
+    allDaysExt6=allDaysExt5[:,dt.f[:].extend({"LetzteMeldung": lastDay - dt.f.MeldeDay})]
+
+    allDaysExt6[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko,"Kontaktrisiko"] = 999999
+
+    sortedByRisk = allDaysExt6.sort(["Kontaktrisiko","LetzteMeldung","FaellePro100k"])
+    #print(sortedByRisk)
+    allDaysExt=sortedByRisk[:,dt.f[:].extend({"Rang": 0})]
+    allDaysExt[:,"Rang"]=np.arange(1,allDaysExt.nrows+1)
+    #print(allDaysExt)
+
 
     print("Column names frame order:",list(enumerate(allDaysExt.names)))
 
     data=allDaysExt.to_pandas()
     return data
 
-# [(0, 'Landkreis'), (1, 'AnzahlFall'), (2, 'FaellePro100k'), (3, 'AnzahlTodesfall'), (4, 'TodesfaellePro100k'),
-# (5, 'Bevoelkerung'), (6, 'AnzahlFallLetzte7Tage'), (7, 'FaellePro100kLetzte7Tage'), (8, 'AnzahlTodesfallLetzte7Tage'),
-# (9, 'TodesfaellePro100kLetzte7Tage'), (10, 'AnzahlFallLetzte7TageDavor'), (11, 'FaellePro100kLetzte7TageDavor'),
-# (12, 'AnzahlTodesfallLetzte7TageDavor'),(13, 'TodesfaellePro100kLetzte7TageDavor'), (14, 'AnzahlFallTrend'),
-# (15, 'FaellePro100kTrend'), (16, 'TodesfaellePro100kTrend'), (17, 'Kontaktrisiko')]
-# Column names frame order: [(0, 'LandkreisName'), (1, 'AnzahlFallPos'), (2, 'FaellePro100k'), (3, 'AnzahlTodesfallPos'), (4, 'TodesfaellePro100k'), (5, 'Bevoelkerung'), (6, 'AnzahlFallLetzte7Tage'), (7, 'FaellePro100kLetzte7Tage'), (8, 'AnzahlTodesfallLetzte7Tage'), (9, 'TodesfaellePro100kLetzte7Tage'), (10, 'AnzahlFallLetzte7TageDavor'), (11, 'FaellePro100kLetzte7TageDavor'), (12, 'AnzahlTodesfallLetzte7TageDavor'), (13, 'TodesfaellePro100kLetzte7TageDavor'), (14, 'AnzahlFallTrend'), (15, 'FaellePro100kTrend'), (16, 'TodesfaellePro100kTrend'), (17, 'Kontaktrisiko')]
 def makeColumns():
-    desiredOrder = [('LandkreisName', ['Kreis','Name'],'text',Format()),
-                    ('Bundesland', ['Kreis', 'Bundesland'], 'text', Format()),
-                    ('LandkreisTyp', ['Kreis', 'Art'], 'text', Format()),
-                    ('Bevoelkerung', ['Kreis','Einwohner'],'numeric',FormatInt),
-                    ('LetzteMeldung', ['Kreis','Letze Meldung'],'numeric',FormatInt),
-                    ('Kontaktrisiko', ['Kreis','Risiko 1:N'],'numeric',FormatInt),
-                    ('AnzahlFallTrend', ['Fälle','Rw'] ,'numeric',FormatFixed2),
-                    ('AnzahlFallLetzte7Tage', ['Fälle','letzte Woche'] ,'numeric',FormatInt),
-                    ('AnzahlFallLetzte7TageDavor',['Fälle','vorletzte Woche'],'numeric',FormatInt),
-                    ('AnzahlFallPos', ['Fälle','total'],'numeric',FormatInt),
-                    ('FaellePro100kLetzte7Tage',['Fälle je 100000','letzte Woche'] ,'numeric',FormatFixed1),
-                    ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000','vorletzte Woche'],'numeric',FormatFixed1),
-                    ('FaellePro100kTrend',['Fälle je 100000','Differenz'] ,'numeric',FormatFixed1),
-                    ('FaellePro100k',['Fälle je 100000','total'],'numeric',FormatFixed1),
-                    ('AnzahlTodesfallLetzte7Tage', ['Todesfälle','letzte Woche'],'numeric',FormatInt),
-                    ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle','vorletzte Woche'],'numeric',FormatInt),
-                    ('AnzahlTodesfallPos', ['Todesfälle','total'],'numeric',FormatInt),
-                    ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000','letzte Woche'],'numeric',FormatFixed2),
-                    ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000','vorletzte Woche'],'numeric',FormatFixed2),
-                    ('TodesfaellePro100kTrend', ['Todesfälle je 100000','Differenz'],'numeric',FormatFixed2),
-                    ('TodesfaellePro100k', ['Todesfälle je 100000', 'total'], 'numeric', FormatFixed2),
-                    ]
+    desiredOrder = [
+        ('Rang', ['Risiko', 'Rang'], 'numeric', FormatInt),
+        ('Kontaktrisiko', ['Risiko', 'Risiko 1:N'], 'numeric', FormatInt),
+        ('LandkreisName', ['Kreis', 'Name'], 'text', Format()),
+        ('Bundesland', ['Kreis', 'Bundesland'], 'text', Format()),
+        ('LandkreisTyp', ['Kreis', 'Art'], 'text', Format()),
+        ('Bevoelkerung', ['Kreis', 'Einwohner'], 'numeric', FormatInt),
+        ('LetzteMeldung', ['Kreis', 'Letze Meldung'], 'numeric', FormatInt),
+        ('AnzahlFallTrend', ['Fälle', 'Rw'], 'numeric', FormatFixed2),
+        ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte Woche'], 'numeric', FormatInt),
+        ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorletzte Woche'], 'numeric', FormatInt),
+        ('AnzahlFallPos', ['Fälle', 'total'], 'numeric', FormatInt),
+        ('FaellePro100kLetzte7Tage', ['Fälle je 100000', 'letzte Woche'], 'numeric', FormatFixed1),
+        ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000', 'vorletzte Woche'], 'numeric', FormatFixed1),
+        ('FaellePro100kTrend', ['Fälle je 100000', 'Differenz'], 'numeric', FormatFixed1),
+        ('FaellePro100k', ['Fälle je 100000', 'total'], 'numeric', FormatFixed1),
+        ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte Woche'], 'numeric', FormatInt),
+        ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorletzte Woche'], 'numeric', FormatInt),
+        ('AnzahlTodesfallPos', ['Todesfälle', 'total'], 'numeric', FormatInt),
+        ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000', 'letzte Woche'], 'numeric', FormatFixed2),
+        ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000', 'vorletzte Woche'], 'numeric', FormatFixed2),
+        ('TodesfaellePro100kTrend', ['Todesfälle je 100000', 'Differenz'], 'numeric', FormatFixed2),
+        ('TodesfaellePro100k', ['Todesfälle je 100000', 'total'], 'numeric', FormatFixed2),
+    ]
 
     orderedCols, orderedNames, orderedTypes, orderFormats = zip(*desiredOrder)
     #orderedIndices = np.array(orderedIndices)+1
@@ -436,25 +441,31 @@ bodyLink="bodyLink"
 
 h_Hinweis=html.P([
     html.Span("Hinweis:", className=introClass),
-    html.Span("Dies ist eine privat betriebene Seite, für die Richtigkeit der Berechnung und der Ergebnisse "
-              "übernehme ich keine Gewähr. Im Zweifel mit den ", className=bodyClass),
+    html.Span(" Dies ist eine privat betriebene Seite, für die Richtigkeit der Berechnung und der Ergebnisse "
+              "gibt es keine Gewähr. Im Zweifel mit den ", className=bodyClass),
     html.A("offiziellen Zahlen des RKI abgleichen.",
            href="https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4/page/page_1/",
            className=bodyLink
            ),
-    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen, inbssondere können hohe Zahlen auch Folge eines "
-              "Ausbruch in einer Klinik, einem Heim oder einer Massenunterkunft sein und nicht repräsentativ für die"
-              "Verteilung in der breiten Bevölkerung. Andererseits ist da noch die Dunkelziffer. ", className=bodyClass),
+    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen, inbssondere können hohe Zahlen auch Folge eines"
+              " Ausbruch in einer Klinik, einem Heim oder einer Massenunterkunft sein und nicht repräsentativ für die"
+              " Verteilung in der breiten Bevölkerung. Andererseits ist da noch die Dunkelziffer, die hier mit 6,25"
+              " angenommen wird. (siehe Risiko 1:N) Es laufen also viel mehr meist symptomlose Infizierte umher als Fälle registriert"
+              " sind. Und fast immer gilt: Steigen die Zahlen, ist es nicht unter Kontrolle.", className=bodyClass),
 ])
 
 h_Erlauterung=html.P([
     html.Span(children="Erläuterung:", className=introClass),
-    html.Span(children="Diese Seite bereitet", className=bodyClass),
+    html.Span(children=" Diese Seite bereitet ", className=bodyClass),
     html.A(children = "die RKI COVID19 Daten aus dem NPGEO-Corona-Hub",
               href="https://npgeo-corona-npgeo-de.hub.arcgis.com/datasets/dd4580c810204019a7b8eb3e0b329dd6_0",
               className=bodyLink),
-    html.Span(children="in tabellarischer Form auf. Sie können einfach nach jeder Spalte sortiert werden,"
-                            " indem das Symbol im Kopf der Spalte ggf. mehrfach angewählt wird.", className=bodyClass),
+    html.Span(children=" in tabellarischer Form auf und berechnet u.a. Trends sowie einen Ansteckungsrisikowert für jeden"
+                       " Landkreis. Anfänglich sind die Landkreise in einer Rangliste von gefährlich bis idyllisch sortiert."
+                       " Die Daten können aber nach jeder Spalte sortiert und gefilter werden, siehe 'Benutzung'."
+                        " Anhand der Ampelfarbgebung läßt sich durch Scrollen schnell ein Überblick über viele"
+                        " Landkreise und die Unterschiede zwischen ihnen verschaffen.",
+              className=bodyClass),
 ])
 
 h_Benutzung = html.P([
@@ -468,13 +479,16 @@ h_Benutzung = html.P([
 
     html.P("Im leeren Feld über der Spalte kann ein Filter eingeben werden, z.B. Teil des Namens des Kreises. "
            "Mit Audrücken wie <10 oder >50 können Datensätzte ausgefiltert werden, die bestimmte Werte in der Spalte "
-           "über- oder unterschreiten."
+           "über- oder unterschreiten. Einfach Wert eingeben und <Return> drücken. Eingabe löschen, um Filter zu entfernen."
            , className=bodyClass),
 ])
 
 h_BedeutungSpaltenHead= html.Span("Bedeutung der Spalten:", className=introClass)
 
-h_BedeutungSpaltenIntro=html.Span("Die Bedeutung der meisten Spalten ist aus ihrem Titel zu entnehmen, mit folgenden Ausnahmen:",
+h_BedeutungSpaltenIntro=html.Span("Am aussagekröftigsten sind Werte je 100.000 Einwohner, und da sind derzeit praktisch"
+" nur die letzten beiden Wochen von Interesse. Wie es sich davor zugetragen hat, lassen aber die Gesamtzahlen erahnen."
+' Wo es null Infektion gab, erlaubt ein Blick auf den Zeitpunkt der letzten Meldung, wie lange der Kreis "COVID-frei" ist.'
+" Hier die Bedeutung der Spalten, die nicht offensichtlich ihrem Titel zu entnehmen ist:",
                    className=bodyClass)
 
 h_BedeutungSpalten = html.P([h_BedeutungSpaltenHead,h_BedeutungSpaltenIntro])
@@ -489,17 +503,22 @@ h_Rw = html.Span(["R", html.Sub("w")])
 
 h_RwDef = makeDefinition(h_Rw,
 '''
-Dies ist eine Berechnung der Vermehrung oder Abnahme der Fälle einer Woche in der Folgewoche. Sie entspricht nicht genau
-der normalen Corona-Reproduktionszahl und beträgt etwa das doppelte, setzt aber keine Annahme über das serielle Intervall
-voraus und vermeidet wochentagsbedingte Schwankungen. EIn Wert von 2 bedeutet, dass in der letzten Woche doppelt so viele
-Fälle gemeldet wurden wie in der Vorwoche, ein Wert von 0,5 dedeutet nur halb so viele neue Fälle.                
+ ist ein wöchentlicher Reproduktionsfaktor. Er ist das Verhältnis aller Fälle der letzten 7 Tage gegenüber den 7
+ Tagen davor. Diese Zahl "schlägt" etwa doppelt so stark aus wie der "normale" Reproduktionsfaktor, aber über 1.0 heißt
+ auch hier Ausbreitung und unter 1.0 Rückgang. Ein Wert von 2 bedeutet, dass in der letzten Woche doppelt so viele
+ Fälle gemeldet wurden wie in der vorletzten Woche, ein Wert von 0,5 bedeutet nur halb so viele neue Fälle. 
+ Dieser wöchentlicher Reproduktionsfaktor vermeidet auch wochentagsbedingte Schwankungen und kommt ohne Annahmen wie
+ Dauer des seriellen Intervalls aus und ist leicht nachvollziehbar.             
 ''')
 
-h_Risiko=makeDefinition("Risiko 1:N",
+h_Risiko=makeDefinition("Risiko 1:N/Rang",
 """
-Die Zahl kann so interpretiert werden, dass jeweils eine von der Zahl dieser Personen ansteckend sein kann. 
-Ist sie etwa 100, kann sich im Durchschnitt in jedem Bus oder Waggon ein Ansteckender befinden.
-Sie berechnet sich wie folgt:  
+Je kleiner diese Zahlen sind, umso grösser die Infektionsgefahr. Die Zahl N kann so interpretiert werden, dass jeweils
+eine von N Personen ansteckend sein kann. Ist N etwa 100, kann sich im Durchschnitt in jedem Bus oder Waggon ein 
+Ansteckender befinden. Rang 1 geht an den Landkreis mit der kleinsten Zahl N, also dem höchsten Risiko. Bei Gleichstand,
+der praktisch nur am Tabellenende vorkommt, gewinnt der, wo der letzte Fall länger zurückliegt, bei Gleichstand auch da
+gewinnt der, wo bisher pro 100.000 die wenigsten Fälle gemeldet wurden.  
+N berechnet sich wie folgt:  
 """)
 
 h_LetzteMeldung=makeDefinition("Letzte Meldung",
@@ -510,7 +529,7 @@ gemeldet hat, 5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
 
 
 h_RisikoList=html.Ul([
-    html.Li(["Bevölkerung / Dunkelzifferfaktor / ((Anzahl der Fälle in den letzten 2 Wochen) *",h_Rw,")"]),
+    html.Li(["N = Bevölkerung / Dunkelzifferfaktor / ([Anzahl der Fälle in den letzten 2 Wochen] *",h_Rw,")"]),
     html.Li("Als Faktor für die Dunkelziffer wurde 6,25 gewählt, also auf 1 gemeldeten Infizierten werden 5,25 weitere vermutet"),
     html.Li("Als grobe Annäherung an die Zahl der Ansteckenden wurde die Summe der Fälle der letzten zwei Wochen gewählt"),
     html.Li("Die Zahl der aktuell Ansteckenden wird zudem für die Risikoberechnung hochgerechnet,"
@@ -549,13 +568,21 @@ h_TextFarbenList=html.Ul([
 
 h_TextFarben=html.Div(["Im Text", h_TextFarbenList])
 
-
-h_BgFarbenList=html.Ul([
-    html.Li([makeColorSpan("Rot: ",conditionDanger), "Lasset alle Hoffnung fahren. Die Situation ist praktisch ausser Kontrolle."
-             "Möglichst zu Hause bleiben und außer Haus bestmögliche Schutzmassnahmen ergreifen. Gegend weiträumig meiden."
-             "Wer kürzlich da war könnte infiziert sein."], style=LiStyle),
-    html.Li([makeColorSpan("Grün: ",conditionSafe), "Einheimische da könnten völlig entspannt sein, wenn sie keinen "
-             "ungeschützten Kontakt mit Fremden aus anderen Kreisen hätten. Würde da bleiben und niemanden rein lassen."], style=LiStyle),
+h_BgFarbenList = html.Ul(
+    [
+        html.Li([makeColorSpan("Rot: ", conditionDanger),
+                 "Lasset alle Hoffnung fahren. Die Situation ist praktisch ausser Kontrolle."
+                 "Wer kürzlich da war und ungeschützte Kontakte hatte, ist mit einer Wahrscheinlichkeit von 1:N infiziert."
+                 "Empfehlung: Möglichst zu Hause bleiben und außer Haus bestmögliche Schutzmaßnahmen ergreifen. Gegend weiträumig meiden."
+                ],
+                style=LiStyle
+        ),
+        html.Li([makeColorSpan("Grün: ",conditionSafe),
+                 "Einheimische da könnten völlig entspannt sein, wenn sie keinen "
+                 "ungeschützten Kontakt mit Fremden aus anderen Kreisen hätten. Empfehlung: Da bleiben und niemanden rein lassen."
+                ],
+                style=LiStyle
+        ),
     ],
     style = {#'padding': '10px',
              #'line-height': '2.5em',
