@@ -30,6 +30,9 @@ import datatable as dt
 import json
 import dash_table.FormatTemplate as FormatTemplate
 #import markdown
+import socket
+
+print("Running on host '{}'".format(socket.gethostname()))
 
 def pretty(jsonmap):
     print(json.dumps(jsonmap, sort_keys=False, indent=4, separators=(',', ': ')))
@@ -187,15 +190,17 @@ def makeColumns():
 
 server = flask.Flask(__name__)
 
-@server.route('/covid/Landkreise/about')
+#@server.route('/covid/Landkreise/about')
+@server.route('/covid/risks/about')
 def index():
-    return 'Hello Covid Flask app'
+    return 'Nothing to see here!'
 
 app = dash.Dash(
     __name__,
     server=server,
-    routes_pathname_prefix='/covid/Landkreise/',
-#    assets_external_path = 'http://covid/Landkreise/assets'
+    routes_pathname_prefix='/covid/risks/',
+    # routes_pathname_prefix='/covid/Landkreise/',
+    #    assets_external_path = 'http://covid/Landkreise/assets'
 )
 #app.css.append_css({'external_url': 'assets/reset.css'})
 
@@ -447,25 +452,51 @@ h_Hinweis=html.P([
            href="https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4/page/page_1/",
            className=bodyLink
            ),
-    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen, inbssondere können hohe Zahlen auch Folge eines"
+    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen, inbesondere können hohe Zahlen auch Folge eines"
               " Ausbruch in einer Klinik, einem Heim oder einer Massenunterkunft sein und nicht repräsentativ für die"
               " Verteilung in der breiten Bevölkerung. Andererseits ist da noch die Dunkelziffer, die hier mit 6,25"
               " angenommen wird. (siehe Risiko 1:N) Es laufen also viel mehr meist symptomlose Infizierte umher als Fälle registriert"
               " sind. Und fast immer gilt: Steigen die Zahlen, ist es nicht unter Kontrolle.", className=bodyClass),
+    html.P(
+        " Und ja, Ranglisten sind unfair, aber nachdem die Zahlen kleiner werden, ist der Blick in die Regionen umso"
+        " aufschlussreicher und hilft vielleicht, die Aufmerksamkeit auf die Orte zu richten, wo die Situation besonders"
+        " schlimm und gefährlich ist. Es lohnt sich aber auch, bis ganz nach unten zu scrollen und auch beruhigend viel grün"
+        " zu sehen.", className=bodyClass),
 ])
 
 h_Erlauterung=html.P([
-    html.Span(children="Erläuterung:", className=introClass),
-    html.Span(children=" Diese Seite bereitet ", className=bodyClass),
-    html.A(children = "die RKI COVID19 Daten aus dem NPGEO-Corona-Hub",
+    html.Span("Erläuterung:", className=introClass),
+    html.Span(" Diese Seite bereitet ", className=bodyClass),
+    html.A("die RKI COVID19 Daten aus dem NPGEO-Corona-Hub",
               href="https://npgeo-corona-npgeo-de.hub.arcgis.com/datasets/dd4580c810204019a7b8eb3e0b329dd6_0",
               className=bodyLink),
-    html.Span(children=" in tabellarischer Form auf und berechnet u.a. Trends sowie einen Ansteckungsrisikowert für jeden"
-                       " Landkreis. Anfänglich sind die Landkreise in einer Rangliste von gefährlich bis idyllisch sortiert."
-                       " Die Daten können aber nach jeder Spalte sortiert und gefilter werden, siehe 'Benutzung'."
-                        " Anhand der Ampelfarbgebung läßt sich durch Scrollen schnell ein Überblick über viele"
-                        " Landkreise und die Unterschiede zwischen ihnen verschaffen.",
-              className=bodyClass),
+    html.Span(" in tabellarischer Form auf und berechnet u.a. Trends sowie einen Ansteckungsrisikowert für jeden"
+            " Landkreis. Anfänglich sind die Landkreise in einer Rangliste von gefährlich bis idyllisch sortiert."
+            " Die Daten können aber nach jeder Spalte sortiert und gefilter werden, siehe 'Benutzung'."
+            " Anhand der Ampelfarbgebung läßt sich durch Scrollen schnell ein Überblick über viele"
+            " Landkreise und die Unterschiede zwischen ihnen verschaffen.",
+            className=bodyClass),
+])
+
+h_About=html.P([
+    html.Span("Der Autor über sich:", className=introClass),
+    html.Span(" Bin weder Webentwickler noch Virologe noch Statisker, aber habe mich in den letzten Wochen sehr"
+              " intensiv mit vielen Aspekten rund um den neuen Corona-Virus auseinander gesetzt, fast täglich"
+              , className=bodyClass),
+    html.A(" auf Twitter",
+              href="https://twitter.com/pavel23",
+              className=bodyLink),
+    html.Span(" und rede einmal in der Woche mit Time Pritlove", className=bodyClass),
+    html.A("  im Corona Weekly Podcast",
+           href="http://ukw.fm/category/corona-krise/corona-weekly/",
+           className=bodyLink),
+    html.Span(" über Zahlen und Apps und News über das Virus. Wir versuchen, das Geschehen zu verstehen, einzuordnen,"
+              " zu erklären und zu bewerten. Diese Webseite ist ein Teil meiner Bemühungen, zu verstehen,"
+              " was hier gerade passiert und andere daran teilhaben zu lassen."
+              " Vielleicht trägt sie ja dazu bei, dass der Eine beruhigter oder der Andere vorsichtiger in den Tag geht."
+              " Und es würde mich freuen, wenn ich bessere Daten hätte, liebes Robert-Koch Institut."
+              , className=bodyClass),
+
 ])
 
 h_Benutzung = html.P([
@@ -632,6 +663,7 @@ h_Bedeutungen = html.Table([
 
 betterExplanation = html.Div([
     h_Erlauterung,
+    h_About,
     h_Hinweis,
     h_Bedeutungen,
     h_Benutzung
@@ -655,4 +687,5 @@ app.layout = html.Div([
 ])
 
 if __name__ == '__main__':
-    app.run_server(host='0.0.0.0', port=1024,debug=True)
+    debugFlag = socket.gethostname() == 'pavlator.local'
+    app.run_server(host='0.0.0.0', port=1024,debug=debugFlag)
