@@ -1,3 +1,5 @@
+
+import cov_dates as cd
 import csv
 import json
 import urllib.request
@@ -13,7 +15,7 @@ from matplotlib.animation import FFMpegWriter
 from matplotlib.animation import ImageMagickWriter
 import datatable as dt
 
-UPDATE = True # fetch new data
+UPDATE = False # fetch new data
 REFRESH= True or UPDATE # recreate enriched, consolidated dump
 
 def autolabel(ax, bars, color, label_range):
@@ -217,92 +219,7 @@ def saveJson(fileName, objectToSave):
     with open(fileName, 'w') as outfile:
         json.dump(objectToSave, outfile)
 
-day0 = time.strptime("22.2.2020", "%d.%m.%Y") # struct_time
-day0t = time.mktime(day0) # float timestamp since epoch
-day0d = datetime.fromtimestamp(day0t) # datetime.datetime
 
-weekDay = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
-
-def dateStrFromStampStr(s) -> str:
-    t = time.gmtime(int(s)/1000) #time.struct_time
-    return "{}.{}.{}".format(t.tm_mday, t.tm_mon,t.tm_year)
-
-def dateTimeStrFromStampStr(s) -> str:
-    t = time.gmtime(int(s)/1000) #time.struct_time
-    return "{0},{1:02d}.{2:02d}.{3} {4:02d}:{5:02d}".format(weekDay[t.tm_wday], t.tm_mday, t.tm_mon,t.tm_year,t.tm_hour, t.tm_min)
-
-def dateFromDay(day) -> datetime:
-    return day0d + timedelta(day)
-
-def dateStrFromDay(day) -> str:
-    result = dateFromDay(day)
-    return "{}.{}.{}".format(result.day, result.month, result.year)
-
-def dateStrYMDFromDay(day) -> str:
-    result = dateFromDay(day)
-    return "{0:04d}-{1:02d}-{2:02d}".format(result.year, result.month, result.day)
-
-def dateStrDMFromDay(day) -> str:
-    result = dateFromDay(day)
-    return "{}.{}".format(result.day,result.month)
-
-def dateStrWDMFromDay(day) -> str:
-    result = dateFromDay(day)
-    return "{}, {}.{}".format(weekDay[result.weekday()],result.day, result.month, result.year)
-
-def dayFromDate(date) -> int:
-    delta = date - day0d
-    return delta.days
-
-def dayFromTime(t) -> int:
-    return dayFromDate(datetime.fromtimestamp(time.mktime(t)))
-
-def dayFromStampStr(s) -> int:
-    d = datetime.fromtimestamp(int(s) / 1000)
-    delta = d - day0d
-    return delta.days
-
-def todayDay():
-    return dayFromTime(time.localtime())
-
-FeiertagDates = ["10.4.2020", "13.4.2020", "1.5.2020"]
-Feiertage = [dayFromTime(time.strptime(f, "%d.%m.%Y")) for f in FeiertagDates]
-
-print("Feiertage",Feiertage)
-
-def daysWorkedOrNot(fromDay, toDay) -> ([bool], [int]):
-    workDays = []
-    consecutiveDays = []
-
-    for day in range(fromDay,toDay):
-        date = dateFromDay(day)
-        dayOfWeek = date.weekday() # 0=Mo, 6= So
-        isFeiertag = day in Feiertage
-        isAWorkDay = dayOfWeek>=0 and dayOfWeek <=4 and not isFeiertag
-        workDays.append(isAWorkDay)
-
-    if workDays[0]:
-        consecutiveDay = dateFromDay(0).weekday()
-    else:
-        consecutiveDay = dateFromDay(0).weekday() - 5
-
-    wasWorkDay = workDays[0]
-    consecutiveDays.append(consecutiveDay)
-    for day in range(fromDay+1,toDay):
-        if workDays[day] == wasWorkDay:
-            consecutiveDay = consecutiveDay + 1
-        else:
-            wasWorkDay = workDays[day]
-            consecutiveDay = 0
-        consecutiveDays.append(consecutiveDay)
-
-    return (workDays, consecutiveDays)
-
-def kindOfDayIndex(day, workDays, consecutiveDays):
-    if workDays[day]:
-        return consecutiveDays[day]
-    else:
-        return consecutiveDays[day]+5
 
 def addDates(records):
     cases = 0
@@ -310,8 +227,8 @@ def addDates(records):
     sameDay = 0
     for data in records:
         record = data["attributes"]
-        record["RefdatumKlar"] = dateTimeStrFromStampStr(record["Refdatum"])
-        record["MeldedatumKlar"] = dateTimeStrFromStampStr(record["Meldedatum"])
+        record["RefdatumKlar"] = cd.dateTimeStrFromStampStr(record["Refdatum"])
+        record["MeldedatumKlar"] = cd.dateTimeStrFromStampStr(record["Meldedatum"])
         cases = cases + int(record["AnzahlFall"])
         dead = dead + int(record["AnzahlTodesfall"])
         record["AnzahlFallLfd"] = cases
@@ -442,7 +359,7 @@ def byDate(records, whichDate, filterFunc):
     return result
 
 
-print("day0={} {}".format(day0, day0t))
+print("day0={} {}".format(cd.day0, cd.day0t))
 
 # def cleanup(jsondump):
 #     records = []
@@ -458,13 +375,13 @@ print("day0={} {}".format(day0, day0t))
 # saveJson("archive/rki-1.5.json",f2)
 
 def archiveFilename(day):
-    return "archive/NPGEO-RKI-{}.json".format(dateStrYMDFromDay(day))
+    return "archive/NPGEO-RKI-{}.json".format(cd.dateStrYMDFromDay(day))
 
 def deltaJsonFilename(day):
-    return "delta/NPGEO-RKI-delta-{}.json".format(dateStrYMDFromDay(day))
+    return "delta/NPGEO-RKI-delta-{}.json".format(cd.dateStrYMDFromDay(day))
 
 def csvFilename(day,kind,dir):
-    return "{}/NPGEO-RKI-{}-{}.csv".format(dir, dateStrYMDFromDay(day),kind)
+    return "{}/NPGEO-RKI-{}-{}.csv".format(dir, cd.dateStrYMDFromDay(day),kind)
 
 allRecords = []
 
@@ -600,12 +517,12 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
     for record in currentRecords:
         attrs = record['attributes']
 
-        attrs['RefDay']=dayFromStampStr(attrs["Refdatum"])
-        attrs['MeldeDay']=dayFromStampStr(attrs["Meldedatum"])
+        attrs['RefDay']=cd.dayFromStampStr(attrs["Refdatum"])
+        attrs['MeldeDay']=cd.dayFromStampStr(attrs["Meldedatum"])
         attrs['LandkreisName']=attrs["Landkreis"][2:]
         attrs['LandkreisTyp']=attrs["Landkreis"][:2]
         if int(attrs["IstErkrankungsbeginn"]):
-            attrs['ErkDay'] = dayFromStampStr(attrs["Refdatum"])
+            attrs['ErkDay'] = cd.dayFromStampStr(attrs["Refdatum"])
 
         neuerFall = int(attrs['NeuerFall'])
         neuerFallNurHeute = neuerFall == 1
@@ -694,12 +611,12 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
             attrs['newDeathOnDay'] = currentDay - 1
 
     print("Day {}, {}, cases={}, newCases={}, deaths={}, newDeaths={} newRecords={}".format(
-        currentDay, dateStrFromDay(currentDay),totalCases,totalNewCases,totalDeaths,totalNewDeaths,len(newCaseRecords)))
+        currentDay, cd.dateStrFromDay(currentDay),totalCases,totalNewCases,totalDeaths,totalNewDeaths,len(newCaseRecords)))
 
     print("Day {}, {}, oldRecords={} newRecords={} oldCaseRecords={} newCaseRecords={} oldDeathRecords={} newDeathRecords={}".format(
-        currentDay, dateStrFromDay(currentDay), len(oldRecords),len(newRecords), len(oldCaseRecords),len(newCaseRecords),
+        currentDay, cd.dateStrFromDay(currentDay), len(oldRecords),len(newRecords), len(oldCaseRecords),len(newCaseRecords),
         len(oldDeathRecords),len(newDeathRecords)))
-    print("Day {}, {}, totalCompensated={} totalNotCompensated={}".format(currentDay, dateStrFromDay(currentDay), totalCompensated, totalNotCompensated))
+    print("Day {}, {}, totalCompensated={} totalNotCompensated={}".format(currentDay, cd.dateStrFromDay(currentDay), totalCompensated, totalNotCompensated))
 
 
     return globalID, oldRecords, newRecords, oldCaseRecords, newCaseRecords, oldDeathRecords, newDeathRecords
@@ -709,8 +626,8 @@ def loadRecords():
     firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
     #lastRecordTime = time.strptime("10.5.2020", "%d.%m.%Y")  # struct_time
     lastRecordTime = time.localtime()  # struct_time
-    firstRecordDay = dayFromTime(firstRecordTime)
-    lastRecordDay = dayFromTime(lastRecordTime)
+    firstRecordDay = cd.dayFromTime(firstRecordTime)
+    lastRecordDay = cd.dayFromTime(lastRecordTime)
 
     allDatedRecords = []
     previousMsgHashes = None
@@ -726,7 +643,7 @@ def loadRecords():
 
         if previousMsgHashes is not None:
             addedMessages, removedMessages, addedMessageCount, removedMessageCount, sameMessageCount = compareRecords(previousMsgHashes, currentMsgHashes)
-            print("Message sets day {}, {}  added={}, removed={}, same={}".format(day, dateStrDMFromDay(day), addedMessageCount, removedMessageCount, sameMessageCount))
+            print("Message sets day {}, {}  added={}, removed={}, same={}".format(day, cd.dateStrDMFromDay(day), addedMessageCount, removedMessageCount, sameMessageCount))
             for msg in removedMessages:
                 (n, hash) = msg
                 anExampleRecord = previousMsgHashes[hash][0]

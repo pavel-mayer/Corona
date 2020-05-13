@@ -6,6 +6,7 @@
 # pip install Click==7.0 Flask==1.1.1 itsdangerous==1.1.0 Jinja2==2.10.3 MarkupSafe==1.1.1 uWSGI==2.0.18 Werkzeug==0.16.0
 # pip install: dash pandas datatable feather-format
 
+import cov_dates as cd
 
 import os
 import flask
@@ -13,12 +14,16 @@ from flask import render_template
 
 import dash
 import dash_table
+from dash_table.Format import Format, Scheme, Sign, Symbol
+import dash_core_components as dcc
+import dash_html_components as html
+
 import pandas as pd
 import numpy as np
 import datatable as dt
 import json
 import dash_table.FormatTemplate as FormatTemplate
-from dash_table.Format import Format, Scheme, Sign, Symbol
+#import markdown
 
 def pretty(jsonmap):
     print(json.dumps(jsonmap, sort_keys=False, indent=4, separators=(',', ': ')))
@@ -77,25 +82,27 @@ def loadAndProcessData(dataFilename):
                dt.sum(dt.f.FaellePro100k),
                dt.sum(dt.f.AnzahlTodesfallPos),
                dt.sum(dt.f.TodesfaellePro100k),
-               dt.mean(dt.f.Bevoelkerung)],
-       dt.by(dt.f.LandkreisName)]
+               dt.mean(dt.f.Bevoelkerung),
+               dt.max(dt.f.MeldeDay)],
+    dt.by(dt.f.LandkreisName)]
 
     last7days=fullTable[dt.f.newCaseOnDay>lastDay-7,:][:,
               [dt.sum(dt.f.AnzahlFallPos),
                dt.sum(dt.f.FaellePro100k),
                dt.sum(dt.f.AnzahlTodesfallPos),
-               dt.sum(dt.f.TodesfaellePro100k)],
+               dt.sum(dt.f.TodesfaellePro100k),
+               dt.max(dt.f.MeldeDay)],
        dt.by(dt.f.LandkreisName)]
-    last7days.names=["LandkreisName","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage","TodesfaellePro100kLetzte7Tage"]
+    last7days.names=["LandkreisName","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage","TodesfaellePro100kLetzte7Tage","LastMeldeDayLetzte7Tage"]
 
-    ## todo: increase when more data here
-    lastWeek7days=fullTable[(dt.f.newCaseOnDay > lastDay-13) & (dt.f.newCaseOnDay<=lastDay-6),:][:,
+    lastWeek7days=fullTable[(dt.f.newCaseOnDay > lastDay-14) & (dt.f.newCaseOnDay<=lastDay-7),:][:,
               [dt.sum(dt.f.AnzahlFallPos),
                dt.sum(dt.f.FaellePro100k),
                dt.sum(dt.f.AnzahlTodesfallPos),
-               dt.sum(dt.f.TodesfaellePro100k)],
+               dt.sum(dt.f.TodesfaellePro100k),
+               dt.max(dt.f.MeldeDay)],
        dt.by(dt.f.LandkreisName)]
-    lastWeek7days.names=["LandkreisName","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor","AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
+    lastWeek7days.names=["LandkreisName","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor","AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor","LastMeldeDayLetzte7TageDavor"]
 
     allDaysExt0 = merge(alldays, last7days, "LandkreisName")
     allDaysExt1 = merge(allDaysExt0, lastWeek7days, "LandkreisName")
@@ -118,14 +125,14 @@ def loadAndProcessData(dataFilename):
 # (9, 'TodesfaellePro100kLetzte7Tage'), (10, 'AnzahlFallLetzte7TageDavor'), (11, 'FaellePro100kLetzte7TageDavor'),
 # (12, 'AnzahlTodesfallLetzte7TageDavor'),(13, 'TodesfaellePro100kLetzte7TageDavor'), (14, 'AnzahlFallTrend'),
 # (15, 'FaellePro100kTrend'), (16, 'TodesfaellePro100kTrend'), (17, 'Kontaktrisiko')]
-
+# Column names frame order: [(0, 'LandkreisName'), (1, 'AnzahlFallPos'), (2, 'FaellePro100k'), (3, 'AnzahlTodesfallPos'), (4, 'TodesfaellePro100k'), (5, 'Bevoelkerung'), (6, 'AnzahlFallLetzte7Tage'), (7, 'FaellePro100kLetzte7Tage'), (8, 'AnzahlTodesfallLetzte7Tage'), (9, 'TodesfaellePro100kLetzte7Tage'), (10, 'AnzahlFallLetzte7TageDavor'), (11, 'FaellePro100kLetzte7TageDavor'), (12, 'AnzahlTodesfallLetzte7TageDavor'), (13, 'TodesfaellePro100kLetzte7TageDavor'), (14, 'AnzahlFallTrend'), (15, 'FaellePro100kTrend'), (16, 'TodesfaellePro100kTrend'), (17, 'Kontaktrisiko')]
 def makeColumns():
     desiredOrder = [(0, 'LandkreisName', ['Kreis','Name'],'text',Format()),
                     (5, 'Bevoelkerung', ['Kreis','Einwohner'],'numeric',FormatInt),
                     (17, 'Kontaktrisiko', ['Kreis','Risiko 1:N'],'numeric',FormatInt),
                     (1, 'AnzahlFallPos', ['Fälle','total'],'numeric',FormatInt),
                     (6, 'AnzahlFallLetzte7Tage', ['Fälle','letzte Woche'] ,'numeric',FormatInt),
-                    (14, 'AnzahlFallTrend', ['Fälle','R'] ,'numeric',FormatFixed2),
+                    (14, 'AnzahlFallTrend', ['Fälle','Rw'] ,'numeric',FormatFixed2),
                     (10, 'AnzahlFallLetzte7TageDavor',['Fälle','vorletzte Woche'],'numeric',FormatInt),
                     (2, 'FaellePro100k',['Fälle je 100000','total'],'numeric',FormatFixed1),
                     (15, 'FaellePro100kTrend',['Fälle je 100000','Differenz'] ,'numeric',FormatFixed1),
@@ -150,15 +157,17 @@ def makeColumns():
 
 server = flask.Flask(__name__)
 
-@server.route('/')
+@server.route('/covid/Landkreise/about')
 def index():
     return 'Hello Covid Flask app'
 
 app = dash.Dash(
     __name__,
     server=server,
-    routes_pathname_prefix='/covid/'
+    routes_pathname_prefix='/covid/Landkreise/',
+#    assets_external_path = 'http://covid/Landkreise/assets'
 )
+#app.css.append_css({'external_url': 'assets/reset.css'})
 
 fullTableFilename = "full-latest.csv"
 cacheFilename = "data-cached.feather"
@@ -172,11 +181,22 @@ else:
     print("Loading data cache from ‘"+cacheFilename+"‘")
     dframe = pd.read_feather(cacheFilename)
 
+maxDay = float(dframe["MeldeDay"].max())
+#print(maxDay)
+dataVersionDate = cd.dateStrWDMYFromDay(maxDay)
+print("Loading done, max Day {} date {}".format(maxDay, dataVersionDate))
+
+print("Creating Datatable")
 data = dframe.to_dict("records")
 columns = makeColumns()
-print("Loading done, creating Datatable")
 
-app.layout = dash_table.DataTable(
+colors = {
+    'background': 'black',
+    'text': 'white'
+}
+
+
+h_table = dash_table.DataTable(
     id='table',
     columns=columns,
     data=data,
@@ -187,15 +207,38 @@ app.layout = dash_table.DataTable(
     style_cell={'textAlign': 'right',
                 'padding': '5px',
                 'backgroundColor': 'rgb(50, 50, 50)',
-                'color': 'white'
+                'color': 'white',
     },
+    style_data={
+        'border-bottom': '1px solid rgb(50, 50, 50)',
+        'border-left': '1px solid rgb(128, 128, 128)',
+        'border-right': '1px solid rgb(128, 128, 128)'
+},
+    # style_as_list_view = True,
+    style_header={
+        'backgroundColor': colors['background'],
+        'color': 'white',
+        #'fontWeight': 'bold',
+        #        'height': '100px',
+        'whiteSpace': 'normal',
+        'height': 'auto',
+        'overflow-wrap': 'normal',
+        'textAlign': 'center'
+    },
+    merge_duplicate_headers=True,
     style_cell_conditional=[
         {
             'if': {'column_id': 'LandkreisName'},
             'textAlign': 'left'
-        }
+        },
+
     ],
     style_data_conditional=[
+        {
+            'if': {'column_id': 'Kontaktrisiko'},
+            'border-left': '3px solid blue',
+            'border-right': '3px solid blue',
+        },
         {
             'if': {'row_index': 'odd'},
             'backgroundColor': 'rgb(70, 70, 70)'
@@ -207,7 +250,7 @@ app.layout = dash_table.DataTable(
                 'column_id': ['FaellePro100kLetzte7Tage', 'LandkreisName']
             },
             'backgroundColor': 'green',
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             'color': 'white'
         },
         {
@@ -216,7 +259,7 @@ app.layout = dash_table.DataTable(
                 'column_id': ['FaellePro100kLetzte7Tage', 'LandkreisName']
             },
             #            'backgroundColor': 'tomato',
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             'color': 'lightgreen'
         },
         {
@@ -225,7 +268,7 @@ app.layout = dash_table.DataTable(
                 'column_id': ['FaellePro100kLetzte7Tage','LandkreisName']
             },
             #            'backgroundColor': 'tomato',
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             'color': 'yellow'
         },
         {
@@ -234,7 +277,7 @@ app.layout = dash_table.DataTable(
                 'column_id': ['FaellePro100kLetzte7Tage','LandkreisName']
             },
             #            'backgroundColor': 'tomato',
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             'color': 'tomato'
         },
         {
@@ -242,7 +285,7 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{FaellePro100kLetzte7Tage} > 50',
                 'column_id': ['FaellePro100kLetzte7Tage','LandkreisName']
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             'backgroundColor': 'firebrick',
             'color': 'white'
         },
@@ -254,7 +297,7 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{FaellePro100kTrend} > 0',
                 'column_id': 'FaellePro100kTrend'
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             #'backgroundColor': 'tomato',
             'color': 'tomato'
         },
@@ -264,7 +307,7 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{AnzahlFallTrend} > 1',
                 'column_id': 'AnzahlFallTrend'
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             #'backgroundColor': 'tomato',
             'color': 'tomato'
         },
@@ -273,7 +316,7 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{AnzahlFallTrend} > 0.9 && {AnzahlFallTrend} <= 1',
                 'column_id': 'AnzahlFallTrend'
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             # 'backgroundColor': 'tomato',
             'color': 'yellow'
         },
@@ -282,7 +325,7 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{AnzahlFallTrend} < 0.7',
                 'column_id': 'AnzahlFallTrend'
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             # 'backgroundColor': 'tomato',
             'color': 'lightgreen'
         },
@@ -292,7 +335,7 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{Kontaktrisiko} > 0 && {Kontaktrisiko} < 100',
                 'column_id': ['Kontaktrisiko','LandkreisName']
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             'backgroundColor': 'firebrick',
             'color': 'white'
         },
@@ -301,7 +344,7 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{Kontaktrisiko} >= 100 && {Kontaktrisiko} < 1000',
                 'column_id': ['Kontaktrisiko','LandkreisName']
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             # 'backgroundColor': 'tomato',
             'color': 'tomato'
         },
@@ -310,7 +353,7 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{Kontaktrisiko} >= 1000 && {Kontaktrisiko} < 2500',
                 'column_id': ['Kontaktrisiko','LandkreisName']
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             # 'backgroundColor': 'tomato',
             'color': 'yellow'
         },
@@ -319,7 +362,7 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{Kontaktrisiko} >= 5000 && {Kontaktrisiko} < 10000',
                 'column_id': ['Kontaktrisiko','LandkreisName']
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             # 'backgroundColor': 'tomato',
             'color': 'lightgreen'
         },
@@ -328,25 +371,186 @@ app.layout = dash_table.DataTable(
                 'filter_query': '{Kontaktrisiko} > 10000',
                 'column_id': ['Kontaktrisiko','LandkreisName']
             },
-            'fontWeight': 'bold',
+            #'fontWeight': 'bold',
             'backgroundColor': 'green',
             'color': 'white'
         },
 
     ],
-#    style_as_list_view = True,
-    style_header={
-        'backgroundColor': 'rgb(30, 30, 30)',
-        'color': 'white',
-        'fontWeight': 'bold',
-#        'height': '100px',
-        'whiteSpace': 'normal',
-        'height': 'auto',
-        'overflow-wrap': 'normal',
-        'textAlign': 'center'
-    },
-    merge_duplicate_headers=True,
+
 )
+
+def readExplanation():
+    with open('explainer.md', 'r') as file:
+        data = file.read()
+    return data
+
+h_header = html.Header(
+    style={
+        'backgroundColor': colors['background'],
+    },
+    children=[
+        html.H1(className="app-header", children="COVID Risiko Deutschland nach Landkreisen", style={'color': colors['text']}),
+        html.H2(className="app-header-date", children="Letzte Meldung: {}".format(dataVersionDate), style={'color': colors['text']})
+    ]
+)
+
+h_explanation = dcc.Markdown(
+    readExplanation(),
+    style={
+        'backgroundColor': colors['background'],
+        'color': 'white',
+        'line-height:': '1.8',
+    },
+    dangerously_allow_html=True,
+)
+
+introClass="intro"
+bodyClass="bodyText"
+bodyLink="bodyLink"
+
+h_Hinweis=html.P([
+    html.Span(children="Hinweis:", className=introClass),
+    html.Span(children="Dies ist eine privat betriebene Seite, für die Richtigkeit der Berechnung und der Ergebnisse"
+                             "übernehme ich keine Gewähr. Im Zweifel mit den", className=bodyClass),
+    html.A(children="offiziellen Zahlen des RKI abgleichen.",
+              href="https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4/page/page_1/",
+              className=bodyLink
+              )])
+
+h_Erlauterung=html.P([
+    html.Span(children="Erläuterung:", className=introClass),
+    html.Span(children="Diese Seite bereitet", className=bodyClass),
+    html.A(children = "die RKI COVID19 Daten aus dem NPGEO-Corona-Hub",
+              href="https://npgeo-corona-npgeo-de.hub.arcgis.com/datasets/dd4580c810204019a7b8eb3e0b329dd6_0",
+              className=bodyLink),
+    html.Span(children="in tabellarischer Form auf. Sie können einfach nach jeder Spalte sortiert werden,"
+                            " indem das Symbol im Kopf der Spalte ggf. mehrfach angewählt wird.", className=bodyClass),
+])
+
+h_BedeutungSpaltenHead= html.Span("Bedeutung der Spalten:", className=introClass)
+
+h_BedeutungSpaltenIntro=html.Span("Die Bedeutung der meisten Spalten ist aus ihrem Titel zu entnehmen, mit folgenden Ausnahmen:",
+                   className=bodyClass)
+
+h_BedeutungSpalten = html.P([h_BedeutungSpaltenHead,h_BedeutungSpaltenIntro])
+
+def makeDefinition(value, definition):
+    return html.Div([
+        html.Span(children=value, className=introClass),
+        html.Span(children=definition, className=bodyClass),
+    ])
+
+h_Rw = html.Span(["R", html.Sub("w")])
+
+h_RwDef = makeDefinition(h_Rw,
+'''
+Dies ist eine Berechnung der Vermehrung oder Abnahme der Fälle einer Woche in der Folgewoche. Sie entspricht nicht genau
+der normalen Corona-Reproduktionszahl und beträgt etwa das doppelte, setzt aber keine Annahme über das serielle Intervall
+voraus und vermeidet wochentagsbedingte Schwankungen. EIn Wert von 2 bedeutet, dass in der letzten Woche doppelt so viele
+Fälle gemeldet wurden wie in der Vorwoche.                
+''')
+
+h_Risiko=makeDefinition("Risiko 1:N",
+"""
+Die Zahl kann so interpretiert werden, dass jeweils eine von der Zahl dieser Personen ansteckend sein kann. 
+Ist sie etwa 100, kann sich im Durchschnitt in jedem Bus oder Waggon ein Ansteckender befinden.
+Sie berechnet sich wie folgt:  
+""")
+
+h_RisikoList=html.Ul([
+    html.Li(["Bevölkerung / 6.25 / ((Anzahl der Fälle in den letzten 2 Wochen) *",h_Rw,")"]),
+    html.Li("Als grobe Annäherung an die Zahl der Ansteckenden wurde die Summe der Fälle der letzten zwei Wochen gewählt"),
+    html.Li("Als Faktor für die Dunkelziffer wurde 6.25 gewählt"),
+    html.Li("Die Zahl der aktuell Ansteckenden wird zudem für die Risikoberechnung hochgerechnet,"
+            "indem die Entwicklung von der vorletzen Woche zur letzen Woche prozentual unverändert fortgeschrieben"
+            "und damit eher dem Stand am heutigen Tag entspricht."),
+    html.Li("Die Dunkelziffer kann bis 1,5 fach höher sein, die Zahl der Anstecken auch halb so hoch,"
+            "so dass der Risokowerte als nicht allzu übertriebene Obergrenze für den Anteil der Ansteckenden zu sehen ist."),
+])
+
+h_BedeutungFarbenHead = html.Span(children="Bedeutung der Farben:", className=introClass)
+h_BedeutungFarbenIntro = html.Span(
+    "Was die Farben bedeuten und wie die Schwellwerte gesetzt sind, ist eher subjektive "
+    "und kann sich ändern. Hier die beabsichtigte Bedeutung der Farben:",
+    className=bodyClass)
+
+h_BedeutungFarben=html.P([h_BedeutungFarbenHead, h_BedeutungFarbenIntro])
+
+def makeColorSpan(text, className):
+    return html.Span(text, className=className)
+
+conditionDanger="conditionDanger"
+conditionTooHigh="conditionTooHigh"
+conditionSerious="conditionSerious"
+conditionGood="conditionGood"
+conditionSafe="conditionSafe"
+
+h_TextFarbenList=html.Ul([
+    html.Li([makeColorSpan("Rot: ",conditionTooHigh), "Zahl ist zu hoch und es müssen dringend Massnahmen getroffen werden, um sie zu senken"]),
+    html.Li([makeColorSpan("Gelb: ",conditionSerious), "Zahl ist zu hoch, um zur Tagesordnung zurückzukehren"]),
+    html.Li([makeColorSpan("Grün: ",conditionGood), "Zahl ist in Ordnung"]),
+])
+
+h_TextFarben=html.Div(["Im Text", h_TextFarbenList])
+
+
+h_BgFarbenList=html.Ul([
+    html.Li([makeColorSpan("Rot: ",conditionDanger), "Lasset alle Hoffnung fahren. Die Situation ist praktisch ausser Kontrolle."
+             "Möglichst zu Hause bleiben und außer Haus bestmögliche Schutzmassnahmen ergreifen. Gegend weiträumig meiden."
+             "Wer kürzlich da war könnte infiziert sein."]),
+    html.Li([makeColorSpan("Grün: ",conditionSafe), "Einheimische da könnten völlig entspannt sein, wenn sie keinen "
+             "ungeschützten Kontakt mit Fremden aus anderen Kreisen hätten. Würde da bleiben und niemanden rein lassen."]),
+])
+
+h_BgtFarben=html.Div(["Feld mit Farbe hinterlegt", h_BgFarbenList])
+
+h_BedeutungSpaltenDef = html.Ul([html.Li(h_RwDef),
+                                 html.Li([h_Risiko, h_RisikoList]),
+                                 ])
+
+h_BedeutungFarbenDef = html.Ul([html.Li(h_TextFarben),
+                                html.Li([h_BgtFarben]),
+                                ])
+h_Bedeutungen = html.Table([
+        html.Tr([html.Th(h_BedeutungSpaltenHead), html.Td(h_BedeutungFarbenHead)]),
+        html.Tr([html.Td(h_BedeutungSpaltenIntro), html.Td(h_BedeutungFarbenIntro)]),
+        html.Tr([html.Td(h_BedeutungSpaltenDef), html.Td(h_BedeutungFarbenDef)])
+],
+    style={'padding': '0 0'}
+)
+
+h_BedeutungenVert = html.Div([
+    h_BedeutungSpalten,
+    html.Ul([html.Li(h_RwDef),
+             html.Li([h_Risiko, h_RisikoList]),
+             ]),
+    h_BedeutungFarben,
+    html.Ul([html.Li(h_TextFarben),
+             html.Li([h_BgtFarben]),
+             ])
+])
+
+betterExplanation = html.Div([
+    h_Hinweis,
+    h_Erlauterung,
+    h_Bedeutungen
+    ],
+    style={'padding': '5px',
+           'backgroundColor': 'rgb(50, 50, 50)',
+           'color': 'white',
+           'text-align': 'left'
+}
+)
+
+app.title = "COVID Risiko Deutschland nach Landkreisen"
+
+
+app.layout = html.Div([
+    h_header,
+    betterExplanation,
+    h_table
+])
 
 if __name__ == '__main__':
     app.run_server(host='0.0.0.0', port=1024,debug=True)
