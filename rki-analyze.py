@@ -16,7 +16,7 @@ from matplotlib.animation import ImageMagickWriter
 import datatable as dt
 
 UPDATE = False # fetch new data
-REFRESH= True or UPDATE # recreate enriched, consolidated dump
+REFRESH= False or UPDATE # recreate enriched, consolidated dump
 
 def autolabel(ax, bars, color, label_range):
     """
@@ -301,7 +301,7 @@ def sumFieldIfDateBefore(records,fieldToSum, dateField, beforeDay):
     result = 0
     for r in records:
         attrs = r['attributes']
-        if dayFromStampStr(attrs[dateField]) < beforeDay:
+        if cd.dayFromStampStr(attrs[dateField]) < beforeDay:
             result = result + int(attrs[fieldToSum])
     return result
 
@@ -309,7 +309,7 @@ def sumFieldbyDayKind(records, fieldToSum, dateField, kindOfDay, dateRange=None,
     result = [0]*9
     for r in records:
         attrs = r['attributes']
-        day = dayFromStampStr(attrs[dateField])
+        day = cd.dayFromStampStr(attrs[dateField])
         #print("day", day)
         if day in range(len(kindOfDay)):
             #print("day1",day)
@@ -323,9 +323,9 @@ def delaysList(records,beforeDay):
     result = []
     for r in records:
         attrs = r['attributes']
-        meldedatum = dayFromStampStr(attrs["Meldedatum"])
+        meldedatum = cd.dayFromStampStr(attrs["Meldedatum"])
         if meldedatum < beforeDay:
-            erkdatum=dayFromStampStr(attrs["Refdatum"])
+            erkdatum=cd.dayFromStampStr(attrs["Refdatum"])
             result.append(meldedatum-erkdatum)
     return result
 
@@ -336,7 +336,7 @@ def includePos(day,attrs):
     return day >= 0
 
 def onlyeErkBeginDiffers(day, attrs):
-    mDay = dayFromStampStr(attrs['Meldedatum'])
+    mDay = cd.dayFromStampStr(attrs['Meldedatum'])
     return day >= 0 and int(attrs['IstErkrankungsbeginn']) == 1 and mDay != day
 
 def onlyErkBegin(day, attrs):
@@ -350,7 +350,7 @@ def byDate(records, whichDate, filterFunc):
     for r in records:
         attrs = r['attributes']
         dateStamp = attrs[whichDate]
-        day = dayFromStampStr(dateStamp)
+        day = cd.dayFromStampStr(dateStamp)
         if filterFunc(day,attrs):
             if day in result:
                 result[day].append(r)
@@ -388,7 +388,7 @@ allRecords = []
 if UPDATE:
     allRecords = retrieveAllRecords()
     saveJson("dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json", allRecords)
-    saveJson(archiveFilename(todayDay()), allRecords)
+    saveJson(archiveFilename(cd.todayDay()), allRecords)
 
 def findOldRecords(currentRecords, likeRecord):
     results = []
@@ -519,8 +519,14 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
 
         attrs['RefDay']=cd.dayFromStampStr(attrs["Refdatum"])
         attrs['MeldeDay']=cd.dayFromStampStr(attrs["Meldedatum"])
-        attrs['LandkreisName']=attrs["Landkreis"][2:]
-        attrs['LandkreisTyp']=attrs["Landkreis"][:2]
+        lkTyp = attrs["Landkreis"][:2]
+        if lkTyp == "SK" or lkTyp == "LK":
+            attrs['LandkreisName']=attrs["Landkreis"][2:]
+            attrs['LandkreisTyp']=lkTyp
+        else:
+            attrs['LandkreisName']=attrs["Landkreis"]
+            attrs['LandkreisTyp']="RE"
+
         if int(attrs["IstErkrankungsbeginn"]):
             attrs['ErkDay'] = cd.dayFromStampStr(attrs["Refdatum"])
 
@@ -767,9 +773,9 @@ def extractDelaysBinned(records, beforeDay, kindOfDay):
     for d in sorted(records.keys()):
         for r in records[d]:
             attrs = r['attributes']
-            meldedatum = dayFromStampStr(attrs["Meldedatum"])
+            meldedatum = cd.dayFromStampStr(attrs["Meldedatum"])
             if meldedatum < beforeDay:
-                erkdatum = dayFromStampStr(attrs["Refdatum"])
+                erkdatum = cd.dayFromStampStr(attrs["Refdatum"])
                 bod = kindOfDay[meldedatum]
                 delay = meldedatum - erkdatum
                 if bod in delayBins:
@@ -864,11 +870,11 @@ def normalized(a, axis=-1, order=2):
 
 num_bins = 24
 
-workDays, consecutiveDays = daysWorkedOrNot(0, lastDay+1)
+workDays, consecutiveDays = cd.daysWorkedOrNot(0, lastDay+1)
 
 #print(tuple(zip(workDays, consecutiveDays)))
 
-kindOfDay = [kindOfDayIndex(day, workDays, consecutiveDays) for day in range(len(workDays))]
+kindOfDay = [cd.kindOfDayIndex(day, workDays, consecutiveDays) for day in range(len(workDays))]
 
 occuranceOfKindOfDay= [0]*9
 for day in range(len(workDays)):
@@ -979,14 +985,14 @@ ax_colors = ['royalblue', 'firebrick', 'darkgreen','darkorange']
 ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
 
 dateRange = range(0,lastDay+7,7)
-dates = [dateStrWDMFromDay(day) for day in dateRange]
+dates = [cd.dateStrWDMFromDay(day) for day in dateRange]
 print(dates)
 
 plt.xticks(dateRange, dates)
 
 ax_bargroups, ax_labelgroups = bar_plot(ax,ax_data,colors=ax_colors,label_groups_range=[0,3], label_range=range(lastDay+1))
 
-dateText = ax.text(1, 1, 'Tag {} ({})'.format(0, dateStrFromDay(0)),
+dateText = ax.text(1, 1, 'Tag {} ({})'.format(0, cd.dateStrFromDay(0)),
                    verticalalignment='top', horizontalalignment='right',
                    transform=ax.transAxes, fontsize=12, bbox=dict(boxstyle='square,pad=1', fc='yellow', ec='none'))
 
@@ -1105,7 +1111,7 @@ def animate(frame):
 
     print("Updating frame {}".format(frame))
 
-    dateText.set_text('Tag {} ({})'.format(frame, dateStrFromDay(frame)), )
+    dateText.set_text('Tag {} ({})'.format(frame, cd.dateStrFromDay(frame)), )
     #################
     # Meldungseingänge
     dayList, deadList, caseList = extractListsPartial(byMeldedatum,frame)

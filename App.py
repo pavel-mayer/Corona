@@ -101,26 +101,28 @@ def loadAndProcessData(dataFilename):
                dt.sum(dt.f.AnzahlTodesfallPos),
                dt.sum(dt.f.TodesfaellePro100k),
                dt.mean(dt.f.Bevoelkerung),
-               dt.max(dt.f.MeldeDay)],
+               dt.max(dt.f.MeldeDay),
+               dt.first(dt.f.LandkreisTyp),
+               dt.first(dt.f.Bundesland)],
     dt.by(dt.f.LandkreisName)]
 
     last7days=fullTable[dt.f.newCaseOnDay>lastDay-7,:][:,
               [dt.sum(dt.f.AnzahlFallPos),
                dt.sum(dt.f.FaellePro100k),
                dt.sum(dt.f.AnzahlTodesfallPos),
-               dt.sum(dt.f.TodesfaellePro100k),
-               dt.max(dt.f.MeldeDay)],
-       dt.by(dt.f.LandkreisName)]
-    last7days.names=["LandkreisName","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage","TodesfaellePro100kLetzte7Tage","LastMeldeDayLetzte7Tage"]
+               dt.sum(dt.f.TodesfaellePro100k)],
+    dt.by(dt.f.LandkreisName)]
+    last7days.names=["LandkreisName","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage",
+                     "TodesfaellePro100kLetzte7Tage"]
 
     lastWeek7days=fullTable[(dt.f.newCaseOnDay > lastDay-14) & (dt.f.newCaseOnDay<=lastDay-7),:][:,
               [dt.sum(dt.f.AnzahlFallPos),
                dt.sum(dt.f.FaellePro100k),
                dt.sum(dt.f.AnzahlTodesfallPos),
-               dt.sum(dt.f.TodesfaellePro100k),
-               dt.max(dt.f.MeldeDay)],
+               dt.sum(dt.f.TodesfaellePro100k)],
        dt.by(dt.f.LandkreisName)]
-    lastWeek7days.names=["LandkreisName","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor","AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor","LastMeldeDayLetzte7TageDavor"]
+    lastWeek7days.names=["LandkreisName","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor",
+                         "AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
 
     allDaysExt0 = merge(alldays, last7days, "LandkreisName")
     allDaysExt1 = merge(allDaysExt0, lastWeek7days, "LandkreisName")
@@ -131,7 +133,8 @@ def loadAndProcessData(dataFilename):
     allDaysExt3=allDaysExt2[:,dt.f[:].extend({"FaellePro100kTrend": dt.f.FaellePro100kLetzte7Tage-dt.f.FaellePro100kLetzte7TageDavor})]
     allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
 
-    allDaysExt=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/6.25/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
+    allDaysExt5=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/6.25/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
+    allDaysExt=allDaysExt5[:,dt.f[:].extend({"LetzteMeldung": lastDay - dt.f.MeldeDay})]
 
     print("Column names frame order:",list(enumerate(allDaysExt.names)))
 
@@ -146,7 +149,10 @@ def loadAndProcessData(dataFilename):
 # Column names frame order: [(0, 'LandkreisName'), (1, 'AnzahlFallPos'), (2, 'FaellePro100k'), (3, 'AnzahlTodesfallPos'), (4, 'TodesfaellePro100k'), (5, 'Bevoelkerung'), (6, 'AnzahlFallLetzte7Tage'), (7, 'FaellePro100kLetzte7Tage'), (8, 'AnzahlTodesfallLetzte7Tage'), (9, 'TodesfaellePro100kLetzte7Tage'), (10, 'AnzahlFallLetzte7TageDavor'), (11, 'FaellePro100kLetzte7TageDavor'), (12, 'AnzahlTodesfallLetzte7TageDavor'), (13, 'TodesfaellePro100kLetzte7TageDavor'), (14, 'AnzahlFallTrend'), (15, 'FaellePro100kTrend'), (16, 'TodesfaellePro100kTrend'), (17, 'Kontaktrisiko')]
 def makeColumns():
     desiredOrder = [('LandkreisName', ['Kreis','Name'],'text',Format()),
+                    ('Bundesland', ['Kreis', 'Bundesland'], 'text', Format()),
+                    ('LandkreisTyp', ['Kreis', 'Art'], 'text', Format()),
                     ('Bevoelkerung', ['Kreis','Einwohner'],'numeric',FormatInt),
+                    ('LetzteMeldung', ['Kreis','Letze Meldung'],'numeric',FormatInt),
                     ('Kontaktrisiko', ['Kreis','Risiko 1:N'],'numeric',FormatInt),
                     ('AnzahlFallTrend', ['Fälle','Rw'] ,'numeric',FormatFixed2),
                     ('AnzahlFallLetzte7Tage', ['Fälle','letzte Woche'] ,'numeric',FormatInt),
@@ -156,9 +162,9 @@ def makeColumns():
                     ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000','vorletzte Woche'],'numeric',FormatFixed1),
                     ('FaellePro100kTrend',['Fälle je 100000','Differenz'] ,'numeric',FormatFixed1),
                     ('FaellePro100k',['Fälle je 100000','total'],'numeric',FormatFixed1),
-                    ('AnzahlTodesfallPos', ['Todesfälle','total'],'numeric',FormatInt),
                     ('AnzahlTodesfallLetzte7Tage', ['Todesfälle','letzte Woche'],'numeric',FormatInt),
                     ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle','vorletzte Woche'],'numeric',FormatInt),
+                    ('AnzahlTodesfallPos', ['Todesfälle','total'],'numeric',FormatInt),
                     ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000','letzte Woche'],'numeric',FormatFixed2),
                     ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000','vorletzte Woche'],'numeric',FormatFixed2),
                     ('TodesfaellePro100kTrend', ['Todesfälle je 100000','Differenz'],'numeric',FormatFixed2),
@@ -214,12 +220,12 @@ colors = {
     'text': 'white'
 }
 
-
 h_table = dash_table.DataTable(
     id='table',
     columns=columns,
     data=data,
     sort_action='native',
+    filter_action='native',
     page_size= 500,
     sort_by = [{"column_id": "Kontaktrisiko", "direction": "asc"}],
 #    fixed_rows={ 'headers': True, 'data': 0 },
@@ -253,11 +259,11 @@ h_table = dash_table.DataTable(
 
     ],
     style_data_conditional=[
-        {
-            'if': {'column_id': 'Kontaktrisiko'},
-            'border-left': '3px solid blue',
-            'border-right': '3px solid blue',
-        },
+        # {
+        #     'if': {'column_id': 'Kontaktrisiko'},
+        #     'border-left': '3px solid blue',
+        #     'border-right': '3px solid blue',
+        # },
         {
             'if': {'row_index': 'odd'},
             'backgroundColor': 'rgb(70, 70, 70)'
@@ -451,6 +457,21 @@ h_Erlauterung=html.P([
                             " indem das Symbol im Kopf der Spalte ggf. mehrfach angewählt wird.", className=bodyClass),
 ])
 
+h_Benutzung = html.P([
+    html.Span("Benutzung:", className=introClass),
+    html.P(
+        "Durch Klicken auf die kleinen Pfeilsymbole im Kopf einer Spalte kann die Tabelle auf- oder absteigend sortiert werden.",
+        className=bodyClass),
+
+    html.P("Interessant ist es, nach Gesamtanzhahl von Fällen  zu sortieren und dann zu sehen,"
+           "wo sich ehemals stark betroffene Gebiete so auf die Liste verteilen.", className=bodyClass),
+
+    html.P("Im leeren Feld über der Spalte kann ein Filter eingeben werden, z.B. Teil des Namens des Kreises. "
+           "Mit Audrücken wie <10 oder >50 können Datensätzte ausgefiltert werden, die bestimmte Werte in der Spalte "
+           "über- oder unterschreiten."
+           , className=bodyClass),
+])
+
 h_BedeutungSpaltenHead= html.Span("Bedeutung der Spalten:", className=introClass)
 
 h_BedeutungSpaltenIntro=html.Span("Die Bedeutung der meisten Spalten ist aus ihrem Titel zu entnehmen, mit folgenden Ausnahmen:",
@@ -480,6 +501,13 @@ Die Zahl kann so interpretiert werden, dass jeweils eine von der Zahl dieser Per
 Ist sie etwa 100, kann sich im Durchschnitt in jedem Bus oder Waggon ein Ansteckender befinden.
 Sie berechnet sich wie folgt:  
 """)
+
+h_LetzteMeldung=makeDefinition("Letzte Meldung",
+"""
+ gibt an, vor wie viel Tagen die letzte Meldung erfolgt. 0 heisst, dass der Kreis am Tag des Datenstands Fälle "
+ "gemeldet hat, 5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
+""")
+
 
 h_RisikoList=html.Ul([
     html.Li(["Bevölkerung / Dunkelzifferfaktor / ((Anzahl der Fälle in den letzten 2 Wochen) *",h_Rw,")"]),
@@ -537,20 +565,20 @@ h_BgFarbenList=html.Ul([
 
 h_BgtFarben=html.Div(["Feld mit Farbe hinterlegt", h_BgFarbenList])
 
-h_BedeutungSpaltenDef = html.Ul([
-    html.Li(h_RwDef),
-    html.Li([h_Risiko, h_RisikoList]),
-    ],
-    style={"padding-left": "16px", "padding-right": "64px"},
-)
+# h_BedeutungSpaltenDef = html.Ul([
+#     html.Li(h_RwDef),
+#     html.Li([h_Risiko, h_RisikoList]),
+#     ],
+#     style={"padding-left": "16px", "padding-right": "64px"},
+# )
 
-h_BedeutungFarbenDef = html.Ul([
-    html.Li(h_TextFarben),
-    html.Li([h_BgtFarben]),
-    ],
-    style={"padding-left": "16px"},
-
-)
+# h_BedeutungFarbenDef = html.Ul([
+#     html.Li(h_TextFarben),
+#     html.Li([h_BgtFarben]),
+#     ],
+#     style={"padding-left": "16px"},
+#
+# )
 
 cellStyle = {"border-left": "1px solid #ffffff", "padding-left": "16px"}
 
@@ -558,26 +586,28 @@ h_Bedeutungen = html.Table([
         html.Tr([html.Th(h_BedeutungSpaltenHead), html.Td(h_BedeutungFarbenHead,style=cellStyle)]),
         html.Tr([html.Td(h_BedeutungSpaltenIntro), html.Td(h_BedeutungFarbenIntro,style=cellStyle)]),
         html.Tr([html.Td(h_RwDef), html.Td(h_TextFarben,style=cellStyle)]),
-        html.Tr([html.Td([h_Risiko, h_RisikoList]), html.Td(h_BgtFarben,style=cellStyle)])
-    ],
+        html.Tr([html.Td([h_Risiko, h_RisikoList]), html.Td(h_BgtFarben,style=cellStyle)]),
+        html.Tr([html.Td(h_LetzteMeldung)]),
+],
 #    style={'padding': '0 0'}
 )
 
-h_BedeutungenVert = html.Div([
-    h_BedeutungSpalten,
-    html.Ul([html.Li(h_RwDef),
-             html.Li([h_Risiko, h_RisikoList]),
-             ]),
-    h_BedeutungFarben,
-    html.Ul([html.Li(h_TextFarben),
-             html.Li([h_BgtFarben]),
-             ])
-])
+# h_BedeutungenVert = html.Div([
+#     h_BedeutungSpalten,
+#     html.Ul([html.Li(h_RwDef),
+#              html.Li([h_Risiko, h_RisikoList]),
+#              ]),
+#     h_BedeutungFarben,
+#     html.Ul([html.Li(h_TextFarben),
+#              html.Li([h_BgtFarben]),
+#              ])
+# ])
 
 betterExplanation = html.Div([
-    h_Hinweis,
     h_Erlauterung,
-    h_Bedeutungen
+    h_Hinweis,
+    h_Bedeutungen,
+    h_Benutzung
     ],
     style={'padding': '5px',
            'backgroundColor': colors['background'],
