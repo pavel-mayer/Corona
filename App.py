@@ -208,7 +208,7 @@ else:
 
 maxDay = float(dframe["MeldeDay"].max())
 #print(maxDay)
-dataVersionDate = cd.dateStrWDMYFromDay(maxDay)
+dataVersionDate = cd.dateStrWDMYFromDay(maxDay+1)
 print("Loading done, max Day {} date {}".format(maxDay, dataVersionDate))
 
 print("Creating Datatable")
@@ -416,7 +416,7 @@ h_header = html.Header(
     },
     children=[
         html.H1(className="app-header", children="COVID Risiko Deutschland nach Landkreisen", style={'color': colors['text']}),
-        html.H2(className="app-header-date", children="Letzte Meldung: {}".format(dataVersionDate), style={'color': colors['text']})
+        html.H3(className="app-header-date", children="Datenstand: {} 00:00 Uhr".format(dataVersionDate), style={'color': colors['text']})
     ]
 )
 
@@ -436,13 +436,13 @@ bodyLink="bodyLink"
 
 h_Hinweis=html.P([
     html.Span("Hinweis:", className=introClass),
-    html.Span("Dies ist eine privat betriebene Seite, für die Richtigkeit der Berechnung und der Ergebnisse"
+    html.Span("Dies ist eine privat betriebene Seite, für die Richtigkeit der Berechnung und der Ergebnisse "
               "übernehme ich keine Gewähr. Im Zweifel mit den ", className=bodyClass),
     html.A("offiziellen Zahlen des RKI abgleichen.",
            href="https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4/page/page_1/",
            className=bodyLink
            ),
-    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen, inbsondere können hohe Zahlen auch Folge eines "
+    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen, inbssondere können hohe Zahlen auch Folge eines "
               "Ausbruch in einer Klinik, einem Heim oder einer Massenunterkunft sein und nicht repräsentativ für die"
               "Verteilung in der breiten Bevölkerung. Andererseits ist da noch die Dunkelziffer. ", className=bodyClass),
 ])
@@ -463,7 +463,7 @@ h_Benutzung = html.P([
         "Durch Klicken auf die kleinen Pfeilsymbole im Kopf einer Spalte kann die Tabelle auf- oder absteigend sortiert werden.",
         className=bodyClass),
 
-    html.P("Interessant ist es, nach Gesamtanzhahl von Fällen  zu sortieren und dann zu sehen,"
+    html.P("Interessant ist es, nach Gesamtanzahl von Fällen  zu sortieren und dann zu sehen,"
            "wo sich ehemals stark betroffene Gebiete so auf die Liste verteilen.", className=bodyClass),
 
     html.P("Im leeren Feld über der Spalte kann ein Filter eingeben werden, z.B. Teil des Namens des Kreises. "
@@ -504,8 +504,8 @@ Sie berechnet sich wie folgt:
 
 h_LetzteMeldung=makeDefinition("Letzte Meldung",
 """
- gibt an, vor wie viel Tagen die letzte Meldung erfolgt. 0 heisst, dass der Kreis am Tag des Datenstands Fälle "
- "gemeldet hat, 5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
+ gibt an, vor wie viel Tagen die letzte Meldung erfolgt. 0 heisst, dass der Kreis am Tag des Datenstands Fälle 
+gemeldet hat, 5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
 """)
 
 
@@ -514,7 +514,7 @@ h_RisikoList=html.Ul([
     html.Li("Als Faktor für die Dunkelziffer wurde 6,25 gewählt, also auf 1 gemeldeten Infizierten werden 5,25 weitere vermutet"),
     html.Li("Als grobe Annäherung an die Zahl der Ansteckenden wurde die Summe der Fälle der letzten zwei Wochen gewählt"),
     html.Li("Die Zahl der aktuell Ansteckenden wird zudem für die Risikoberechnung hochgerechnet,"
-            "indem die Entwicklung von der vorletzen Woche zur letzen Woche prozentual unverändert fortgeschrieben"
+            "indem die Entwicklung von der vorletzen Woche zur letzen Woche prozentual unverändert fortgeschrieben wird "
             "und damit eher dem Stand am heutigen Tag entspricht."),
     html.Li("Die Dunkelziffer kann bis 2-fach höher sein, die Zahl der Ansteckenden aber nur halb so hoch,"
             "so dass der Risikowert als nicht allzu übertriebene Obergrenze für den Anteil der Ansteckenden zu sehen ist. Your mileage may vary."),
