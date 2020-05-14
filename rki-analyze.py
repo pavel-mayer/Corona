@@ -16,7 +16,7 @@ from matplotlib.animation import ImageMagickWriter
 import datatable as dt
 
 UPDATE = False # fetch new data
-REFRESH= False or UPDATE # recreate enriched, consolidated dump
+REFRESH= True or UPDATE # recreate enriched, consolidated dump
 
 def autolabel(ax, bars, color, label_range):
     """
@@ -267,8 +267,8 @@ def addLandkreisData(records):
         if IdLandkreis in Bevoelkerung:
             KreisBevoelkerung = Bevoelkerung[IdLandkreis]
             record["Bevoelkerung"] = KreisBevoelkerung
-            record["FaellePro100k"] = record["AnzahlFallPos"]*100000/KreisBevoelkerung
-            record["TodesfaellePro100k"] = record["AnzahlTodesfallPos"]*100000/KreisBevoelkerung
+            record["FaellePro100k"] = record["AnzahlFall"]*100000/KreisBevoelkerung
+            record["TodesfaellePro100k"] = record["AnzahlTodesfall"]*100000/KreisBevoelkerung
             isStadt = Landkreis[:2] != "LK"
             record["isStadt"] = int(isStadt)
 
@@ -389,6 +389,8 @@ if UPDATE:
     allRecords = retrieveAllRecords()
     saveJson("dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json", allRecords)
     saveJson(archiveFilename(cd.todayDay()), allRecords)
+    saveCsv(csvFilename(cd.todayDay(), "fullDaily", "archive_csv"), allRecords)
+
 
 def findOldRecords(currentRecords, likeRecord):
     results = []
@@ -535,10 +537,6 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
         neuerFallNurGestern = neuerFall == -1 # In diesem Fall ist Anzahlfall negativ!
         neuerFallGesternUndHeute = neuerFall == 0
         cases = int(attrs['AnzahlFall'])
-        if cases >= 0:
-            attrs['AnzahlFallPos'] = cases
-        else:
-            attrs['AnzahlFallPos'] = 0
 
         if neuerFallNurHeute or neuerFallGesternUndHeute:
             totalCases = totalCases+cases
@@ -594,10 +592,6 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
         neuerTodesfallGesternUndHeute = neuerTodesfall == 0
         keinTodesfall = neuerTodesfall == -9
         deaths = int(attrs['AnzahlTodesfall'])
-        if deaths >= 0:
-            attrs['AnzahlTodesfallPos'] = deaths
-        else:
-            attrs['AnzahlTodesfallPos'] = 0
 
         if neuerTodesfallNurHeute or neuerTodesfallGesternUndHeute:
             totalDeaths = totalDeaths+deaths
@@ -630,7 +624,7 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
 
 def loadRecords():
     firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
-    #lastRecordTime = time.strptime("10.5.2020", "%d.%m.%Y")  # struct_time
+    #lastRecordTime = time.strptime("13.5.2020", "%d.%m.%Y")  # struct_time
     lastRecordTime = time.localtime()  # struct_time
     firstRecordDay = cd.dayFromTime(firstRecordTime)
     lastRecordDay = cd.dayFromTime(lastRecordTime)
@@ -640,6 +634,7 @@ def loadRecords():
     globalID = 1
     for day in range(firstRecordDay, lastRecordDay+1):
         currentRecords = loadJson(archiveFilename(day))
+        saveCsv(csvFilename(day, "fullDaily", "archive_csv"),currentRecords)
         globalID, currentcaseHashes, currentMsgHashes = stampRecords(currentRecords, globalID)
 
         caseCols = collisionStats(currentcaseHashes)
@@ -654,11 +649,15 @@ def loadRecords():
                 (n, hash) = msg
                 anExampleRecord = previousMsgHashes[hash][0]
                 print("Removed {} times : {}".format(n,anExampleRecord))
+            for msg in addedMessages:
+                (n, hash) = msg
+                anExampleRecord = currentMsgHashes[hash][0]
+                print("Added {} times : {}".format(n,anExampleRecord))
 
         previousMsgHashes = currentMsgHashes
 
         globalID, oldRecords, newRecords, oldCaseRecords, newCaseRecords, oldDeathRecords, newDeathRecords =\
-            enhanceRecords(currentRecords, day, globalID,currentcaseHashes)
+            enhanceRecords(currentRecords, day-1, globalID,currentcaseHashes)
         print("newRecords {} allDatedRecords {}".format(len(newRecords), len(allDatedRecords)))
 
         if day == firstRecordDay:
@@ -671,11 +670,11 @@ def loadRecords():
         # saveCsv(csvFilename(day, "oldDeaths", "debug"), oldDeathRecords)
         # saveCsv(csvFilename(day, "newDeaths", "debug"), newDeathRecords)
         casesinResult = sumField(newRecords, "AnzahlFall")
-        casesinResultToday = sumFieldIf(newRecords, "AnzahlFall","newCaseOnDay",day)
-        casesinResultYesterday = sumFieldIf(newRecords, "AnzahlFall","newCaseOnDay",day-1)
+        casesinResultToday = sumFieldIf(newRecords, "AnzahlFall","newCaseOnDay",day-1)
+        casesinResultYesterday = sumFieldIf(newRecords, "AnzahlFall","newCaseOnDay",day-2)
         deadinResult = sumField(newDeathRecords, "AnzahlTodesfall")
-        deadinResultToday = sumFieldIf(newDeathRecords, "AnzahlTodesfall","newDeathOnDay",day)
-        deadinResultYesterday = sumFieldIf(newDeathRecords, "AnzahlTodesfall","newDeathOnDay",day-1)
+        deadinResultToday = sumFieldIf(newDeathRecords, "AnzahlTodesfall","newDeathOnDay",day-1)
+        deadinResultYesterday = sumFieldIf(newDeathRecords, "AnzahlTodesfall","newDeathOnDay",day-2)
         print("In result: Cases {} today {} yday {}, dead {} today {} yday {} allDatedRecords {}".format(
             casesinResult, casesinResultToday, casesinResultYesterday, deadinResult,
             deadinResultToday,deadinResultYesterday,len(allDatedRecords)))

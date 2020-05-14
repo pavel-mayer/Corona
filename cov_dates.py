@@ -21,6 +21,10 @@ def dateTimeStrFromStampStr(s) -> str:
     t = time.gmtime(int(s)/1000) #time.struct_time
     return "{0},{1:02d}.{2:02d}.{3} {4:02d}:{5:02d}".format(weekDay[t.tm_wday], t.tm_mday, t.tm_mon,t.tm_year,t.tm_hour, t.tm_min)
 
+def dateTimeStrFromTime(tt) -> str:
+    t = time.gmtime(tt) #time.struct_time
+    return "{0},{1:02d}.{2:02d}.{3} {4:02d}:{5:02d}".format(weekDay[t.tm_wday], t.tm_mday, t.tm_mon,t.tm_year,t.tm_hour, t.tm_min)
+
 def dateFromDay(day) -> datetime:
     return day0d + timedelta(day)
 
