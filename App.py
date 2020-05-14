@@ -92,43 +92,53 @@ def loadAndProcessData(dataFilename):
     dead = fullTable[:,'AnzahlTodesfall'].sum()[0,0]
 
     lastDay=fullTable[:,'MeldeDay'].max()[0,0]
-    print("File stats: lastDay {} cases {} dead {}".format(lastDay, cases, dead))
+    lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
+    print("File stats: lastDay {} lastnewCaseOnDay {} cases {} dead {}".format(lastDay, lastnewCaseOnDay, cases, dead))
 
     newTable=fullTable[:,dt.f[:].extend({"erkMeldeDelay": dt.f.MeldeDay-dt.f.RefDay})]
     #print(newTable.keys())
 
     #dt.by(dt.f.Bundesland)]
     alldays=fullTable[:,
-              [dt.sum(dt.f.AnzahlFallPos),
+              [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
-               dt.sum(dt.f.AnzahlTodesfallPos),
+               dt.sum(dt.f.AnzahlTodesfall),
                dt.sum(dt.f.TodesfaellePro100k),
                dt.mean(dt.f.Bevoelkerung),
                dt.max(dt.f.MeldeDay),
                dt.first(dt.f.LandkreisTyp),
                dt.first(dt.f.Bundesland)],
-    dt.by(dt.f.LandkreisName)]
+    dt.by(dt.f.Landkreis)]
 
     last7days=fullTable[dt.f.newCaseOnDay>lastDay-7,:][:,
-              [dt.sum(dt.f.AnzahlFallPos),
+              [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
-               dt.sum(dt.f.AnzahlTodesfallPos),
+               dt.sum(dt.f.AnzahlTodesfall),
                dt.sum(dt.f.TodesfaellePro100k)],
-    dt.by(dt.f.LandkreisName)]
-    last7days.names=["LandkreisName","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage",
+    dt.by(dt.f.Landkreis)]
+    last7days.names=["Landkreis","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage",
                      "TodesfaellePro100kLetzte7Tage"]
+    last7days[dt.f.AnzahlFallLetzte7Tage <0, "AnzahlFallLetzte7Tage"] = 0
+    last7days[dt.f.FaellePro100kLetzte7Tage <0, "FaellePro100kLetzte7Tage"] = 0
+    last7days[dt.f.AnzahlTodesfallLetzte7Tage <0, "AnzahlTodesfallLetzte7Tage"] = 0
+    last7days[dt.f.TodesfaellePro100kLetzte7Tage <0, "TodesfaellePro100kLetzte7Tage"] = 0
 
     lastWeek7days=fullTable[(dt.f.newCaseOnDay > lastDay-14) & (dt.f.newCaseOnDay<=lastDay-7),:][:,
-              [dt.sum(dt.f.AnzahlFallPos),
+              [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
-               dt.sum(dt.f.AnzahlTodesfallPos),
+               dt.sum(dt.f.AnzahlTodesfall),
                dt.sum(dt.f.TodesfaellePro100k)],
-       dt.by(dt.f.LandkreisName)]
-    lastWeek7days.names=["LandkreisName","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor",
+       dt.by(dt.f.Landkreis)]
+    #lastWeek7days[dt.f[1:] < 0, dt.f[1:]] = 0
+    lastWeek7days.names=["Landkreis","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor",
                          "AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
+    lastWeek7days[dt.f.AnzahlFallLetzte7TageDavor <0, "AnzahlFallLetzte7TageDavor"] = 0
+    lastWeek7days[dt.f.FaellePro100kLetzte7TageDavor <0, "FaellePro100kLetzte7TageDavor"] = 0
+    lastWeek7days[dt.f.AnzahlTodesfallLetzte7TageDavor <0, "AnzahlTodesfallLetzte7TageDavor"] = 0
+    lastWeek7days[dt.f.TodesfaellePro100kLetzte7TageDavor <0, "TodesfaellePro100kLetzte7TageDavor"] = 0
 
-    allDaysExt0 = merge(alldays, last7days, "LandkreisName")
-    allDaysExt1 = merge(allDaysExt0, lastWeek7days, "LandkreisName")
+    allDaysExt0 = merge(alldays, last7days, "Landkreis")
+    allDaysExt1 = merge(allDaysExt0, lastWeek7days, "Landkreis")
 
     Rw = dt.f.AnzahlFallLetzte7Tage/dt.f.AnzahlFallLetzte7TageDavor
 
@@ -137,11 +147,12 @@ def loadAndProcessData(dataFilename):
     allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
 
     allDaysExt5=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/6.25/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
-    allDaysExt6=allDaysExt5[:,dt.f[:].extend({"LetzteMeldung": lastDay - dt.f.MeldeDay})]
+    allDaysExt6 = allDaysExt5[:, dt.f[:].extend({"LetzteMeldung": lastDay - dt.f.MeldeDay})]
+    allDaysExt6b = allDaysExt6[:, dt.f[:].extend({"LetzteMeldungNeg": dt.f.MeldeDay - lastDay})]
 
-    allDaysExt6[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko,"Kontaktrisiko"] = 999999
+    allDaysExt6b[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 999999
 
-    sortedByRisk = allDaysExt6.sort(["Kontaktrisiko","LetzteMeldung","FaellePro100k"])
+    sortedByRisk = allDaysExt6b.sort(["Kontaktrisiko","LetzteMeldung","FaellePro100k"])
     #print(sortedByRisk)
     allDaysExt=sortedByRisk[:,dt.f[:].extend({"Rang": 0})]
     allDaysExt[:,"Rang"]=np.arange(1,allDaysExt.nrows+1)
@@ -157,22 +168,22 @@ def makeColumns():
     desiredOrder = [
         ('Rang', ['Risiko', 'Rang'], 'numeric', FormatInt),
         ('Kontaktrisiko', ['Risiko', 'Risiko 1:N'], 'numeric', FormatInt),
-        ('LandkreisName', ['Kreis', 'Name'], 'text', Format()),
+        ('Landkreis', ['Kreis', 'Name'], 'text', Format()),
         ('Bundesland', ['Kreis', 'Bundesland'], 'text', Format()),
         ('LandkreisTyp', ['Kreis', 'Art'], 'text', Format()),
         ('Bevoelkerung', ['Kreis', 'Einwohner'], 'numeric', FormatInt),
-        ('LetzteMeldung', ['Kreis', 'Letze Meldung'], 'numeric', FormatInt),
+        ('LetzteMeldungNeg', ['Kreis', 'Letze Meldung'], 'numeric', FormatInt),
         ('AnzahlFallTrend', ['Fälle', 'Rw'], 'numeric', FormatFixed2),
         ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte Woche'], 'numeric', FormatInt),
         ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorletzte Woche'], 'numeric', FormatInt),
-        ('AnzahlFallPos', ['Fälle', 'total'], 'numeric', FormatInt),
+        ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt),
         ('FaellePro100kLetzte7Tage', ['Fälle je 100000', 'letzte Woche'], 'numeric', FormatFixed1),
         ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000', 'vorletzte Woche'], 'numeric', FormatFixed1),
         ('FaellePro100kTrend', ['Fälle je 100000', 'Differenz'], 'numeric', FormatFixed1),
         ('FaellePro100k', ['Fälle je 100000', 'total'], 'numeric', FormatFixed1),
         ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte Woche'], 'numeric', FormatInt),
         ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorletzte Woche'], 'numeric', FormatInt),
-        ('AnzahlTodesfallPos', ['Todesfälle', 'total'], 'numeric', FormatInt),
+        ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt),
         ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000', 'letzte Woche'], 'numeric', FormatFixed2),
         ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000', 'vorletzte Woche'], 'numeric', FormatFixed2),
         ('TodesfaellePro100kTrend', ['Todesfälle je 100000', 'Differenz'], 'numeric', FormatFixed2),
@@ -184,7 +195,7 @@ def makeColumns():
     #print(orderedIndices)
 
     columns = [{'name': L1, 'id': L2, 'type':L3, 'format':L4} for (L1,L2,L3,L4) in zip(orderedNames,orderedCols,orderedTypes,orderFormats)]
-    print("columns=",columns)
+    #print("columns=",columns)
     return columns
 
 
@@ -230,6 +241,129 @@ colors = {
     'text': 'white'
 }
 
+conditionDanger="conditionDanger"
+conditionTooHigh="conditionTooHigh"
+conditionSerious="conditionSerious"
+conditionGood="conditionGood"
+conditionSafe="conditionSafe"
+
+conditions = [conditionDanger, conditionTooHigh, conditionSerious, conditionGood, conditionSafe]
+
+conditionStyleDict = {
+    conditionDanger : {'backgroundColor': 'firebrick', 'color': 'white'},
+    conditionTooHigh: {'color': 'tomato'},
+    conditionSerious: {'color': 'yellow'},
+    conditionGood: {'color': 'lightgreen'},
+    conditionSafe: {'backgroundColor': 'green', 'color': 'white'}
+}
+
+def conditionalStyle(condition, filterExprs, columns):
+    #print("condition", condition, "filterExprc", filterExprs)
+    template = {
+        'if': {
+            'filter_query': filterExprs[condition],
+            'column_id': columns
+        },
+    }
+    for k in conditionStyleDict[condition].keys():
+        template = {**template, **conditionStyleDict[condition]}
+    #print ("returning", pretty(template))
+    return template
+
+def Not(condition):
+    return "!("+condition+")"
+
+def braced(condition):
+    return "("+condition+")"
+
+KontaktrisikoClass = {
+    conditionDanger : '{Kontaktrisiko} > 0 && {Kontaktrisiko} < 100',
+    conditionTooHigh: '{Kontaktrisiko} >= 100 && {Kontaktrisiko} < 1000',
+    conditionSerious: '{Kontaktrisiko} >= 1000 && {Kontaktrisiko} < 2500',
+    conditionGood: '{Kontaktrisiko} >= 2500 && {Kontaktrisiko} < 10000',
+    conditionSafe: '{Kontaktrisiko} > 10000'
+}
+
+FaellePro100kLetzte7TageClass = {
+    conditionDanger : '{FaellePro100kLetzte7Tage} > 50',
+    conditionTooHigh: '{FaellePro100kLetzte7Tage} > 20 && {FaellePro100kLetzte7Tage} < 50',
+    conditionSerious: '{FaellePro100kLetzte7Tage} > 5 && {FaellePro100kLetzte7Tage} < 20',
+    conditionGood: '{FaellePro100kLetzte7Tage} >= 1 && {FaellePro100kLetzte7Tage} < 5',
+    conditionSafe: '{FaellePro100kLetzte7Tage} < 1'
+}
+
+AnzahlFallTrendClass = {
+    conditionDanger : '{AnzahlFallTrend} > 3',
+    conditionTooHigh: '{AnzahlFallTrend} > 1 && {AnzahlFallTrend} <= 3',
+    conditionSerious: '{AnzahlFallTrend} > 0.9 && {AnzahlFallTrend} <= 1',
+    conditionGood: '{AnzahlFallTrend} > 0.3 && {AnzahlFallTrend} <= 0.9',
+    conditionSafe: '{AnzahlFallTrend} < 0.3'
+}
+
+LandkreisClass = {
+    conditionDanger : KontaktrisikoClass[conditionDanger] +" || "+ braced(FaellePro100kLetzte7TageClass[conditionDanger])+" || "+braced(AnzahlFallTrendClass[conditionDanger]),
+    conditionTooHigh: KontaktrisikoClass[conditionTooHigh]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
+    conditionSerious: KontaktrisikoClass[conditionSerious]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
+    conditionGood: KontaktrisikoClass[conditionGood]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
+    conditionSafe: KontaktrisikoClass[conditionSafe]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
+}
+
+xClass = {
+    conditionDanger : '',
+    conditionTooHigh: '',
+    conditionSerious: '',
+    conditionGood: '',
+    conditionSafe: ''
+}
+
+def conditionalStyles(conditionClass, columns):
+    #print("conditionalStyles conditionClass", conditionClass, "columns", columns)
+    result = []
+    for c in conditions:
+        #print("condition", c)
+        style = conditionalStyle(c, conditionClass, columns)
+        #print("appending Style", pretty(style))
+        result.append(style)
+    return result
+
+
+def make_style_data_conditional():
+    result = [
+        # {
+        #     'if': {'column_id': 'Kontaktrisiko'},
+        #     'border-left': '3px solid blue',
+        #     'border-right': '3px solid blue',
+        # },
+        {
+            'if': {'row_index': 'odd'},
+            'backgroundColor': 'rgb(70, 70, 70)'
+        },
+        {
+            'if': {
+                'filter_query': '{FaellePro100kTrend} > 0',
+                'column_id': 'FaellePro100kTrend'
+            },
+            'color': 'tomato'
+        },
+        {
+            'if': {
+                'filter_query': '{FaellePro100kTrend} <= 0',
+                'column_id': 'FaellePro100kTrend'
+            },
+            'color': 'lightgreen'
+        },
+    ]
+    result = result + conditionalStyles(FaellePro100kLetzte7TageClass, ['FaellePro100kLetzte7Tage'])
+    result = result + conditionalStyles(AnzahlFallTrendClass, ['AnzahlFallTrend'])
+    result = result + conditionalStyles(KontaktrisikoClass, ['Kontaktrisiko'])
+    result = result + conditionalStyles(LandkreisClass, ['Landkreis'])
+
+    return result
+
+cs_data = make_style_data_conditional()
+#print("cs_data", cs_data)
+#pretty(cs_data)
+
 h_table = dash_table.DataTable(
     id='table',
     columns=columns,
@@ -263,155 +397,12 @@ h_table = dash_table.DataTable(
     merge_duplicate_headers=True,
     style_cell_conditional=[
         {
-            'if': {'column_id': 'LandkreisName'},
+            'if': {'column_id': 'Landkreis'},
             'textAlign': 'left'
         },
 
     ],
-    style_data_conditional=[
-        # {
-        #     'if': {'column_id': 'Kontaktrisiko'},
-        #     'border-left': '3px solid blue',
-        #     'border-right': '3px solid blue',
-        # },
-        {
-            'if': {'row_index': 'odd'},
-            'backgroundColor': 'rgb(70, 70, 70)'
-        },
-        ############################################################################
-        {
-            'if': {
-                'filter_query': '{FaellePro100kLetzte7Tage} < 1',
-                'column_id': ['FaellePro100kLetzte7Tage', 'LandkreisName']
-            },
-            'backgroundColor': 'green',
-            #'fontWeight': 'bold',
-            'color': 'white'
-        },
-        {
-            'if': {
-                'filter_query': '{FaellePro100kLetzte7Tage} >= 1 && {FaellePro100kLetzte7Tage} < 5',
-                'column_id': ['FaellePro100kLetzte7Tage', 'LandkreisName']
-            },
-            #            'backgroundColor': 'tomato',
-            #'fontWeight': 'bold',
-            'color': 'lightgreen'
-        },
-        {
-            'if': {
-                'filter_query': '{FaellePro100kLetzte7Tage} > 10 && {FaellePro100kLetzte7Tage} < 20',
-                'column_id': ['FaellePro100kLetzte7Tage','LandkreisName']
-            },
-            #            'backgroundColor': 'tomato',
-            #'fontWeight': 'bold',
-            'color': 'yellow'
-        },
-        {
-            'if': {
-                'filter_query': '{FaellePro100kLetzte7Tage} > 20 && {FaellePro100kLetzte7Tage} < 50',
-                'column_id': ['FaellePro100kLetzte7Tage','LandkreisName']
-            },
-            #            'backgroundColor': 'tomato',
-            #'fontWeight': 'bold',
-            'color': 'tomato'
-        },
-        {
-            'if': {
-                'filter_query': '{FaellePro100kLetzte7Tage} > 50',
-                'column_id': ['FaellePro100kLetzte7Tage','LandkreisName']
-            },
-            #'fontWeight': 'bold',
-            'backgroundColor': 'firebrick',
-            'color': 'white'
-        },
-
-        ############################################################################
-
-        {
-            'if': {
-                'filter_query': '{FaellePro100kTrend} > 0',
-                'column_id': 'FaellePro100kTrend'
-            },
-            #'fontWeight': 'bold',
-            #'backgroundColor': 'tomato',
-            'color': 'tomato'
-        },
-        ############################################################################
-        {
-            'if': {
-                'filter_query': '{AnzahlFallTrend} > 1',
-                'column_id': 'AnzahlFallTrend'
-            },
-            #'fontWeight': 'bold',
-            #'backgroundColor': 'tomato',
-            'color': 'tomato'
-        },
-        {
-            'if': {
-                'filter_query': '{AnzahlFallTrend} > 0.9 && {AnzahlFallTrend} <= 1',
-                'column_id': 'AnzahlFallTrend'
-            },
-            #'fontWeight': 'bold',
-            # 'backgroundColor': 'tomato',
-            'color': 'yellow'
-        },
-        {
-            'if': {
-                'filter_query': '{AnzahlFallTrend} < 0.7',
-                'column_id': 'AnzahlFallTrend'
-            },
-            #'fontWeight': 'bold',
-            # 'backgroundColor': 'tomato',
-            'color': 'lightgreen'
-        },
-        ############################################################################
-        {
-            'if': {
-                'filter_query': '{Kontaktrisiko} > 0 && {Kontaktrisiko} < 100',
-                'column_id': ['Kontaktrisiko','LandkreisName']
-            },
-            #'fontWeight': 'bold',
-            'backgroundColor': 'firebrick',
-            'color': 'white'
-        },
-        {
-            'if': {
-                'filter_query': '{Kontaktrisiko} >= 100 && {Kontaktrisiko} < 1000',
-                'column_id': ['Kontaktrisiko','LandkreisName']
-            },
-            #'fontWeight': 'bold',
-            # 'backgroundColor': 'tomato',
-            'color': 'tomato'
-        },
-        {
-            'if': {
-                'filter_query': '{Kontaktrisiko} >= 1000 && {Kontaktrisiko} < 2500',
-                'column_id': ['Kontaktrisiko','LandkreisName']
-            },
-            #'fontWeight': 'bold',
-            # 'backgroundColor': 'tomato',
-            'color': 'yellow'
-        },
-        {
-            'if': {
-                'filter_query': '{Kontaktrisiko} >= 5000 && {Kontaktrisiko} < 10000',
-                'column_id': ['Kontaktrisiko','LandkreisName']
-            },
-            #'fontWeight': 'bold',
-            # 'backgroundColor': 'tomato',
-            'color': 'lightgreen'
-        },
-        {
-            'if': {
-                'filter_query': '{Kontaktrisiko} > 10000',
-                'column_id': ['Kontaktrisiko','LandkreisName']
-            },
-            #'fontWeight': 'bold',
-            'backgroundColor': 'green',
-            'color': 'white'
-        },
-
-    ],
+    style_data_conditional = make_style_data_conditional()
 
 )
 
@@ -420,25 +411,35 @@ def readExplanation():
         data = file.read()
     return data
 
+appDate = os.path.getmtime("app.py")
+print(appDate)
+appDateStr=cd.dateTimeStrFromTime(appDate)
+print(appDateStr)
+
 h_header = html.Header(
     style={
         'backgroundColor': colors['background'],
     },
     children=[
         html.H1(className="app-header", children="COVID Risiko Deutschland nach Landkreisen", style={'color': colors['text']}),
-        html.H3(className="app-header-date", children="Datenstand: {} 00:00 Uhr".format(dataVersionDate), style={'color': colors['text']})
+        html.H4(className="app-header-date",
+                children="Datenstand: {} 00:00 Uhr (wird täglich gegen Mittag aktualisiert)".format(dataVersionDate),
+                style={'color': colors['text']}),
+        html.H4(className="app-header-date",
+                children="Softwarestand: {} (UTC), Version 0.9.4".format(appDateStr),
+                style={'color': colors['text']})
     ]
 )
 
-h_explanation = dcc.Markdown(
-    readExplanation(),
-    style={
-        'backgroundColor': colors['background'],
-        'color': 'white',
-        'line-height:': '1.8',
-    },
-    dangerously_allow_html=True,
-)
+# h_explanation = dcc.Markdown(
+#     readExplanation(),
+#     style={
+#         'backgroundColor': colors['background'],
+#         'color': 'white',
+#         'line-height:': '1.8',
+#     },
+#     dangerously_allow_html=True,
+# )
 
 introClass="intro"
 bodyClass="bodyText"
@@ -446,13 +447,14 @@ bodyLink="bodyLink"
 
 h_Hinweis=html.P([
     html.Span("Hinweis:", className=introClass),
-    html.Span(" Dies ist eine privat betriebene Seite, für die Richtigkeit der Berechnung und der Ergebnisse "
+    html.Span(" Dies ist eine privat betriebene Seite im Testbetrieb, für die Richtigkeit der Berechnung und der Ergebnisse "
               "gibt es keine Gewähr. Im Zweifel mit den ", className=bodyClass),
     html.A("offiziellen Zahlen des RKI abgleichen.",
            href="https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4/page/page_1/",
            className=bodyLink
            ),
-    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen, inbesondere können hohe Zahlen auch Folge eines"
+    html.P("Das System ist brandneu, kann unentdeckte, subtile Fehler machen, und auch die Berechnung des Rangs kann sich durch Updates der Software derzeit noch verändern.", className=bodyClass),
+    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen. Auf Landkreisebene sind die Zahlen niederig, eine Handvoll neue Fälle kann viel ausmachen. Auch können hohe Zahlen Folge eines"
               " Ausbruch in einer Klinik, einem Heim oder einer Massenunterkunft sein und nicht repräsentativ für die"
               " Verteilung in der breiten Bevölkerung. Andererseits ist da noch die Dunkelziffer, die hier mit 6,25"
               " angenommen wird. (siehe Risiko 1:N) Es laufen also viel mehr meist symptomlose Infizierte umher als Fälle registriert"
@@ -486,7 +488,7 @@ h_About=html.P([
     html.A(" auf Twitter",
               href="https://twitter.com/pavel23",
               className=bodyLink),
-    html.Span(" und rede einmal in der Woche mit Time Pritlove", className=bodyClass),
+    html.Span(" und rede einmal in der Woche mit Tim Pritlove", className=bodyClass),
     html.A("  im Corona Weekly Podcast",
            href="http://ukw.fm/category/corona-krise/corona-weekly/",
            className=bodyLink),
@@ -554,8 +556,8 @@ N berechnet sich wie folgt:
 
 h_LetzteMeldung=makeDefinition("Letzte Meldung",
 """
- gibt an, vor wie viel Tagen die letzte Meldung erfolgt. 0 heisst, dass der Kreis am Tag des Datenstands Fälle 
-gemeldet hat, 5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
+ gibt an, vor wie viel Tagen die letzte Meldung erfolgt. 0 heisst, dass der Kreis am (Vor-)Tag des Datenstands Fälle 
+gemeldet hat, -5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
 """)
 
 
@@ -580,12 +582,6 @@ h_BedeutungFarben=html.P([h_BedeutungFarbenHead, h_BedeutungFarbenIntro])
 
 def makeColorSpan(text, className):
     return html.Span(text, className=className)
-
-conditionDanger="conditionDanger"
-conditionTooHigh="conditionTooHigh"
-conditionSerious="conditionSerious"
-conditionGood="conditionGood"
-conditionSafe="conditionSafe"
 
 LiStyle = {#'padding': '10px',
            'margin-bottom': '0.5em',
