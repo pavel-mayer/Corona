@@ -47,6 +47,7 @@ a:active {
 .intro {
   text-decoration: underline;
   font-weight: bold;
+  color:lightsteelblue;
 }
 .conditionDanger {
   background-color: firebrick;

@@ -140,9 +140,14 @@ def loadAndProcessData(dataFilename):
     allDaysExt0 = merge(alldays, last7days, "Landkreis")
     allDaysExt1 = merge(allDaysExt0, lastWeek7days, "Landkreis")
 
-    Rw = dt.f.AnzahlFallLetzte7Tage/dt.f.AnzahlFallLetzte7TageDavor
+    Rw = (dt.f.AnzahlFallLetzte7Tage+5)/(dt.f.AnzahlFallLetzte7TageDavor + 5)
 
     allDaysExt2=allDaysExt1[:,dt.f[:].extend({"AnzahlFallTrend":  Rw})]
+    #allDaysExt2[dt.f.AnzahlFallLetzte7TageDavor == 0, "AnzahlFallTrend"] = 1
+    #allDaysExt2[dt.f.AnzahlFallLetzte7TageDavor == 0 & dt.f.AnzahlFallLetzte7Tage >0 , "AnzahlFallTrend"] = 1
+    #allDaysExt2[dt.f.AnzahlFallLetzte7TageDavor == 0 & dt.f.AnzahlFallLetzte7Tage == 0 , "AnzahlFallTrend"] = 1
+
+
     allDaysExt3=allDaysExt2[:,dt.f[:].extend({"FaellePro100kTrend": dt.f.FaellePro100kLetzte7Tage-dt.f.FaellePro100kLetzte7TageDavor})]
     allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
 
@@ -174,18 +179,18 @@ def makeColumns():
         ('Bevoelkerung', ['Kreis', 'Einwohner'], 'numeric', FormatInt),
         ('LetzteMeldungNeg', ['Kreis', 'Letze Meldung'], 'numeric', FormatInt),
         ('AnzahlFallTrend', ['Fälle', 'Rw'], 'numeric', FormatFixed2),
-        ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte Woche'], 'numeric', FormatInt),
-        ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorletzte Woche'], 'numeric', FormatInt),
+        ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt),
+        ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorletzte 7 Tage'], 'numeric', FormatInt),
         ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt),
-        ('FaellePro100kLetzte7Tage', ['Fälle je 100000', 'letzte Woche'], 'numeric', FormatFixed1),
-        ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000', 'vorletzte Woche'], 'numeric', FormatFixed1),
+        ('FaellePro100kLetzte7Tage', ['Fälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed1),
+        ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000', 'vorletzte 7 Tage'], 'numeric', FormatFixed1),
         ('FaellePro100kTrend', ['Fälle je 100000', 'Differenz'], 'numeric', FormatFixed1),
         ('FaellePro100k', ['Fälle je 100000', 'total'], 'numeric', FormatFixed1),
-        ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte Woche'], 'numeric', FormatInt),
-        ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorletzte Woche'], 'numeric', FormatInt),
+        ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt),
+        ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorletzte 7 Tage'], 'numeric', FormatInt),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt),
-        ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000', 'letzte Woche'], 'numeric', FormatFixed2),
-        ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000', 'vorletzte Woche'], 'numeric', FormatFixed2),
+        ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed2),
+        ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000', 'vorletzte 7 Tage'], 'numeric', FormatFixed2),
         ('TodesfaellePro100kTrend', ['Todesfälle je 100000', 'Differenz'], 'numeric', FormatFixed2),
         ('TodesfaellePro100k', ['Todesfälle je 100000', 'total'], 'numeric', FormatFixed2),
     ]
@@ -372,7 +377,7 @@ h_table = dash_table.DataTable(
     filter_action='native',
     page_size= 500,
     sort_by = [{"column_id": "Kontaktrisiko", "direction": "asc"}],
-#    fixed_rows={ 'headers': True, 'data': 0 },
+    #fixed_rows={ 'headers': True, 'data': 0 },
     style_cell={'textAlign': 'right',
                 'padding': '5px',
                 'backgroundColor': colors['background'],
@@ -416,21 +421,25 @@ print(appDate)
 appDateStr=cd.dateTimeStrFromTime(appDate)
 print(appDateStr)
 
+introClass="intro"
+bodyClass="bodyText"
+bodyLink="bodyLink"
+
 h_header = html.Header(
     style={
         'backgroundColor': colors['background'],
     },
     children=[
-        html.H1(className="app-header", children="COVID Risiko Deutschland nach Landkreisen", style={'color': colors['text']}),
+        html.A(html.H1(className="app-header", children="COVID Risiko Deutschland nach Landkreisen", style={'color': colors['text']}), href="#test"),
         html.H4(className="app-header-date",
-                children="Datenstand: {} 00:00 Uhr (wird täglich gegen Mittag aktualisiert)".format(dataVersionDate),
+                children="Datenstand: {} 00:00 Uhr (wird täglich aktualisiert)".format(dataVersionDate),
                 style={'color': colors['text']}),
         html.H4(className="app-header-date",
-                children="Softwarestand: {} (UTC), Version 0.9.4".format(appDateStr),
-                style={'color': colors['text']})
+                children="Softwarestand: {} (UTC), Version 0.9.6".format(appDateStr),
+                style={'color': colors['text']}),
+        html.H3(html.A(html.Span("Zur Tabelle springen ⬇", className=introClass), href="#Benutzung")),
     ]
 )
-
 # h_explanation = dcc.Markdown(
 #     readExplanation(),
 #     style={
@@ -441,9 +450,7 @@ h_header = html.Header(
 #     dangerously_allow_html=True,
 # )
 
-introClass="intro"
-bodyClass="bodyText"
-bodyLink="bodyLink"
+
 
 h_Hinweis=html.P([
     html.Span("Hinweis:", className=introClass),
@@ -454,13 +461,13 @@ h_Hinweis=html.P([
            className=bodyLink
            ),
     html.P("Das System ist brandneu, kann unentdeckte, subtile Fehler machen, und auch die Berechnung des Rangs kann sich durch Updates der Software derzeit noch verändern.", className=bodyClass),
-    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen. Auf Landkreisebene sind die Zahlen niederig, eine Handvoll neue Fälle kann viel ausmachen. Auch können hohe Zahlen Folge eines"
+    html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen. Auf Landkreisebene sind die Zahlen niedrig, eine Handvoll neue Fälle kann viel ausmachen. Auch können hohe Zahlen Folge eines"
               " Ausbruch in einer Klinik, einem Heim oder einer Massenunterkunft sein und nicht repräsentativ für die"
               " Verteilung in der breiten Bevölkerung. Andererseits ist da noch die Dunkelziffer, die hier mit 6,25"
               " angenommen wird. (siehe Risiko 1:N) Es laufen also viel mehr meist symptomlose Infizierte umher als Fälle registriert"
               " sind. Und fast immer gilt: Steigen die Zahlen, ist es nicht unter Kontrolle.", className=bodyClass),
     html.P(
-        " Und ja, Ranglisten sind unfair, aber nachdem die Zahlen kleiner werden, ist der Blick in die Regionen umso"
+        " Und ja, Ranglisten sind immer fragwürdige Vereinfachungen, aber nachdem die Zahlen kleiner werden, ist der Blick in die Regionen umso"
         " aufschlussreicher und hilft vielleicht, die Aufmerksamkeit auf die Orte zu richten, wo die Situation besonders"
         " schlimm und gefährlich ist. Es lohnt sich aber auch, bis ganz nach unten zu scrollen und auch beruhigend viel grün"
         " zu sehen.", className=bodyClass),
@@ -474,10 +481,31 @@ h_Erlauterung=html.P([
               className=bodyLink),
     html.Span(" in tabellarischer Form auf und berechnet u.a. Trends sowie einen Ansteckungsrisikowert für jeden"
             " Landkreis. Anfänglich sind die Landkreise in einer Rangliste von gefährlich bis idyllisch sortiert."
-            " Die Daten können aber nach jeder Spalte sortiert und gefilter werden, siehe 'Benutzung'."
+            " Die Daten können aber nach jeder Spalte sortiert und gefiltert werden, siehe 'Benutzung'."
             " Anhand der Ampelfarbgebung läßt sich durch Scrollen schnell ein Überblick über viele"
             " Landkreise und die Unterschiede zwischen ihnen verschaffen.",
             className=bodyClass),
+])
+
+h_News=html.P([
+    html.Span("News:", className=introClass),
+    html.Span(" Das Feedback ersten beiden Tage auf Twitter hat geholfen, Fehler zu finden und vieles zu verbessern."
+            " Vielen Dank dafür. Und ja, ich würde auch gerne die Spaltenheader stehen lassen beim Scrollen und kann das"
+            " in Dash auch, aber das Ergebnis ist nicht wie gewünscht, es ist ein grösserer Akt, aber ich bin dran."
+            " Es gab falsche Zahlen bei einigen Landkreisen, das sollte behoben sein. Des weitern liess das eigentliche"
+            " Ranking noch zu wünschen übrig, vor allem da, wo die Zahlen 0 waren oder es größere Sprünge gab."
+              "", className=bodyClass),
+    html.P(" Das Feedback ersten beiden Tage auf Twitter hat geholfen, Fehler zu finden und vieles zu verbessern."
+           " Berechnungen für einzelne Landkreise haben generell das Problem kleiner Zahlen und großen Sprüngen,"
+            " noch sehr viel mehr als auf Bundesebene, wo sich das Problem kleiner Zahlen zum Glück aller (außer den"
+            " Statistikern) inzwischen auch bemerkbar macht."
+            "", className=bodyClass),
+    html.P(" Die Rangberechnung wurde mehrfach verbessert, um vor allem in Sonderfällen eine plausiblere Platzierung zu"
+             " erhalten. Dazu wurde aus dem Rw der RwK, K für klein oder Kreis. Siehe die RwK-Erläuterung unten."
+             " Ansonsten ist die Wunschliste möglicher Verbesserungen lang, aber jede Phase von Corona scheint auch"
+             " andere Werkzeuge, Betrachtungen und Maßnahmen zu erfordern Dieses Werkzeug hier sollte speziell in der"
+             " Phase kleiner und noch kleiner werdender Zahlen helfen, das sehr differenzierte Geschehen dennoch im Auge zu behalten."
+            "", className=bodyClass),
 ])
 
 h_About=html.P([
@@ -502,7 +530,8 @@ h_About=html.P([
 ])
 
 h_Benutzung = html.P([
-    html.Span("Benutzung:", className=introClass),
+    html.P(html.H4(html.A(html.Span("An den Seitenanfang springen ⬆", className=introClass), href="#top",id="Benutzung"))),
+    html.A(html.Span("Benutzung:", className=introClass)),
     html.P(
         "Durch Klicken auf die kleinen Pfeilsymbole im Kopf einer Spalte kann die Tabelle auf- oder absteigend sortiert werden.",
         className=bodyClass),
@@ -514,11 +543,12 @@ h_Benutzung = html.P([
            "Mit Audrücken wie <10 oder >50 können Datensätzte ausgefiltert werden, die bestimmte Werte in der Spalte "
            "über- oder unterschreiten. Einfach Wert eingeben und <Return> drücken. Eingabe löschen, um Filter zu entfernen."
            , className=bodyClass),
+    html.H4(html.A(html.Span("Ans Tabellenende springen ⬇", className=introClass), href="#bottom")),
 ])
 
 h_BedeutungSpaltenHead= html.Span("Bedeutung der Spalten:", className=introClass)
 
-h_BedeutungSpaltenIntro=html.Span("Am aussagekröftigsten sind Werte je 100.000 Einwohner, und da sind derzeit praktisch"
+h_BedeutungSpaltenIntro=html.Span("Am aussagekräftigsten sind Werte je 100.000 Einwohner, und da sind derzeit praktisch"
 " nur die letzten beiden Wochen von Interesse. Wie es sich davor zugetragen hat, lassen aber die Gesamtzahlen erahnen."
 ' Wo es null Infektion gab, erlaubt ein Blick auf den Zeitpunkt der letzten Meldung, wie lange der Kreis "COVID-frei" ist.'
 " Hier die Bedeutung der Spalten, die nicht offensichtlich ihrem Titel zu entnehmen ist:",
@@ -533,15 +563,24 @@ def makeDefinition(value, definition):
     ])
 
 h_Rw = html.Span(["R", html.Sub("w")])
+h_RwK = html.Span(["R", html.Sub("w"),"K"])
 
 h_RwDef = makeDefinition(h_Rw,
 '''
  ist ein wöchentlicher Reproduktionsfaktor. Er ist das Verhältnis aller Fälle der letzten 7 Tage gegenüber den 7
- Tagen davor. Diese Zahl "schlägt" etwa doppelt so stark aus wie der "normale" Reproduktionsfaktor, aber über 1.0 heißt
- auch hier Ausbreitung und unter 1.0 Rückgang. Ein Wert von 2 bedeutet, dass in der letzten Woche doppelt so viele
- Fälle gemeldet wurden wie in der vorletzten Woche, ein Wert von 0,5 bedeutet nur halb so viele neue Fälle. 
+ Tagen davor. Diese Zahl "schlägt" stärker aus als der "normale" Reproduktionsfaktor, aber über 1.0 heißt
+ auch hier Ausbreitung und unter 1.0 Rückgang. Ein Wert von 2 bedeutet, dass in der letzten Woche ungefähr doppelt so viele
+ so viele Fälle gemeldet wurden wie in der vorletzten Woche, ein Wert von 0,5 bedeutet ungefähr nur halb so viele neue Fälle.
+ Warum ungefähr? Der Rw, der zuvor verwendet wurde, kann nicht gut mit 0 Fällen in einer Woche umgehen. Steigen die
+ Infizerten von 0 auf 1, ist der Faktor unendlich. Es gibt keine perfekte Lösung für das Problem, aber wenn Physiker
+ es mit Divisionen durch Null zu tun haben, addieren sie überall was auf, und das macht der RwK auch:
+ RwK = ((Fälle in letzten 7 Tage)+5) / ((Fälle in 7 Tagen davor)+5) Warum 5? Sie liefert brauchbare Ergebnisse bei diesem
+ Indektionsgeschen. Man kann sich auch vorstellen, dass bei Dunkelzifferquote 6,25 es für jeden bekannten Infizierten
+ 5 Unentdeckte gibt, von denen jetzt einer gefunden wurde, Werden die Zahlen grösser, fällt die zusätzliche 5 immer weniger ins Gewicht, RwK nähert sich dem Rw.
  Dieser wöchentlicher Reproduktionsfaktor vermeidet auch wochentagsbedingte Schwankungen und kommt ohne Annahmen wie
- Dauer des seriellen Intervalls aus und ist leicht nachvollziehbar.             
+ Dauer des seriellen Intervalls aus und ist leicht nachvollziehbar. Er modelliert aber nicht den Reproduktionswert eines
+ konkreten Virus, sondern ist einfach nur ein Verhältnis, aber bei den kleinen Zahlen kann man schlichtweg keinen sinnvollen
+ R-Wert mit seriellem Intervall berechnen, und der RwK liefert keine allzu absurden oder unbrauchbaren Ergebnisse.           
 ''')
 
 h_Risiko=makeDefinition("Risiko 1:N/Rang",
@@ -659,6 +698,7 @@ h_Bedeutungen = html.Table([
 
 betterExplanation = html.Div([
     h_Erlauterung,
+    h_News,
     h_About,
     h_Hinweis,
     h_Bedeutungen,
@@ -679,7 +719,15 @@ app.title = "COVID Risiko Deutschland nach Landkreisen"
 app.layout = html.Div([
     h_header,
     betterExplanation,
-    h_table
+    h_table,
+
+    #html.P(html.H3(
+    #html.A(html.Span("An den Seitenanfang springen ⬆", className=introClass), href="#top", id="Benutzung"))),
+
+    #html.P(html.H3(
+    html.P(html.H4(html.A(html.Span("An den Tabellenanfang springen ⬆", className=introClass), href="#Benutzung")),style={'padding': '0px',
+           'backgroundColor': colors['background']}, id="bottom"),
+
 ])
 
 if __name__ == '__main__':
