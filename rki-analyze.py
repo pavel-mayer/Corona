@@ -1,3 +1,4 @@
+import os
 
 import cov_dates as cd
 import csv
@@ -387,9 +388,17 @@ allRecords = []
 
 if UPDATE:
     allRecords = retrieveAllRecords()
-    saveJson("dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json", allRecords)
-    saveJson(archiveFilename(cd.todayDay()), allRecords)
-    saveCsv(csvFilename(cd.todayDay(), "fullDaily", "archive_csv"), allRecords)
+    dfn = "dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json"
+    if not os.path.isfile(dfn):
+        saveJson(dfn, allRecords)
+
+    afn=archiveFilename(cd.todayDay())
+    if not os.path.isfile(afn):
+        saveJson(afn, allRecords)
+
+    fn = csvFilename(cd.todayDay(), "fullDaily", "archive_csv")
+    if not os.path.isfile(fn):
+        saveCsv(fn, allRecords)
 
 
 def findOldRecords(currentRecords, likeRecord):
@@ -598,12 +607,12 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
         if neuerTodesfallNurHeute or neuerTodesfallNurGestern:
             totalNewDeaths = totalNewDeaths+deaths
             newDeathRecords.append(record)
-            if newRecords[-1] != record:
+            if len(newRecords) and newRecords[-1] != record:
                 newRecords.append(record)
         if neuerTodesfallGesternUndHeute:
             attrs['newDeathBeforeDay'] = currentDay - 1
             oldDeathRecords.append(record)
-            if oldRecords[-1] != record:
+            if len(oldRecords) and oldRecords[-1] != record:
                 oldRecords.append(record)
         if neuerTodesfallNurHeute:
             attrs['newDeathOnDay'] = currentDay
