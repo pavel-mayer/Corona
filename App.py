@@ -3,7 +3,7 @@
 # Quick hack to browse RKI-NPGEO-Data, Pavel Mayer 2020,
 # License: Use freely at your own risk.
 
-# pip install Click==7.0 Flask==1.1.1 itsdangerous==1.1.0 Jinja2==2.10.3 MarkupSafe==1.1.1 uWSGI==2.0.18 Werkzeug==0.16.0
+# pip install Click==7.0 Flask==1.1.1 itsdangerous==1.1.0 Jinja2==2.10.3 MarkupSafe==1.1.1 uWSGI==2.0.18 Werkzeug==0.16.0 dash=1.11.0
 # pip install: dash pandas datatable feather-format
 
 import locale
@@ -13,6 +13,7 @@ locale.setlocale(locale.LC_ALL, 'de_DE')
 print("Locale set to:"+str(locale.getlocale()))
 
 import cov_dates as cd
+import pm_util as pmu
 
 import os
 import flask
@@ -110,8 +111,20 @@ def loadAndProcessData(dataFilename):
                dt.first(dt.f.Bundesland)],
     dt.by(dt.f.Landkreis)]
 
-    last7days=fullTable[dt.f.newCaseOnDay>lastDay-7,:][:,
-              [dt.sum(dt.f.AnzahlFall),
+
+    specialDump = fullTable[(dt.f.newCaseOnDay > lastDay - 7) & (dt.f.Landkreis == "LK Main-Tauber-Kreis"), :]
+    specialDump.to_csv("special.csv")
+
+    specialDump2 = fullTable[(dt.f.newCaseOnDay > lastDay - 14) & (dt.f.newCaseOnDay < lastDay-7) & (dt.f.Landkreis == "LK Main-Tauber-Kreis"), :]
+    specialDump2.to_csv("special2.csv")
+
+
+    last7daysRecs = fullTable[((dt.f.newCaseOnDay > lastDay - 7) & (dt.f.MeldeDay > lastDay - 14)), :]
+    last7daysRecs.to_csv("last7daysRecs.csv")
+
+#    last7days = fullTable[dt.f.MeldeDay > lastDay - 7, :][:,
+    last7days = last7daysRecs[:,
+                [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
                dt.sum(dt.f.AnzahlTodesfall),
                dt.sum(dt.f.TodesfaellePro100k)],
@@ -123,8 +136,11 @@ def loadAndProcessData(dataFilename):
     last7days[dt.f.AnzahlTodesfallLetzte7Tage <0, "AnzahlTodesfallLetzte7Tage"] = 0
     last7days[dt.f.TodesfaellePro100kLetzte7Tage <0, "TodesfaellePro100kLetzte7Tage"] = 0
 
-    lastWeek7days=fullTable[(dt.f.newCaseOnDay > lastDay-14) & (dt.f.newCaseOnDay<=lastDay-7),:][:,
-              [dt.sum(dt.f.AnzahlFall),
+    lastWeek7daysRecs = fullTable[(dt.f.newCaseOnDay > lastDay-14) & (dt.f.newCaseOnDay <= lastDay-7)
+                                  & (dt.f.MeldeDay > lastDay - 21)& (dt.f.MeldeDay <= lastDay - 7), :]
+
+    lastWeek7days=lastWeek7daysRecs[:,
+                    [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
                dt.sum(dt.f.AnzahlTodesfall),
                dt.sum(dt.f.TodesfaellePro100k)],
@@ -169,39 +185,65 @@ def loadAndProcessData(dataFilename):
     data=allDaysExt.to_pandas()
     return data
 
+defaultColWidth=70
+#charWidth=7
+
+def colWidth(pixels):
+    return pixels
+
+def colWidthStr(pixels):
+    #print("colWidth pixels=", pixels)
+    return "{}px".format(colWidth(pixels))
+
 def makeColumns():
     desiredOrder = [
-        ('Rang', ['Risiko', 'Rang'], 'numeric', FormatInt),
-        ('Kontaktrisiko', ['Risiko', 'Risiko 1:N'], 'numeric', FormatInt),
-        ('Landkreis', ['Kreis', 'Name'], 'text', Format()),
-        ('Bundesland', ['Kreis', 'Bundesland'], 'text', Format()),
-        ('LandkreisTyp', ['Kreis', 'Art'], 'text', Format()),
-        ('Bevoelkerung', ['Kreis', 'Einwohner'], 'numeric', FormatInt),
-        ('LetzteMeldungNeg', ['Kreis', 'Letze Meldung'], 'numeric', FormatInt),
-        ('AnzahlFallTrend', ['Fälle', 'Rw'], 'numeric', FormatFixed2),
-        ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt),
-        ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorletzte 7 Tage'], 'numeric', FormatInt),
-        ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt),
-        ('FaellePro100kLetzte7Tage', ['Fälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed1),
-        ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000', 'vorletzte 7 Tage'], 'numeric', FormatFixed1),
-        ('FaellePro100kTrend', ['Fälle je 100000', 'Differenz'], 'numeric', FormatFixed1),
-        ('FaellePro100k', ['Fälle je 100000', 'total'], 'numeric', FormatFixed1),
-        ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt),
-        ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorletzte 7 Tage'], 'numeric', FormatInt),
-        ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt),
-        ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed2),
-        ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000', 'vorletzte 7 Tage'], 'numeric', FormatFixed2),
-        ('TodesfaellePro100kTrend', ['Todesfälle je 100000', 'Differenz'], 'numeric', FormatFixed2),
-        ('TodesfaellePro100k', ['Todesfälle je 100000', 'total'], 'numeric', FormatFixed2),
+        ('Rang', ['Risiko', 'Rang'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('Kontaktrisiko', ['Risiko', 'Risiko 1:N'], 'numeric', FormatInt, colWidth(81)),
+        ('Landkreis', ['Kreis', 'Name'], 'text', Format(), colWidth(298)),
+        ('Bundesland', ['Kreis', 'Bundesland'], 'text', Format(), colWidth(190)),
+        ('LandkreisTyp', ['Kreis', 'Art'], 'text', Format(), colWidth(defaultColWidth)),
+        ('Bevoelkerung', ['Kreis', 'Einwohner'], 'numeric', FormatInt, colWidth(82)),
+        ('LetzteMeldungNeg', ['Kreis', 'Letze Meldung'], 'numeric', FormatInt, colWidth(70)),
+        ('AnzahlFallTrend', ['Fälle', 'RwK'], 'numeric', FormatFixed2, colWidth(70)),
+        ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('FaellePro100kLetzte7Tage', ['Fälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('FaellePro100kTrend', ['Fälle je 100000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('FaellePro100k', ['Fälle je 100000', 'total'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000', 'vorl. 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('TodesfaellePro100kTrend', ['Todesfälle je 100000', 'Diff.'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('TodesfaellePro100k', ['Todesfälle je 100000', 'total'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
     ]
 
-    orderedCols, orderedNames, orderedTypes, orderFormats = zip(*desiredOrder)
+    orderedCols, orderedNames, orderedTypes, orderFormats, orderWidths = zip(*desiredOrder)
     #orderedIndices = np.array(orderedIndices)+1
     #print(orderedIndices)
 
     columns = [{'name': L1, 'id': L2, 'type':L3, 'format':L4} for (L1,L2,L3,L4) in zip(orderedNames,orderedCols,orderedTypes,orderFormats)]
+    widths = {}
+    totalWidth = 0
+    minWidth = 0
+    maxWidth = 0
+    #print(orderedCols)
+    #print(orderWidths)
+    for i, n in enumerate(orderedCols):
+        #print(i,n)
+        widths[n] = str(orderWidths[i])+"px"
+        thisColWidth = orderWidths[i]
+        totalWidth = totalWidth + thisColWidth # + 1
+        if thisColWidth < minWidth or minWidth == 0:
+            minWidth = thisColWidth
+        if thisColWidth > maxWidth:
+            maxWidth = thisColWidth
+
     #print("columns=",columns)
-    return columns
+    return columns, widths, totalWidth+1, minWidth, maxWidth
 
 
 server = flask.Flask(__name__)
@@ -239,7 +281,15 @@ print("Loading done, max Day {} date {}".format(maxDay, dataVersionDate))
 
 print("Creating Datatable")
 data = dframe.to_dict("records")
-columns = makeColumns()
+columns, colWidths, totalWidth, minWidth, maxWidth = makeColumns()
+totalWidthStr = colWidthStr(totalWidth)
+minWidthStr = colWidthStr(minWidth)
+maxWidthStr = colWidthStr(maxWidth)
+
+print("colWidths", colWidths)
+print("totalWidthStr",totalWidthStr)
+print("minWidthStr",minWidthStr)
+print("maxWidthStr",maxWidthStr)
 
 colors = {
     'background': 'rgb(50, 50, 50)',
@@ -331,6 +381,48 @@ def conditionalStyles(conditionClass, columns):
         result.append(style)
     return result
 
+def makeNonDefaultColWidthCondStyles(colWidths, default):
+    result = []
+    for col in colWidths.keys():
+        if colWidths[col] != colWidthStr(default):
+            csd = {
+                'if': {'column_id': col},
+                'width': colWidths[col],
+                'maxWidth': colWidths[col],
+                'minWidth': colWidths[col],
+            }
+            result.append(csd)
+    return result
+
+nonDefaultColWidthStyles = makeNonDefaultColWidthCondStyles(colWidths, defaultColWidth)
+#print("nonDefaultColWidthStyles",pretty(nonDefaultColWidthStyles))
+
+def make_width_style_conditional():
+    result = [
+        {
+            'if': {'column_id': 'Landkreis'},
+            'width': colWidths['Landkreis'],
+            'maxWidth': colWidths['Landkreis'],
+            'minWidth': colWidths['Landkreis'],
+
+        },
+        {
+            'if': {'column_id': 'Bundesland'},
+            'width': colWidths['Bundesland'],
+            'maxWidth': colWidths['Bundesland'],
+            'minWidth': colWidths['Bundesland'],
+        },
+        {
+            'if': {'column_id': 'Kontaktrisiko'},
+            'width': colWidths['Kontaktrisiko'],
+            'maxWidth': colWidths['Kontaktrisiko'],
+            'minWidth': colWidths['Kontaktrisiko'],
+        },
+    ]
+    return result
+
+#width_style_conditional = make_width_style_conditional()
+width_style_conditional = nonDefaultColWidthStyles
 
 def make_style_data_conditional():
     result = [
@@ -358,16 +450,30 @@ def make_style_data_conditional():
             'color': 'lightgreen'
         },
     ]
-    result = result + conditionalStyles(FaellePro100kLetzte7TageClass, ['FaellePro100kLetzte7Tage'])
-    result = result + conditionalStyles(AnzahlFallTrendClass, ['AnzahlFallTrend'])
-    result = result + conditionalStyles(KontaktrisikoClass, ['Kontaktrisiko'])
-    result = result + conditionalStyles(LandkreisClass, ['Landkreis'])
+#    result = result + nonDefaultColWidthStyles
+    result = result + width_style_conditional
+    # result = result + conditionalStyles(FaellePro100kLetzte7TageClass, ['FaellePro100kLetzte7Tage'])
+    # result = result + conditionalStyles(AnzahlFallTrendClass, ['AnzahlFallTrend'])
+    # result = result + conditionalStyles(KontaktrisikoClass, ['Kontaktrisiko'])
+    # result = result + conditionalStyles(LandkreisClass, ['Landkreis'])
+    result = result + conditionalStyles(FaellePro100kLetzte7TageClass, 'FaellePro100kLetzte7Tage')
+    result = result + conditionalStyles(AnzahlFallTrendClass, 'AnzahlFallTrend')
+    result = result + conditionalStyles(KontaktrisikoClass, 'Kontaktrisiko')
+    result = result + conditionalStyles(LandkreisClass, 'Landkreis')
 
     return result
+
+
+
 
 cs_data = make_style_data_conditional()
 #print("cs_data", cs_data)
 #pretty(cs_data)
+
+tableHeight='90vh'
+
+#tableWidth= '2400px'
+tableWidth = totalWidthStr
 
 h_table = dash_table.DataTable(
     id='table',
@@ -376,18 +482,29 @@ h_table = dash_table.DataTable(
     sort_action='native',
     filter_action='native',
     page_size= 500,
+    style_table = {
+            'minWidth': tableWidth, 'width': tableWidth, 'maxWidth': tableWidth,
+            'minHeight': tableHeight, 'height': tableHeight, 'maxHeight': tableHeight,
+            'overflow-y': 'scroll',
+#            'tableLayout': 'auto'
+            'table-layout': 'fixed'
+    },
     sort_by = [{"column_id": "Kontaktrisiko", "direction": "asc"}],
-    #fixed_rows={ 'headers': True, 'data': 0 },
+    fixed_rows={ 'headers': True, 'data': 0 },
     style_cell={'textAlign': 'right',
                 'padding': '5px',
                 'backgroundColor': colors['background'],
                 'color': 'white',
-    },
+                },
     style_data={
         'border-bottom': '1px solid '+colors['background'],
         'border-left': '1px solid rgb(128, 128, 128)',
-        'border-right': '1px solid rgb(128, 128, 128)'
-},
+        'border-right': '1px solid rgb(128, 128, 128)',
+#        'textOverflow': 'ellipsis',
+         'width': colWidthStr(defaultColWidth),
+         'maxWidth': maxWidthStr,
+         'minWidth': minWidthStr
+    },
     # style_as_list_view = True,
     style_header={
         'backgroundColor': colors['background'],
@@ -397,7 +514,7 @@ h_table = dash_table.DataTable(
         'whiteSpace': 'normal',
         'height': 'auto',
         'overflow-wrap': 'normal',
-        'textAlign': 'center'
+        'textAlign': 'center',
     },
     merge_duplicate_headers=True,
     style_cell_conditional=[
@@ -405,9 +522,14 @@ h_table = dash_table.DataTable(
             'if': {'column_id': 'Landkreis'},
             'textAlign': 'left'
         },
+        {
+            'if': {'column_id': 'Bundesland'},
+            'textAlign': 'left'
+        },
 
     ],
-    style_data_conditional = make_style_data_conditional()
+    style_data_conditional = cs_data,
+#    style_header_conditional= width_style_conditional
 
 )
 
@@ -430,14 +552,14 @@ h_header = html.Header(
         'backgroundColor': colors['background'],
     },
     children=[
-        html.A(html.H1(className="app-header", children="COVID Risiko Deutschland nach Landkreisen", style={'color': colors['text']}), href="#test"),
+        html.H1(className="app-header", children="COVID Risiko Deutschland nach Landkreisen", style={'color': colors['text'], 'text-decoration': 'none'}, id="title_header"),
         html.H4(className="app-header-date",
                 children="Datenstand: {} 00:00 Uhr (wird täglich aktualisiert)".format(dataVersionDate),
                 style={'color': colors['text']}),
         html.H4(className="app-header-date",
-                children="Softwarestand: {} (UTC), Version 0.9.6".format(appDateStr),
+                children="Softwarestand: {} (UTC), Version 0.9.7".format(appDateStr),
                 style={'color': colors['text']}),
-        html.H3(html.A(html.Span("Zur Tabelle springen ⬇", className=introClass), href="#Benutzung")),
+        html.H3(html.A(html.Span("Zur Tabelle springen ⬇", className=introClass), href="#tabletop")),
     ]
 )
 # h_explanation = dcc.Markdown(
@@ -489,22 +611,25 @@ h_Erlauterung=html.P([
 
 h_News=html.P([
     html.Span("News:", className=introClass),
-    html.Span(" Das Feedback ersten beiden Tage auf Twitter hat geholfen, Fehler zu finden und vieles zu verbessern."
-            " Vielen Dank dafür. Und ja, ich würde auch gerne die Spaltenheader stehen lassen beim Scrollen und kann das"
-            " in Dash auch, aber das Ergebnis ist nicht wie gewünscht, es ist ein grösserer Akt, aber ich bin dran."
-            " Es gab falsche Zahlen bei einigen Landkreisen, das sollte behoben sein. Des weitern liess das eigentliche"
-            " Ranking noch zu wünschen übrig, vor allem da, wo die Zahlen 0 waren oder es größere Sprünge gab."
+    html.P(" Danke für das Feedback auf Twitter. Sie Spaltenheader bleiben jetzt, und es war alles noch schlimmer als"
+            " gedacht. Eigentlich sollte es eine Sache von Minuten sein, aber ein Bug in der aktuellen Version von Dash"
+            " hat mich einen Arbeit Tag gekostet und ich musste auf eine ältere Dash-Version umsteigen, die leider langsamer"
+            " ist, aber die Spalten im Kopf und Tabelle korrekt übereinander hält."
               "", className=bodyClass),
-    html.P(" Das Feedback ersten beiden Tage auf Twitter hat geholfen, Fehler zu finden und vieles zu verbessern."
-           " Berechnungen für einzelne Landkreise haben generell das Problem kleiner Zahlen und großen Sprüngen,"
-            " noch sehr viel mehr als auf Bundesebene, wo sich das Problem kleiner Zahlen zum Glück aller (außer den"
-            " Statistikern) inzwischen auch bemerkbar macht."
-            "", className=bodyClass),
-    html.P(" Die Rangberechnung wurde mehrfach verbessert, um vor allem in Sonderfällen eine plausiblere Platzierung zu"
-             " erhalten. Dazu wurde aus dem Rw der RwK, K für klein oder Kreis. Siehe die RwK-Erläuterung unten."
-             " Ansonsten ist die Wunschliste möglicher Verbesserungen lang, aber jede Phase von Corona scheint auch"
-             " andere Werkzeuge, Betrachtungen und Maßnahmen zu erfordern Dieses Werkzeug hier sollte speziell in der"
-             " Phase kleiner und noch kleiner werdender Zahlen helfen, das sehr differenzierte Geschehen dennoch im Auge zu behalten."
+    html.P(" Bei den Berechnungen für einzelne Landkreise gab es eine bedeutende Änderung. Die Definition"
+           " wurde geändert, was die Zählung der Fälle pro Woche betrifft. Als Fall in den letzten 7 Tagen gilt nun,"
+           " wenn der Fall in den letzten 7 Tagen beim RKI eingegangen ist und in den letzten 14 Tagen beim Gesundheitsamt"
+           " gemeldet wurde. Hintergrund ist, dass es bei einzelnen Landkreisen immer wieder zu Nachmeldungen von zig Fällen"
+           " ans RKI kommt, die teilweise Wochen oder Monate zurückliegen. In Einzelfällen führte das zu einem zu hohen Risikoranking"
+           " und einem verfälschten Bild der Entwicklung."
+           "", className=bodyClass),
+    html.P(" Während das RKI nur als Fälle der letzten 7 Tage diejenigen ausweist, die sich auch in den letzen 7 Tagen"
+            " beim beim Gesundheitsamt gemeldet haben, fallen in der RKI-Landkreis-7-Tage-Rechnung alle Fälle unter den Tisch"
+            " die nicht auch in den letzten 7 Tagen eingegangen sind. Dadurch sind die RKI-Zahlen für die letzten 7 Tage"
+            " meist zu niedrig, je nach Meldeverzögerung, während sie hier weniger zu niedrig oder zu hoch sind, weil hier"
+            " verspätet eingegange Fälle der vorletzen 7 Tage den letzen Tagen zugeschlagen werden, wenn sie erst in den"
+            " letzen 7 Tagen eingangen sind. Es wäre interessant zu wissen, warum Wochen zurückliegende Fälle in nennenswerter Zahl, manchmal"
+            " in der Grössenordung von zig bis über hundert Fällen in einem Landkreis alle an einem Tag nachgemeldet werden."
             "", className=bodyClass),
 ])
 
@@ -543,7 +668,10 @@ h_Benutzung = html.P([
            "Mit Audrücken wie <10 oder >50 können Datensätzte ausgefiltert werden, die bestimmte Werte in der Spalte "
            "über- oder unterschreiten. Einfach Wert eingeben und <Return> drücken. Eingabe löschen, um Filter zu entfernen."
            , className=bodyClass),
-    html.H4(html.A(html.Span("Ans Tabellenende springen ⬇", className=introClass), href="#bottom")),
+    html.H4(html.A(html.Span("Ans Seitenende springen ⬇", className=introClass), href="#bottom")),
+    html.P(html.H4(html.A(html.Span("Zu Absatz 'Benutzung' springen ⬆", className=introClass), href="#Benutzung")),
+           style={'padding': '0px',
+                  'backgroundColor': colors['background']}, id="tabletop"),
 ])
 
 h_BedeutungSpaltenHead= html.Span("Bedeutung der Spalten:", className=introClass)
@@ -674,12 +802,13 @@ h_BgtFarben=html.Div(["Feld mit Farbe hinterlegt", h_BgFarbenList])
 # )
 
 cellStyle = {"border-left": "1px solid #ffffff", "padding-left": "16px"}
+cellStyleFarben = {"border-left": "1px solid #ffffff", "padding-left": "16px", 'min-width':'30%','width':'30%'}
 
 h_Bedeutungen = html.Table([
-        html.Tr([html.Th(h_BedeutungSpaltenHead), html.Td(h_BedeutungFarbenHead,style=cellStyle)]),
+        html.Tr([html.Th(h_BedeutungSpaltenHead), html.Td(h_BedeutungFarbenHead,style=cellStyleFarben)]),
         html.Tr([html.Td(h_BedeutungSpaltenIntro), html.Td(h_BedeutungFarbenIntro,style=cellStyle)]),
-        html.Tr([html.Td(h_RwDef), html.Td(h_TextFarben,style=cellStyle)]),
-        html.Tr([html.Td([h_Risiko, h_RisikoList]), html.Td(h_BgtFarben,style=cellStyle)]),
+        html.Tr([html.Td(h_RwDef), html.Td(h_TextFarben,style=cellStyleFarben)]),
+        html.Tr([html.Td([h_Risiko, h_RisikoList]), html.Td(h_BgtFarben,style=cellStyleFarben)]),
         html.Tr([html.Td(h_LetzteMeldung)]),
 ],
 #    style={'padding': '0 0'}
@@ -725,7 +854,7 @@ app.layout = html.Div([
     #html.A(html.Span("An den Seitenanfang springen ⬆", className=introClass), href="#top", id="Benutzung"))),
 
     #html.P(html.H3(
-    html.P(html.H4(html.A(html.Span("An den Tabellenanfang springen ⬆", className=introClass), href="#Benutzung")),style={'padding': '0px',
+    html.P(html.H4(html.A(html.Span("Zu Absatz 'Benutzung' springen ⬆", className=introClass), href="#Benutzung")),style={'padding': '0px',
            'backgroundColor': colors['background']}, id="bottom"),
 
 ])

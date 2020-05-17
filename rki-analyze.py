@@ -16,6 +16,8 @@ from matplotlib.animation import FFMpegWriter
 from matplotlib.animation import ImageMagickWriter
 import datatable as dt
 
+import pm_util as pmu
+
 UPDATE = False # fetch new data
 REFRESH= True or UPDATE # recreate enriched, consolidated dump
 
@@ -158,28 +160,8 @@ def bar_plot(ax, data, colors=None, total_width=0.8, single_width=1, legend=True
 #     bar_plot(ax, data, total_width=.8, single_width=.9)
 #     plt.show()
 
-def saveCsv(filename, records):
-    print("saveCsv: Saving "+filename)
-    csv_columns = list(records[0]["attributes"].keys())
-    for data in records:
-        record = data["attributes"]
-        for attr in record:
-            if not attr in csv_columns:
-                csv_columns.append(attr)
-    #print(csv_columns)
 
-    try:
-        with open(filename, 'w') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
-            writer.writeheader()
-            for data in records:
-                record = data["attributes"]
-                writer.writerow(record)
-    except IOError:
-        print("I/O error")
 
-def pretty(jsonmap):
-    print(json.dumps(jsonmap, sort_keys=False, indent=4, separators=(',', ': ')))
 
 def retrieveRecords(offset, length):
     url = "https://services7.arcgis.com/mOBPykOjAyBO2ZKk/arcgis/rest/services/RKI_COVID19/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json&resultOffset={}&resultRecordCount={}".format(offset, length)
@@ -208,18 +190,6 @@ def retrieveAllRecords():
             ready = True
     print("Done")
     return records
-
-def loadJson(fileName):
-    print("loadJson: Loading "+fileName)
-    with open(fileName, 'r') as openfile:
-        json_object = json.load(openfile)
-        return json_object
-
-def saveJson(fileName, objectToSave):
-    print("saveJson: Saving "+fileName)
-    with open(fileName, 'w') as outfile:
-        json.dump(objectToSave, outfile)
-
 
 
 def addDates(records):
@@ -390,15 +360,15 @@ if UPDATE:
     allRecords = retrieveAllRecords()
     dfn = "dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json"
     if not os.path.isfile(dfn):
-        saveJson(dfn, allRecords)
+        pmu.saveJson(dfn, allRecords)
 
     afn=archiveFilename(cd.todayDay())
     if not os.path.isfile(afn):
-        saveJson(afn, allRecords)
+        pmu.saveJson(afn, allRecords)
 
     fn = csvFilename(cd.todayDay(), "fullDaily", "archive_csv")
     if not os.path.isfile(fn):
-        saveCsv(fn, allRecords)
+        pmu.saveCsv(fn, allRecords)
 
 
 def findOldRecords(currentRecords, likeRecord):
@@ -643,7 +613,7 @@ def loadRecords():
     globalID = 1
     for day in range(firstRecordDay, lastRecordDay+1):
         currentRecords = loadJson(archiveFilename(day))
-        saveCsv(csvFilename(day, "fullDaily", "archive_csv"),currentRecords)
+        pmu.saveCsv(csvFilename(day, "fullDaily", "archive_csv"),currentRecords)
         globalID, currentcaseHashes, currentMsgHashes = stampRecords(currentRecords, globalID)
 
         caseCols = collisionStats(currentcaseHashes)
@@ -694,8 +664,8 @@ if REFRESH:
     addDates(allRecords)
     addLandkreisData(allRecords)
 
-    saveJson("full-latest.json",allRecords)
-    saveCsv("full-latest.csv", allRecords)
+    pmu.saveJson("full-latest.json",allRecords)
+    pmu.saveCsv("full-latest.csv", allRecords)
 else:
     allRecords = loadJson("full-latest.json")
 
