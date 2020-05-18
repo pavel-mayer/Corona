@@ -612,7 +612,7 @@ def loadRecords():
     previousMsgHashes = None
     globalID = 1
     for day in range(firstRecordDay, lastRecordDay+1):
-        currentRecords = loadJson(archiveFilename(day))
+        currentRecords = pmu.loadJson(archiveFilename(day))
         pmu.saveCsv(csvFilename(day, "fullDaily", "archive_csv"),currentRecords)
         globalID, currentcaseHashes, currentMsgHashes = stampRecords(currentRecords, globalID)
 
@@ -667,7 +667,7 @@ if REFRESH:
     pmu.saveJson("full-latest.json",allRecords)
     pmu.saveCsv("full-latest.csv", allRecords)
 else:
-    allRecords = loadJson("full-latest.json")
+    allRecords = pmu.loadJson("full-latest.json")
 
 casesinResult = sumField(allRecords, "AnzahlFall")
 deadinResult = sumField(allRecords, "AnzahlTodesfall")
