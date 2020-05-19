@@ -38,7 +38,9 @@ print("Running on host '{}'".format(socket.gethostname()))
 def pretty(jsonmap):
     print(json.dumps(jsonmap, sort_keys=False, indent=4, separators=(',', ': ')))
 
-def merge(largerTable, smallerTable, keyFieldName):
+# creates a new table by joining all columns from smaller table according to same values of keyFieldName
+# largerTable must contain all keys present in smallertable but not vice versa
+def join(largerTable, smallerTable, keyFieldName):
     keys = smallerTable[:, keyFieldName].to_list()[0]
     extTable = largerTable.copy()
     for colName in smallerTable.names:
@@ -53,6 +55,23 @@ def merge(largerTable, smallerTable, keyFieldName):
                     extTable[i,colName] = valuesDict[lk]
     return extTable
 
+# creates a new table by replacing all values in larger_table with values in matching columns in smaller_table according
+# to same values of keyFieldName
+# largerTable must contain all keys (key values) present in smallertable but not vice versa
+def merge(largerTable, smallerTable, keyFieldName):
+    keys = smallerTable[:, keyFieldName].to_list()[0]
+    extTable = largerTable.copy()
+    for colName in smallerTable.names:
+        if colName != keyFieldName:
+            values = smallerTable[:, colName].to_list()[0]
+            valuesDict = dict(zip(keys, values))
+
+            #extTable = extTable[:, dt.f[:].extend({colName: 0.0})]
+
+            for i, lk in enumerate(extTable[:,keyFieldName].to_list()[0]):
+                if lk in valuesDict:
+                    extTable[i,colName] = valuesDict[lk]
+    return extTable
 
 FormatFixed1 = Format(
     precision=1,
@@ -82,21 +101,52 @@ FormatInt = Format(
                 symbol=Symbol.no,
 #                symbol_suffix=u'˚F'
             )
+FormatIntBracketed = Format(
+                nully='',
+                precision=0,
+                scheme=Scheme.fixed,
+                symbol=Symbol.yes,
+                symbol_suffix=')',
+                symbol_prefix='(',
+)
+FormatIntPlus = Format(
+                nully='',
+                precision=0,
+                scheme=Scheme.fixed,
+                sign=Sign.positive,
+                symbol=Symbol.no,
+            )
+FormatIntRatio = Format(
+                nully='',
+                precision=0,
+                scheme=Scheme.fixed,
+                symbol=Symbol.yes,
+                symbol_prefix='1/',
+                group=FormatTemplate.Group.yes,
+                group_delimiter='.',
+)
 
-def loadAndProcessData(dataFilename):
-    print("Loading "+dataFilename)
+def loadData(dataFilename):
+    print("Loading " + dataFilename)
 
     fullTable = dt.fread(dataFilename)
-    print("Loading done loading table from ‘"+dataFilename+"‘, keys:")
+    print("Loading done loading table from ‘" + dataFilename + "‘, keys:")
     print(fullTable.keys())
-    cases = fullTable[:,'AnzahlFall'].sum()[0,0]
-    dead = fullTable[:,'AnzahlTodesfall'].sum()[0,0]
-
+    cases = fullTable[:, 'AnzahlFall'].sum()[0, 0]
+    dead = fullTable[:, 'AnzahlTodesfall'].sum()[0, 0]
     lastDay=fullTable[:,'MeldeDay'].max()[0,0]
     lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
     print("File stats: lastDay {} lastnewCaseOnDay {} cases {} dead {}".format(lastDay, lastnewCaseOnDay, cases, dead))
-
     newTable=fullTable[:,dt.f[:].extend({"erkMeldeDelay": dt.f.MeldeDay-dt.f.RefDay})]
+    return newTable, lastDay
+
+def processData(fullCurrentTable, forDay):
+
+    fullTable = fullCurrentTable[(dt.f.newCaseOnDay <= forDay) | (dt.f.newCaseBeforeDay < forDay),:]
+
+    lastDay = fullTable[:, 'MeldeDay'].max()[0, 0]
+    lastnewCaseOnDay = fullTable[:, 'newCaseOnDay'].max()[0, 0]
+
     #print(newTable.keys())
 
     #dt.by(dt.f.Bundesland)]
@@ -105,24 +155,46 @@ def loadAndProcessData(dataFilename):
                dt.sum(dt.f.FaellePro100k),
                dt.sum(dt.f.AnzahlTodesfall),
                dt.sum(dt.f.TodesfaellePro100k),
-               dt.mean(dt.f.Bevoelkerung),
+               dt.first(dt.f.Bevoelkerung),
                dt.max(dt.f.MeldeDay),
                dt.first(dt.f.LandkreisTyp),
                dt.first(dt.f.Bundesland)],
     dt.by(dt.f.Landkreis)]
 
+    '''
+    bevoelkerung = alldays[:, [dt.sum(dt.f.Bevoelkerung), dt.sum(dt.f.AnzahlFall), dt.sum(dt.f.AnzahlTodesfall),], dt.by(dt.f.Bundesland)]
+    bevoelkerung=bevoelkerung[:,dt.f[:].extend({"FaellePro100k": dt.f.AnzahlFall * 100000 / dt.f.Bevoelkerung})]
+    bevoelkerung=bevoelkerung[:,dt.f[:].extend({"TodesfaellePro100k": dt.f.AnzahlTodesfall * 100000 / dt.f.Bevoelkerung})]
 
-    specialDump = fullTable[(dt.f.newCaseOnDay > lastDay - 7) & (dt.f.Landkreis == "LK Main-Tauber-Kreis"), :]
-    specialDump.to_csv("special.csv")
+    alldaysBundeslaender = fullTable[:,
+              [dt.sum(dt.f.AnzahlFall),
+               dt.sum(dt.f.FaellePro100k),
+               dt.sum(dt.f.AnzahlTodesfall),
+               dt.sum(dt.f.TodesfaellePro100k),
+               dt.first(dt.f.Bevoelkerung),
+               dt.max(dt.f.MeldeDay),
+               dt.first(dt.f.LandkreisTyp),
+               dt.first(dt.f.Bundesland)],
+            dt.by(dt.f.Bundesland)]
 
-    specialDump2 = fullTable[(dt.f.newCaseOnDay > lastDay - 14) & (dt.f.newCaseOnDay < lastDay-7) & (dt.f.Landkreis == "LK Main-Tauber-Kreis"), :]
-    specialDump2.to_csv("special2.csv")
+    alldaysBundeslaender[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
+    alldaysBundeslaender[:, "Landkreis"] = bevoelkerung[:, "Bundesland"]
+    alldaysBundeslaender[:, "FaellePro100k"] = bevoelkerung[:, "FaellePro100k"]
+    alldaysBundeslaender[:, "TodesfaellePro100k"] = bevoelkerung[:, "TodesfaellePro100k"]
+    alldaysBundeslaender[:, "LandkreisTyp"] = "BL"
+    alldays.rbind(alldaysBundeslaender, force=True)
 
+
+    # specialDump = fullTable[(dt.f.newCaseOnDay > lastDay - 7) & (dt.f.Landkreis == "LK Main-Tauber-Kreis"), :]
+    # specialDump.to_csv("special.csv")
+    #
+    # specialDump2 = fullTable[(dt.f.newCaseOnDay > lastDay - 14) & (dt.f.newCaseOnDay < lastDay-7) & (dt.f.Landkreis == "LK Main-Tauber-Kreis"), :]
+    # specialDump2.to_csv("special2.csv")
+    ##############################################################################
+    '''
 
     last7daysRecs = fullTable[((dt.f.newCaseOnDay > lastDay - 7) & (dt.f.MeldeDay > lastDay - 14)), :]
-    last7daysRecs.to_csv("last7daysRecs.csv")
-
-#    last7days = fullTable[dt.f.MeldeDay > lastDay - 7, :][:,
+    #last7daysRecs.to_csv("last7daysRecs.csv")
     last7days = last7daysRecs[:,
                 [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
@@ -131,14 +203,28 @@ def loadAndProcessData(dataFilename):
     dt.by(dt.f.Landkreis)]
     last7days.names=["Landkreis","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage",
                      "TodesfaellePro100kLetzte7Tage"]
+    '''
+    last7daysBL = last7daysRecs[:,
+                [dt.sum(dt.f.AnzahlFall),
+                 dt.sum(dt.f.AnzahlTodesfall),
+                 dt.sum(dt.f.Bevoelkerung)],
+                dt.by(dt.f.Bundesland)]
+    last7daysBL.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage","Bevoelkerung"]
+    last7daysBL = last7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+    last7daysBL = last7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+    print("last7daysBL")
+    print(last7daysBL)
+    last7days.rbind(last7daysBL, force=True)
+    '''
+    # clip case to zero
     last7days[dt.f.AnzahlFallLetzte7Tage <0, "AnzahlFallLetzte7Tage"] = 0
     last7days[dt.f.FaellePro100kLetzte7Tage <0, "FaellePro100kLetzte7Tage"] = 0
     last7days[dt.f.AnzahlTodesfallLetzte7Tage <0, "AnzahlTodesfallLetzte7Tage"] = 0
     last7days[dt.f.TodesfaellePro100kLetzte7Tage <0, "TodesfaellePro100kLetzte7Tage"] = 0
+    ##############################################################################
 
     lastWeek7daysRecs = fullTable[(dt.f.newCaseOnDay > lastDay-14) & (dt.f.newCaseOnDay <= lastDay-7)
                                   & (dt.f.MeldeDay > lastDay - 21)& (dt.f.MeldeDay <= lastDay - 7), :]
-
     lastWeek7days=lastWeek7daysRecs[:,
                     [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
@@ -148,13 +234,27 @@ def loadAndProcessData(dataFilename):
     #lastWeek7days[dt.f[1:] < 0, dt.f[1:]] = 0
     lastWeek7days.names=["Landkreis","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor",
                          "AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
+    '''
+    lastWeek7daysBL = lastWeek7daysRecs[:,
+                  [dt.sum(dt.f.AnzahlFall),
+                   dt.sum(dt.f.AnzahlTodesfall),
+                   dt.sum(dt.f.Bevoelkerung)],
+                  dt.by(dt.f.Bundesland)]
+    lastWeek7daysBL.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
+    lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
+    lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7TageDavor": dt.f.AnzahlTodesfallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
+    print("lastWeek7daysBL")
+    print(lastWeek7daysBL)
+    lastWeek7days.rbind(lastWeek7daysBL, force=True)
+    '''
+
     lastWeek7days[dt.f.AnzahlFallLetzte7TageDavor <0, "AnzahlFallLetzte7TageDavor"] = 0
     lastWeek7days[dt.f.FaellePro100kLetzte7TageDavor <0, "FaellePro100kLetzte7TageDavor"] = 0
     lastWeek7days[dt.f.AnzahlTodesfallLetzte7TageDavor <0, "AnzahlTodesfallLetzte7TageDavor"] = 0
     lastWeek7days[dt.f.TodesfaellePro100kLetzte7TageDavor <0, "TodesfaellePro100kLetzte7TageDavor"] = 0
 
-    allDaysExt0 = merge(alldays, last7days, "Landkreis")
-    allDaysExt1 = merge(allDaysExt0, lastWeek7days, "Landkreis")
+    allDaysExt0 = join(alldays, last7days, "Landkreis")
+    allDaysExt1 = join(allDaysExt0, lastWeek7days, "Landkreis")
 
     Rw = (dt.f.AnzahlFallLetzte7Tage+5)/(dt.f.AnzahlFallLetzte7TageDavor + 5)
 
@@ -163,7 +263,6 @@ def loadAndProcessData(dataFilename):
     #allDaysExt2[dt.f.AnzahlFallLetzte7TageDavor == 0 & dt.f.AnzahlFallLetzte7Tage >0 , "AnzahlFallTrend"] = 1
     #allDaysExt2[dt.f.AnzahlFallLetzte7TageDavor == 0 & dt.f.AnzahlFallLetzte7Tage == 0 , "AnzahlFallTrend"] = 1
 
-
     allDaysExt3=allDaysExt2[:,dt.f[:].extend({"FaellePro100kTrend": dt.f.FaellePro100kLetzte7Tage-dt.f.FaellePro100kLetzte7TageDavor})]
     allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
 
@@ -171,18 +270,56 @@ def loadAndProcessData(dataFilename):
     allDaysExt6 = allDaysExt5[:, dt.f[:].extend({"LetzteMeldung": lastDay - dt.f.MeldeDay})]
     allDaysExt6b = allDaysExt6[:, dt.f[:].extend({"LetzteMeldungNeg": dt.f.MeldeDay - lastDay})]
 
-    allDaysExt6b[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 999999
+    allDaysExt6b[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 99999
 
     sortedByRisk = allDaysExt6b.sort(["Kontaktrisiko","LetzteMeldung","FaellePro100k"])
     #print(sortedByRisk)
     allDaysExt=sortedByRisk[:,dt.f[:].extend({"Rang": 0})]
     allDaysExt[:,"Rang"]=np.arange(1,allDaysExt.nrows+1)
     #print(allDaysExt)
+    return allDaysExt
 
 
-    print("Column names frame order:",list(enumerate(allDaysExt.names)))
 
-    data=allDaysExt.to_pandas()
+def loadAndProcessData(fileName):
+    currentFullTable, lastDay = loadData(fileName)
+    todayTable = processData(currentFullTable, lastDay).sort("Landkreis")
+    yesterdayTable = processData(currentFullTable, lastDay-1).sort("Landkreis")
+
+    print(currentFullTable)
+    print(todayTable)
+    print(yesterdayTable)
+
+    resultTable=todayTable[:,dt.f[:].extend({"RangChange": 0})]
+    rangChange = np.subtract(yesterdayTable[:,"Rang"],todayTable[:,"Rang"])
+    resultTable[:,"RangChange"] = rangChange
+
+    resultTable=resultTable[:,dt.f[:].extend({"RangYesterday": 0})]
+    resultTable[:,"RangYesterday"] = yesterdayTable[:,"Rang"]
+
+    resultTable=resultTable[:,dt.f[:].extend({"RangChangeStr": "-"})]
+
+    rangChangeStrs = np.full(len(rangChange), "*")
+    for i, rc in enumerate(rangChange):
+        #print(i, rc)
+
+        rangChangeStr = ""
+        if rc > 0:
+            rangChangeStr = "▲"
+        if rc < 0:
+            rangChangeStr = "▼"
+
+        resultTable[i, "RangChangeStr"] = rangChangeStr
+        rangChangeStrs[i] = rangChangeStr
+
+    #print(rangChangeStrs)
+
+    print("Column names frame order:", list(enumerate(resultTable.names)))
+    resultTable2 = resultTable.sort("Rang")
+    #print(resultTable2)
+    data = resultTable2.to_pandas()
+    print(data)
+
     return data
 
 defaultColWidth=70
@@ -197,28 +334,31 @@ def colWidthStr(pixels):
 
 def makeColumns():
     desiredOrder = [
-        ('Rang', ['Risiko', 'Rang'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('Kontaktrisiko', ['Risiko', 'Risiko 1:N'], 'numeric', FormatInt, colWidth(81)),
+        ('Rang', ['Rang', 'Rang'], 'numeric', FormatInt, colWidth(40)),
+        ('RangChangeStr', ['Rang', ''], 'text', Format(), colWidth(20)),
+        ('RangChange', ['Rang', '+/-'], 'numeric', FormatIntPlus, colWidth(34)),
+        ('RangYesterday', ['Rang', 'Gestern'], 'numeric', FormatIntBracketed, colWidth(defaultColWidth)),
+        ('Kontaktrisiko', ['Risiko', '1/N'], 'numeric', FormatIntRatio, colWidth(71)),
         ('Landkreis', ['Kreis', 'Name'], 'text', Format(), colWidth(298)),
         ('Bundesland', ['Kreis', 'Bundesland'], 'text', Format(), colWidth(190)),
-        ('LandkreisTyp', ['Kreis', 'Art'], 'text', Format(), colWidth(defaultColWidth)),
-        ('Bevoelkerung', ['Kreis', 'Einwohner'], 'numeric', FormatInt, colWidth(82)),
-        ('LetzteMeldungNeg', ['Kreis', 'Letze Meldung'], 'numeric', FormatInt, colWidth(70)),
+        ('LandkreisTyp', ['Kreis', 'Art'], 'text', Format(), colWidth(30)),
+        ('Bevoelkerung', ['Kreis', 'Einwohner'], 'numeric', FormatInt, colWidth(90)),
+        ('LetzteMeldungNeg', ['Kreis', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
         ('AnzahlFallTrend', ['Fälle', 'RwK'], 'numeric', FormatFixed2, colWidth(70)),
         ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(60)),
         ('FaellePro100kLetzte7Tage', ['Fälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100kTrend', ['Fälle je 100000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
-        ('FaellePro100k', ['Fälle je 100000', 'total'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('FaellePro100k', ['Fälle je 100000', 'total'], 'numeric', FormatFixed1, colWidth(60)),
         ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
         ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000', 'vorl. 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
         ('TodesfaellePro100kTrend', ['Todesfälle je 100000', 'Diff.'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
-        ('TodesfaellePro100k', ['Todesfälle je 100000', 'total'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('TodesfaellePro100k', ['Todesfälle je 100000', 'total'], 'numeric', FormatFixed2, colWidth(60)),
     ]
 
     orderedCols, orderedNames, orderedTypes, orderFormats, orderWidths = zip(*desiredOrder)
@@ -397,29 +537,29 @@ def makeNonDefaultColWidthCondStyles(colWidths, default):
 nonDefaultColWidthStyles = makeNonDefaultColWidthCondStyles(colWidths, defaultColWidth)
 #print("nonDefaultColWidthStyles",pretty(nonDefaultColWidthStyles))
 
-def make_width_style_conditional():
-    result = [
-        {
-            'if': {'column_id': 'Landkreis'},
-            'width': colWidths['Landkreis'],
-            'maxWidth': colWidths['Landkreis'],
-            'minWidth': colWidths['Landkreis'],
-
-        },
-        {
-            'if': {'column_id': 'Bundesland'},
-            'width': colWidths['Bundesland'],
-            'maxWidth': colWidths['Bundesland'],
-            'minWidth': colWidths['Bundesland'],
-        },
-        {
-            'if': {'column_id': 'Kontaktrisiko'},
-            'width': colWidths['Kontaktrisiko'],
-            'maxWidth': colWidths['Kontaktrisiko'],
-            'minWidth': colWidths['Kontaktrisiko'],
-        },
-    ]
-    return result
+# def make_width_style_conditional():
+#     result = [
+#         {
+#             'if': {'column_id': 'Landkreis'},
+#             'width': colWidths['Landkreis'],
+#             'maxWidth': colWidths['Landkreis'],
+#             'minWidth': colWidths['Landkreis'],
+#
+#         },
+#         {
+#             'if': {'column_id': 'Bundesland'},
+#             'width': colWidths['Bundesland'],
+#             'maxWidth': colWidths['Bundesland'],
+#             'minWidth': colWidths['Bundesland'],
+#         },
+#         {
+#             'if': {'column_id': 'Kontaktrisiko'},
+#             'width': colWidths['Kontaktrisiko'],
+#             'maxWidth': colWidths['Kontaktrisiko'],
+#             'minWidth': colWidths['Kontaktrisiko'],
+#         },
+#     ]
+#     return result
 
 #width_style_conditional = make_width_style_conditional()
 width_style_conditional = nonDefaultColWidthStyles
@@ -449,6 +589,56 @@ def make_style_data_conditional():
             },
             'color': 'lightgreen'
         },
+        ################################################################
+        {
+            'if': {
+                'filter_query': '{RangChange} > 0',
+                'column_id': 'RangChangeStr'
+            },
+            'color': 'tomato'
+        },
+        {
+            'if': {
+                'filter_query': '{RangChange} < 0',
+                'column_id': 'RangChangeStr'
+            },
+            'color': 'lightgreen'
+        },
+        ################################################################
+        {
+            'if': {'column_id': 'RangYesterday'},
+            'border-left': 'none',
+            #'border-right': '3px solid blue',
+        },
+        {
+            'if': {'column_id': 'RangChange'},
+            'border-left': 'none',
+            # 'border-right': '3px solid blue',
+        },
+        ################################################################
+        {
+            'if': {
+                'filter_query': '{RangChange} > 0',
+                'column_id': 'RangChange'
+            },
+            'color': 'tomato'
+        },
+        {
+            'if': {
+                'filter_query': '{RangChange} < 0',
+                'column_id': 'RangChange'
+            },
+            'color': 'lightgreen'
+        },
+        {
+            'if': {
+                'filter_query': '{RangChange} = 0',
+                'column_id': 'RangChange'
+            },
+            'color': colors["background"]
+        },
+        ################################################################
+
     ]
 #    result = result + nonDefaultColWidthStyles
     result = result + width_style_conditional
@@ -526,6 +716,18 @@ h_table = dash_table.DataTable(
             'if': {'column_id': 'Bundesland'},
             'textAlign': 'left'
         },
+        {
+            'if': {'column_id': 'RangYesterday'},
+            'textAlign': 'center'
+        },
+        {
+            'if': {'column_id': 'Rang'},
+            'textAlign': 'center'
+        },
+        {
+            'if': {'column_id': 'Kontaktrisiko'},
+            'textAlign': 'center'
+        },
 
     ],
     style_data_conditional = cs_data,
@@ -557,7 +759,7 @@ h_header = html.Header(
                 children="Datenstand: {} 00:00 Uhr (wird täglich aktualisiert)".format(dataVersionDate),
                 style={'color': colors['text']}),
         html.H4(className="app-header-date",
-                children="Softwarestand: {} (UTC), Version 0.9.7".format(appDateStr),
+                children="Softwarestand: {} (UTC), Version 0.9.8".format(appDateStr),
                 style={'color': colors['text']}),
         html.H3(html.A(html.Span("Zur Tabelle springen ⬇", className=introClass), href="#tabletop")),
     ]
@@ -582,11 +784,11 @@ h_Hinweis=html.P([
            href="https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4/page/page_1/",
            className=bodyLink
            ),
-    html.P("Das System ist brandneu, kann unentdeckte, subtile Fehler machen, und auch die Berechnung des Rangs kann sich durch Updates der Software derzeit noch verändern.", className=bodyClass),
+    html.P("Das System ist relativ neu, kann unentdeckte, subtile Fehler machen, und auch die Berechnung des Rangs kann sich durch Updates der Software derzeit noch verändern.", className=bodyClass),
     html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen. Auf Landkreisebene sind die Zahlen niedrig, eine Handvoll neue Fälle kann viel ausmachen. Auch können hohe Zahlen Folge eines"
               " Ausbruch in einer Klinik, einem Heim oder einer Massenunterkunft sein und nicht repräsentativ für die"
               " Verteilung in der breiten Bevölkerung. Andererseits ist da noch die Dunkelziffer, die hier mit 6,25"
-              " angenommen wird. (siehe Risiko 1:N) Es laufen also viel mehr meist symptomlose Infizierte umher als Fälle registriert"
+              " angenommen wird. (siehe Risiko 1/N) Es laufen also viel mehr meist symptomlose Infizierte umher als Fälle registriert"
               " sind. Und fast immer gilt: Steigen die Zahlen, ist es nicht unter Kontrolle.", className=bodyClass),
     html.P(
         " Und ja, Ranglisten sind immer fragwürdige Vereinfachungen, aber nachdem die Zahlen kleiner werden, ist der Blick in die Regionen umso"
@@ -611,31 +813,30 @@ h_Erlauterung=html.P([
 
 h_News=html.P([
     html.Span("News:", className=introClass),
-    html.P(" Danke für das Feedback auf Twitter. Sie Spaltenheader bleiben jetzt, und es war alles noch schlimmer als"
-            " gedacht. Eigentlich sollte es eine Sache von Minuten sein, aber ein Bug in der aktuellen Version von Dash"
-            " hat mich einen Arbeit Tag gekostet und ich musste auf eine ältere Dash-Version umsteigen, die leider langsamer"
-            " ist, aber die Spalten im Kopf und Tabelle korrekt übereinander hält."
+    html.P(" Version 0.9.8: Veränderung der Platzierung gegenüber gestern wird angezeigt"
+           "", className=bodyClass),
+    html.P(" Version 0.9.7: Sie Spaltenheader bleiben stehen beim scrollen."
               "", className=bodyClass),
-    html.P(" Bei den Berechnungen für einzelne Landkreise gab es eine bedeutende Änderung. Die Definition"
+    html.P(" Version 0.9.6: Bei den Berechnungen für einzelne Landkreise gab es in der Version eine bedeutende Änderung. Die Definition"
            " wurde geändert, was die Zählung der Fälle pro Woche betrifft. Als Fall in den letzten 7 Tagen gilt nun,"
            " wenn der Fall in den letzten 7 Tagen beim RKI eingegangen ist und in den letzten 14 Tagen beim Gesundheitsamt"
            " gemeldet wurde. Hintergrund ist, dass es bei einzelnen Landkreisen immer wieder zu Nachmeldungen von zig Fällen"
            " ans RKI kommt, die teilweise Wochen oder Monate zurückliegen. In Einzelfällen führte das zu einem zu hohen Risikoranking"
            " und einem verfälschten Bild der Entwicklung."
            "", className=bodyClass),
-    html.P(" Während das RKI nur als Fälle der letzten 7 Tage diejenigen ausweist, die sich auch in den letzen 7 Tagen"
+    html.P(" Während das RKI nur als Fälle der letzten 7 Tage diejenigen ausweist, die sich auch in den letzten 7 Tagen"
             " beim beim Gesundheitsamt gemeldet haben, fallen in der RKI-Landkreis-7-Tage-Rechnung alle Fälle unter den Tisch"
             " die nicht auch in den letzten 7 Tagen eingegangen sind. Dadurch sind die RKI-Zahlen für die letzten 7 Tage"
             " meist zu niedrig, je nach Meldeverzögerung, während sie hier weniger zu niedrig oder zu hoch sind, weil hier"
-            " verspätet eingegange Fälle der vorletzen 7 Tage den letzen Tagen zugeschlagen werden, wenn sie erst in den"
-            " letzen 7 Tagen eingangen sind. Es wäre interessant zu wissen, warum Wochen zurückliegende Fälle in nennenswerter Zahl, manchmal"
+            " verspätet eingegange Fälle der vorletzten 7 Tage den letzten Tagen zugeschlagen werden, wenn sie erst in den"
+            " letzten 7 Tagen eingangen sind. Es wäre interessant zu wissen, warum Wochen zurückliegende Fälle in nennenswerter Zahl, manchmal"
             " in der Grössenordung von zig bis über hundert Fällen in einem Landkreis alle an einem Tag nachgemeldet werden."
             "", className=bodyClass),
 ])
 
 h_About=html.P([
     html.Span("Der Autor über sich:", className=introClass),
-    html.Span(" Bin weder Webentwickler noch Virologe noch Statisker, aber habe mich in den letzten Wochen sehr"
+    html.Span(" Bin weder Webentwickler noch Virologe noch Statistiker, aber habe mich in den letzten Wochen sehr"
               " intensiv mit vielen Aspekten rund um den neuen Corona-Virus auseinander gesetzt, fast täglich"
               , className=bodyClass),
     html.A(" auf Twitter",
@@ -693,7 +894,7 @@ def makeDefinition(value, definition):
 h_Rw = html.Span(["R", html.Sub("w")])
 h_RwK = html.Span(["R", html.Sub("w"),"K"])
 
-h_RwDef = makeDefinition(h_Rw,
+h_RwDef = makeDefinition(h_RwK,
 '''
  ist ein wöchentlicher Reproduktionsfaktor. Er ist das Verhältnis aller Fälle der letzten 7 Tage gegenüber den 7
  Tagen davor. Diese Zahl "schlägt" stärker aus als der "normale" Reproduktionsfaktor, aber über 1.0 heißt
@@ -711,7 +912,7 @@ h_RwDef = makeDefinition(h_Rw,
  R-Wert mit seriellem Intervall berechnen, und der RwK liefert keine allzu absurden oder unbrauchbaren Ergebnisse.           
 ''')
 
-h_Risiko=makeDefinition("Risiko 1:N/Rang",
+h_Risiko=makeDefinition("Rang, Risiko 1/N",
 """
 Je kleiner diese Zahlen sind, umso grösser die Infektionsgefahr. Die Zahl N kann so interpretiert werden, dass jeweils
 eine von N Personen ansteckend sein kann. Ist N etwa 100, kann sich im Durchschnitt in jedem Bus oder Waggon ein 
@@ -729,11 +930,11 @@ gemeldet hat, -5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
 
 
 h_RisikoList=html.Ul([
-    html.Li(["N = Bevölkerung / Dunkelzifferfaktor / ([Anzahl der Fälle in den letzten 2 Wochen] *",h_Rw,")"]),
+    html.Li(["N = Bevölkerung / Dunkelzifferfaktor / ([Anzahl der Fälle in den letzten 2 Wochen] *",h_RwK,")"]),
     html.Li("Als Faktor für die Dunkelziffer wurde 6,25 gewählt, also auf 1 gemeldeten Infizierten werden 5,25 weitere vermutet"),
     html.Li("Als grobe Annäherung an die Zahl der Ansteckenden wurde die Summe der Fälle der letzten zwei Wochen gewählt"),
     html.Li("Die Zahl der aktuell Ansteckenden wird zudem für die Risikoberechnung hochgerechnet,"
-            "indem die Entwicklung von der vorletzen Woche zur letzen Woche prozentual unverändert fortgeschrieben wird "
+            "indem die Entwicklung von der vorletzten Woche zur letzten Woche prozentual unverändert fortgeschrieben wird "
             "und damit eher dem Stand am heutigen Tag entspricht."),
     html.Li("Die Dunkelziffer kann bis 2-fach höher sein, die Zahl der Ansteckenden aber nur halb so hoch,"
             "so dass der Risikowert als nicht allzu übertriebene Obergrenze für den Anteil der Ansteckenden zu sehen ist. Your mileage may vary."),
@@ -766,7 +967,7 @@ h_BgFarbenList = html.Ul(
     [
         html.Li([makeColorSpan("Rot: ", conditionDanger),
                  "Lasset alle Hoffnung fahren. Die Situation ist praktisch ausser Kontrolle."
-                 "Wer kürzlich da war und ungeschützte Kontakte hatte, ist mit einer Wahrscheinlichkeit von 1:N infiziert."
+                 "Wer kürzlich da war und ungeschützte Kontakte hatte, ist mit einer Wahrscheinlichkeit von 1/N infiziert."
                  "Empfehlung: Möglichst zu Hause bleiben und außer Haus bestmögliche Schutzmaßnahmen ergreifen. Gegend weiträumig meiden."
                 ],
                 style=LiStyle
