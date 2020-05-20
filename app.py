@@ -40,13 +40,13 @@ def pretty(jsonmap):
 
 # creates a new table by joining all columns from smaller table according to same values of keyFieldName
 # largerTable must contain all keys present in smallertable but not vice versa
-def join(largerTable, smallerTable, keyFieldName):
-    keys = smallerTable[:, keyFieldName].to_list()[0]
+def join(largerTable, smallerTable, keyFieldName, overwriteSame=False):
+    sKeys = smallerTable[:, keyFieldName].to_list()[0]
     extTable = largerTable.copy()
     for colName in smallerTable.names:
-        if colName != keyFieldName:
+        if colName != keyFieldName and (not colName in largerTable.names or overwriteSame):
             values = smallerTable[:, colName].to_list()[0]
-            valuesDict = dict(zip(keys, values))
+            valuesDict = dict(zip(sKeys, values))
 
             extTable = extTable[:, dt.f[:].extend({colName: 0.0})]
 
@@ -144,12 +144,9 @@ def processData(fullCurrentTable, forDay):
 
     fullTable = fullCurrentTable[(dt.f.newCaseOnDay <= forDay) | (dt.f.newCaseBeforeDay < forDay),:]
 
-    lastDay = fullTable[:, 'MeldeDay'].max()[0, 0]
-    lastnewCaseOnDay = fullTable[:, 'newCaseOnDay'].max()[0, 0]
+    #lastDay = fullTable[:, 'MeldeDay'].max()[0, 0]
+    #lastnewCaseOnDay = fullTable[:, 'newCaseOnDay'].max()[0, 0]
 
-    #print(newTable.keys())
-
-    #dt.by(dt.f.Bundesland)]
     alldays=fullTable[:,
               [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
@@ -161,70 +158,105 @@ def processData(fullCurrentTable, forDay):
                dt.first(dt.f.Bundesland)],
     dt.by(dt.f.Landkreis)]
 
-    '''
+    # compute and add rows for Bundeslaender
     bevoelkerung = alldays[:, [dt.sum(dt.f.Bevoelkerung), dt.sum(dt.f.AnzahlFall), dt.sum(dt.f.AnzahlTodesfall),], dt.by(dt.f.Bundesland)]
     bevoelkerung=bevoelkerung[:,dt.f[:].extend({"FaellePro100k": dt.f.AnzahlFall * 100000 / dt.f.Bevoelkerung})]
     bevoelkerung=bevoelkerung[:,dt.f[:].extend({"TodesfaellePro100k": dt.f.AnzahlTodesfall * 100000 / dt.f.Bevoelkerung})]
 
     alldaysBundeslaender = fullTable[:,
               [dt.sum(dt.f.AnzahlFall),
-               dt.sum(dt.f.FaellePro100k),
+               dt.first(dt.f.FaellePro100k), # just create the column, will be overwritten
                dt.sum(dt.f.AnzahlTodesfall),
-               dt.sum(dt.f.TodesfaellePro100k),
-               dt.first(dt.f.Bevoelkerung),
+               dt.first(dt.f.TodesfaellePro100k), # just create the column, will be overwritten
+               dt.first(dt.f.Bevoelkerung), # just create the column, will be overwritten
                dt.max(dt.f.MeldeDay),
-               dt.first(dt.f.LandkreisTyp),
-               dt.first(dt.f.Bundesland)],
+               dt.first(dt.f.LandkreisTyp), # just create the column, will be overwritten
+               dt.first(dt.f.Landkreis)],
             dt.by(dt.f.Bundesland)]
 
     alldaysBundeslaender[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
     alldaysBundeslaender[:, "Landkreis"] = bevoelkerung[:, "Bundesland"]
     alldaysBundeslaender[:, "FaellePro100k"] = bevoelkerung[:, "FaellePro100k"]
     alldaysBundeslaender[:, "TodesfaellePro100k"] = bevoelkerung[:, "TodesfaellePro100k"]
-    alldaysBundeslaender[:, "LandkreisTyp"] = "BL"
+    alldaysBundeslaender[:, "LandkreisTyp"] = "B"
     alldays.rbind(alldaysBundeslaender, force=True)
 
+    # compute and add row for all Germany
+    bevoelkerungGermany = alldays[dt.f.Landkreis != dt.f.Bundesland, [dt.sum(dt.f.Bevoelkerung), dt.sum(dt.f.AnzahlFall), dt.sum(dt.f.AnzahlTodesfall)]]
+    bevoelkerungGermany = bevoelkerungGermany[:,
+                          dt.f[:].extend({"FaellePro100k": dt.f.AnzahlFall * 100000 / dt.f.Bevoelkerung})]
+    bevoelkerungGermany = bevoelkerungGermany[:,
+                          dt.f[:].extend({"TodesfaellePro100k": dt.f.AnzahlTodesfall * 100000 / dt.f.Bevoelkerung})]
 
-    # specialDump = fullTable[(dt.f.newCaseOnDay > lastDay - 7) & (dt.f.Landkreis == "LK Main-Tauber-Kreis"), :]
-    # specialDump.to_csv("special.csv")
-    #
-    # specialDump2 = fullTable[(dt.f.newCaseOnDay > lastDay - 14) & (dt.f.newCaseOnDay < lastDay-7) & (dt.f.Landkreis == "LK Main-Tauber-Kreis"), :]
-    # specialDump2.to_csv("special2.csv")
+    alldaysGermany = fullTable[dt.f.Landkreis != dt.f.Bundesland,
+                     [dt.sum(dt.f.AnzahlFall),
+                      dt.first(dt.f.FaellePro100k),  # just create the column, will be overwritten
+                      dt.sum(dt.f.AnzahlTodesfall),
+                      dt.first(dt.f.TodesfaellePro100k),  # just create the column, will be overwritten
+                      dt.first(dt.f.Bevoelkerung),  # just create the column, will be overwritten
+                      dt.max(dt.f.MeldeDay),
+                      dt.first(dt.f.LandkreisTyp),  # just create the column, will be overwritten
+                      dt.first(dt.f.Landkreis),
+                      dt.first(dt.f.Bundesland)]]
+    alldaysGermany[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
+    alldaysGermany[:, "Landkreis"] = "Deutschland"
+    alldaysGermany[:, "Bundesland"] = "Deutschland"
+    alldaysGermany[:, "FaellePro100k"] = bevoelkerungGermany[:, "FaellePro100k"]
+    alldaysGermany[:, "TodesfaellePro100k"] = bevoelkerungGermany[:, "TodesfaellePro100k"]
+    alldaysGermany[:, "LandkreisTyp"] = "BR"
+    alldays.rbind(alldaysGermany, force=True)
+
     ##############################################################################
-    '''
-
-    last7daysRecs = fullTable[((dt.f.newCaseOnDay > lastDay - 7) & (dt.f.MeldeDay > lastDay - 14)), :]
+    # compute values for last 7 days for Landkreise
+    last7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 7) & (dt.f.MeldeDay > forDay - 14)), :]
     #last7daysRecs.to_csv("last7daysRecs.csv")
     last7days = last7daysRecs[:,
                 [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
                dt.sum(dt.f.AnzahlTodesfall),
                dt.sum(dt.f.TodesfaellePro100k)],
-    dt.by(dt.f.Landkreis)]
+                dt.by(dt.f.Landkreis)]
     last7days.names=["Landkreis","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage",
                      "TodesfaellePro100kLetzte7Tage"]
-    '''
+
+    # compute values for last 7 days for Bundesländer
     last7daysBL = last7daysRecs[:,
                 [dt.sum(dt.f.AnzahlFall),
                  dt.sum(dt.f.AnzahlTodesfall),
                  dt.sum(dt.f.Bevoelkerung)],
-                dt.by(dt.f.Bundesland)]
+                  dt.by(dt.f.Bundesland)]
     last7daysBL.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage","Bevoelkerung"]
+    last7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
     last7daysBL = last7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
     last7daysBL = last7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
-    print("last7daysBL")
-    print(last7daysBL)
     last7days.rbind(last7daysBL, force=True)
-    '''
-    # clip case to zero
+
+    # compute values for last 7 days for Germany
+    last7daysDE = last7daysRecs[:,
+                  [dt.first(dt.f.Landkreis),
+                   dt.sum(dt.f.AnzahlFall),
+                   dt.sum(dt.f.AnzahlTodesfall),
+                   dt.first(dt.f.Bevoelkerung),
+                   ]]
+    last7daysDE.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage", "Bevoelkerung"]
+    last7daysDE[:, "Landkreis"] = "Deutschland"
+    last7daysDE[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
+    last7daysDE = last7daysDE[:,
+                  dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+    last7daysDE = last7daysDE[:, dt.f[:].extend(
+        {"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+    last7days.rbind(last7daysDE, force=True)
+
+    # clip case count to zero
     last7days[dt.f.AnzahlFallLetzte7Tage <0, "AnzahlFallLetzte7Tage"] = 0
     last7days[dt.f.FaellePro100kLetzte7Tage <0, "FaellePro100kLetzte7Tage"] = 0
     last7days[dt.f.AnzahlTodesfallLetzte7Tage <0, "AnzahlTodesfallLetzte7Tage"] = 0
     last7days[dt.f.TodesfaellePro100kLetzte7Tage <0, "TodesfaellePro100kLetzte7Tage"] = 0
     ##############################################################################
+    # compute values for last 7 days before 7 days
 
-    lastWeek7daysRecs = fullTable[(dt.f.newCaseOnDay > lastDay-14) & (dt.f.newCaseOnDay <= lastDay-7)
-                                  & (dt.f.MeldeDay > lastDay - 21)& (dt.f.MeldeDay <= lastDay - 7), :]
+    lastWeek7daysRecs = fullTable[(dt.f.newCaseOnDay > forDay-14) & (dt.f.newCaseOnDay <= forDay-7)
+                                  & (dt.f.MeldeDay > forDay - 21)& (dt.f.MeldeDay <= forDay - 7), :]
     lastWeek7days=lastWeek7daysRecs[:,
                     [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
@@ -234,20 +266,36 @@ def processData(fullCurrentTable, forDay):
     #lastWeek7days[dt.f[1:] < 0, dt.f[1:]] = 0
     lastWeek7days.names=["Landkreis","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor",
                          "AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
-    '''
+
+    # compute values for last 7 days before 7 days for Bundesländer
     lastWeek7daysBL = lastWeek7daysRecs[:,
                   [dt.sum(dt.f.AnzahlFall),
                    dt.sum(dt.f.AnzahlTodesfall),
                    dt.sum(dt.f.Bevoelkerung)],
                   dt.by(dt.f.Bundesland)]
     lastWeek7daysBL.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
+    lastWeek7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
     lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
     lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7TageDavor": dt.f.AnzahlTodesfallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
-    print("lastWeek7daysBL")
-    print(lastWeek7daysBL)
     lastWeek7days.rbind(lastWeek7daysBL, force=True)
-    '''
 
+    # compute values for last 7 days for Germany
+    lastWeek7daysDE = lastWeek7daysRecs[:,
+                  [dt.first(dt.f.Landkreis),
+                   dt.sum(dt.f.AnzahlFall),
+                   dt.sum(dt.f.AnzahlTodesfall),
+                   dt.first(dt.f.Bevoelkerung),
+                   ]]
+    lastWeek7daysDE.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
+    lastWeek7daysDE[:, "Landkreis"] = "Deutschland"
+    lastWeek7daysDE[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
+    lastWeek7daysDE = lastWeek7daysDE[:,
+                  dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
+    lastWeek7daysDE = lastWeek7daysDE[:, dt.f[:].extend(
+        {"TodesfaellePro100kLetzte7TageDavor": dt.f.AnzahlTodesfallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
+    lastWeek7days.rbind(lastWeek7daysDE, force=True)
+
+    # clip case count to zero
     lastWeek7days[dt.f.AnzahlFallLetzte7TageDavor <0, "AnzahlFallLetzte7TageDavor"] = 0
     lastWeek7days[dt.f.FaellePro100kLetzte7TageDavor <0, "FaellePro100kLetzte7TageDavor"] = 0
     lastWeek7days[dt.f.AnzahlTodesfallLetzte7TageDavor <0, "AnzahlTodesfallLetzte7TageDavor"] = 0
@@ -259,16 +307,12 @@ def processData(fullCurrentTable, forDay):
     Rw = (dt.f.AnzahlFallLetzte7Tage+5)/(dt.f.AnzahlFallLetzte7TageDavor + 5)
 
     allDaysExt2=allDaysExt1[:,dt.f[:].extend({"AnzahlFallTrend":  Rw})]
-    #allDaysExt2[dt.f.AnzahlFallLetzte7TageDavor == 0, "AnzahlFallTrend"] = 1
-    #allDaysExt2[dt.f.AnzahlFallLetzte7TageDavor == 0 & dt.f.AnzahlFallLetzte7Tage >0 , "AnzahlFallTrend"] = 1
-    #allDaysExt2[dt.f.AnzahlFallLetzte7TageDavor == 0 & dt.f.AnzahlFallLetzte7Tage == 0 , "AnzahlFallTrend"] = 1
-
     allDaysExt3=allDaysExt2[:,dt.f[:].extend({"FaellePro100kTrend": dt.f.FaellePro100kLetzte7Tage-dt.f.FaellePro100kLetzte7TageDavor})]
     allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
 
     allDaysExt5=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/6.25/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
-    allDaysExt6 = allDaysExt5[:, dt.f[:].extend({"LetzteMeldung": lastDay - dt.f.MeldeDay})]
-    allDaysExt6b = allDaysExt6[:, dt.f[:].extend({"LetzteMeldungNeg": dt.f.MeldeDay - lastDay})]
+    allDaysExt6 = allDaysExt5[:, dt.f[:].extend({"LetzteMeldung": forDay - dt.f.MeldeDay})]
+    allDaysExt6b = allDaysExt6[:, dt.f[:].extend({"LetzteMeldungNeg": dt.f.MeldeDay - forDay})]
 
     allDaysExt6b[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 99999
 
@@ -277,7 +321,7 @@ def processData(fullCurrentTable, forDay):
     allDaysExt=sortedByRisk[:,dt.f[:].extend({"Rang": 0})]
     allDaysExt[:,"Rang"]=np.arange(1,allDaysExt.nrows+1)
     #print(allDaysExt)
-    allDaysExt.materialize()
+    #allDaysExt.materialize()
     return allDaysExt
 
 def loadAndProcessData(fileName):
@@ -285,9 +329,9 @@ def loadAndProcessData(fileName):
     todayTable = processData(currentFullTable, lastDay).sort("Landkreis")
     yesterdayTable = processData(currentFullTable, lastDay-1).sort("Landkreis")
 
-    print(currentFullTable)
-    print(todayTable)
-    print(yesterdayTable)
+    #print(currentFullTable)
+    #print(todayTable)
+    #print(yesterdayTable)
 
     resultTable=todayTable[:,dt.f[:].extend({"RangChange": 0})]
     rangChange = np.subtract(yesterdayTable[:,"Rang"],todayTable[:,"Rang"])
@@ -313,11 +357,11 @@ def loadAndProcessData(fileName):
 
     #print(rangChangeStrs)
 
-    print("Column names frame order:", list(enumerate(resultTable.names)))
+    #print("Column names frame order:", list(enumerate(resultTable.names)))
     resultTable2 = resultTable.sort("Rang")
     #print(resultTable2)
     data = resultTable2.to_pandas()
-    print(data)
+    #print(data)
 
     return data
 
@@ -338,11 +382,11 @@ def makeColumns():
         ('RangChange', ['Rang', '+/-'], 'numeric', FormatIntPlus, colWidth(34)),
         ('RangYesterday', ['Rang', 'Gestern'], 'numeric', FormatIntBracketed, colWidth(defaultColWidth)),
         ('Kontaktrisiko', ['Risiko', '1/N'], 'numeric', FormatIntRatio, colWidth(71)),
-        ('Landkreis', ['Kreis', 'Name'], 'text', Format(), colWidth(298)),
-        ('Bundesland', ['Kreis', 'Bundesland'], 'text', Format(), colWidth(190)),
-        ('LandkreisTyp', ['Kreis', 'Art'], 'text', Format(), colWidth(30)),
-        ('Bevoelkerung', ['Kreis', 'Einwohner'], 'numeric', FormatInt, colWidth(90)),
-        ('LetzteMeldungNeg', ['Kreis', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
+        ('Landkreis', ['Region', 'Name'], 'text', Format(), colWidth(298)),
+        ('Bundesland', ['Region', 'Land'], 'text', Format(), colWidth(190)),
+        ('LandkreisTyp', ['Region', 'Art'], 'text', Format(), colWidth(30)),
+        ('Bevoelkerung', ['Region', 'Einwohner'], 'numeric', FormatInt, colWidth(90)),
+        ('LetzteMeldungNeg', ['Region', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
         ('AnzahlFallTrend', ['Fälle', 'RwK'], 'numeric', FormatFixed2, colWidth(70)),
         ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -425,10 +469,10 @@ totalWidthStr = colWidthStr(totalWidth)
 minWidthStr = colWidthStr(minWidth)
 maxWidthStr = colWidthStr(maxWidth)
 
-print("colWidths", colWidths)
-print("totalWidthStr",totalWidthStr)
-print("minWidthStr",minWidthStr)
-print("maxWidthStr",maxWidthStr)
+# print("colWidths", colWidths)
+# print("totalWidthStr",totalWidthStr)
+# print("minWidthStr",minWidthStr)
+# print("maxWidthStr",maxWidthStr)
 
 colors = {
     'background': 'rgb(50, 50, 50)',
@@ -758,7 +802,7 @@ h_header = html.Header(
                 children="Datenstand: {} 00:00 Uhr (wird täglich aktualisiert)".format(dataVersionDate),
                 style={'color': colors['text']}),
         html.H4(className="app-header-date",
-                children="Softwarestand: {} (UTC), Version 0.9.8".format(appDateStr),
+                children="Softwarestand: {} (UTC), Version 0.9.9".format(appDateStr),
                 style={'color': colors['text']}),
         html.H3(html.A(html.Span("Zur Tabelle springen ⬇", className=introClass), href="#tabletop")),
     ]
@@ -805,13 +849,16 @@ h_Erlauterung=html.P([
     html.Span(" in tabellarischer Form auf und berechnet u.a. Trends sowie einen Ansteckungsrisikowert für jeden"
             " Landkreis. Anfänglich sind die Landkreise in einer Rangliste von gefährlich bis idyllisch sortiert."
             " Die Daten können aber nach jeder Spalte sortiert und gefiltert werden, siehe 'Benutzung'."
-            " Anhand der Ampelfarbgebung läßt sich durch Scrollen schnell ein Überblick über viele"
+            " Anhand der Ampelfarbgebung läßt sich durch Scrollen schnell ein Überblick über Bundesländer und "
             " Landkreise und die Unterschiede zwischen ihnen verschaffen.",
             className=bodyClass),
 ])
 
 h_News=html.P([
     html.Span("News:", className=introClass),
+    html.P(" Version 0.9.9: Bundesländer und Deutschland tauchen jetzt als eigene Region in der Liste auf. So lassen sich"
+           " sehr einfach Bundesländer untereinander oder ein Kreis mit dem Landesdurchschitt oder ein Land mit dem Bund vergleichen."
+           "", className=bodyClass),
     html.P(" Version 0.9.8: Veränderung der Platzierung gegenüber gestern wird angezeigt"
            "", className=bodyClass),
     html.P(" Version 0.9.7: Sie Spaltenheader bleiben stehen beim scrollen."
@@ -861,12 +908,16 @@ h_Benutzung = html.P([
         "Durch Klicken auf die kleinen Pfeilsymbole im Kopf einer Spalte kann die Tabelle auf- oder absteigend sortiert werden.",
         className=bodyClass),
 
-    html.P("Interessant ist es, nach Gesamtanzahl von Fällen  zu sortieren und dann zu sehen,"
-           "wo sich ehemals stark betroffene Gebiete so auf die Liste verteilen.", className=bodyClass),
+    html.P("Interessant ist es, nach unterschiedlichen Kriterien zu sortieren und dann zu sehen,"
+           "wie sich betroffene Gebiete anhand des Kriteriums so auf die Liste verteilen.", className=bodyClass),
 
     html.P("Im leeren Feld über der Spalte kann ein Filter eingeben werden, z.B. Teil des Namens des Kreises. "
-           "Mit Audrücken wie <10 oder >50 können Datensätzte ausgefiltert werden, die bestimmte Werte in der Spalte "
+           "Mit Audrücken wie <10 oder >=50 können Datensätzte ausgefiltert werden, die bestimmte Werte in der Spalte "
            "über- oder unterschreiten. Einfach Wert eingeben und <Return> drücken. Eingabe löschen, um Filter zu entfernen."
+           , className=bodyClass),
+    html.P("Um nur die Bundesländer uns Deutschland zu sehen, 'B' im Feld Region/Art eingeben, '=B', um nur die Bundesländer"
+            " zu sehen, 'R', um nur Deutschland zu sehen. Weitere Werte sind 'LK' für "
+           " für Landkreis, SK für Stadtkreis und LSK für Land/Stadtregionen."
            , className=bodyClass),
     html.H4(html.A(html.Span("Ans Seitenende springen ⬇", className=introClass), href="#bottom")),
     html.P(html.H4(html.A(html.Span("Zu Absatz 'Benutzung' springen ⬆", className=introClass), href="#Benutzung")),
@@ -878,7 +929,7 @@ h_BedeutungSpaltenHead= html.Span("Bedeutung der Spalten:", className=introClass
 
 h_BedeutungSpaltenIntro=html.Span("Am aussagekräftigsten sind Werte je 100.000 Einwohner, und da sind derzeit praktisch"
 " nur die letzten beiden Wochen von Interesse. Wie es sich davor zugetragen hat, lassen aber die Gesamtzahlen erahnen."
-' Wo es null Infektion gab, erlaubt ein Blick auf den Zeitpunkt der letzten Meldung, wie lange der Kreis "COVID-frei" ist.'
+' Wo es null Infektionen gab, erlaubt ein Blick auf den Zeitpunkt der letzten Meldung, wie lange der Kreis "COVID-frei" ist.'
 " Hier die Bedeutung der Spalten, die nicht offensichtlich ihrem Titel zu entnehmen ist:",
                    className=bodyClass)
 
@@ -966,7 +1017,7 @@ h_BgFarbenList = html.Ul(
     [
         html.Li([makeColorSpan("Rot: ", conditionDanger),
                  "Lasset alle Hoffnung fahren. Die Situation ist praktisch ausser Kontrolle."
-                 "Wer kürzlich da war und ungeschützte Kontakte hatte, ist mit einer Wahrscheinlichkeit von 1/N infiziert."
+                 "Wer kürzlich da war und ungeschützte Kontakte hatte, ist mit einer Wahrscheinlichkeit von (Anzahl der Kontakte)/N infiziert."
                  "Empfehlung: Möglichst zu Hause bleiben und außer Haus bestmögliche Schutzmaßnahmen ergreifen. Gegend weiträumig meiden."
                 ],
                 style=LiStyle
@@ -1042,8 +1093,7 @@ betterExplanation = html.Div([
     }
 )
 
-app.title = "COVID Risiko Deutschland nach Landkreisen"
-
+app.title = "COVID Risiko Deutschland nach Ländern und Kreisen"
 
 app.layout = html.Div([
     h_header,

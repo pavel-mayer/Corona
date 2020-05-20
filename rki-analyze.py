@@ -526,7 +526,7 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
             attrs['LandkreisTyp']=lkTyp
         else:
             attrs['LandkreisName']=attrs["Landkreis"]
-            attrs['LandkreisTyp']="RE"
+            attrs['LandkreisTyp']="LSK"
 
         if int(attrs["IstErkrankungsbeginn"]):
             attrs['ErkDay'] = cd.dayFromStampStr(attrs["Refdatum"])
