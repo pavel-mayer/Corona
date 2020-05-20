@@ -13,6 +13,7 @@ day0d = datetime.fromtimestamp(day0t) # datetime.datetime
 
 weekDay = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
+
 def dateStrFromStampStr(s) -> str:
     t = time.gmtime(int(s)/1000) #time.struct_time
     return "{}.{}.{}".format(t.tm_mday, t.tm_mon,t.tm_year)
@@ -64,6 +65,17 @@ def dayFromStampStr(s) -> int:
     d = datetime.fromtimestamp(int(s) / 1000)
     delta = d - day0d
     return delta.days
+
+# Parse date string like "19.05.2020, 00:00 Uhr"
+def datetimeFromDatenstand(ds):
+    st = time.strptime(ds, "%d.%m.%Y, %H:%M Uhr")
+    stf = time.mktime(st)
+    sdt = datetime.fromtimestamp(stf)
+    return sdt
+
+def dayFromDatenstand(ds):
+    return dayFromDate(datetimeFromDatenstand(ds))
+
 
 def todayDay():
     return dayFromTime(time.localtime())

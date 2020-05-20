@@ -18,7 +18,8 @@ import datatable as dt
 
 import pm_util as pmu
 
-UPDATE = False # fetch new data
+UPDATE = True # fetch new data for the day if it not already exist
+FORCE_UPDATE = False # fetch new data for the day even if it already exists
 REFRESH= True or UPDATE # recreate enriched, consolidated dump
 
 def autolabel(ax, bars, color, label_range):
@@ -171,6 +172,14 @@ def retrieveRecords(offset, length):
         #print(data)
         # records = data['fields']
         return data
+
+def getRecordVersionOnServer():
+    print("Retrieving version date from server")
+    ##pmu.pretty(chunk)
+    chunk = retrieveRecords(0,1)
+    datenStand = chunk['features'][0]['attributes']['Datenstand']
+    print("Version on server is: "+datenStand)
+    return datenStand
 
 def retrieveAllRecords():
     ready = 0
@@ -356,19 +365,30 @@ def csvFilename(day,kind,dir):
 
 allRecords = []
 
-if UPDATE:
-    allRecords = retrieveAllRecords()
-    dfn = "dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+".json"
-    if not os.path.isfile(dfn):
+if UPDATE or FORCE_UPDATE:
+    datenStand = getRecordVersionOnServer()
+    datenStandDay = cd.dayFromDatenstand(datenStand)
+    afn=archiveFilename(datenStandDay)
+
+    if not os.path.isfile(afn):
+        print("New data available, Stand: {} Tag: {}, downloading...".format(datenStand, datenStandDay))
+    else:
+        print("Data already locally exists, Stand: {} Tag: {}".format(datenStand, datenStandDay))
+        if FORCE_UPDATE:
+            print("Forcing Download because FORCE_UPDATE is set")
+
+    if not os.path.isfile(afn) or FORCE_UPDATE:
+        allRecords = retrieveAllRecords()
+        dfn = "dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+"-Stand-"+cd.dateStrYMDFromDay(datenStandDay)+".json"
         pmu.saveJson(dfn, allRecords)
 
-    afn=archiveFilename(cd.todayDay())
-    if not os.path.isfile(afn):
-        pmu.saveJson(afn, allRecords)
+        afn=archiveFilename(datenStandDay)
+        if not os.path.isfile(afn) or FORCE_UPDATE:
+            pmu.saveJson(afn, allRecords)
 
-    fn = csvFilename(cd.todayDay(), "fullDaily", "archive_csv")
-    if not os.path.isfile(fn):
-        pmu.saveCsv(fn, allRecords)
+        fn = csvFilename(datenStandDay, "fullDaily", "archive_csv")
+        if not os.path.isfile(fn) or FORCE_UPDATE:
+            pmu.saveCsv(fn, allRecords)
 
 
 def findOldRecords(currentRecords, likeRecord):
@@ -613,7 +633,7 @@ def loadRecords():
     globalID = 1
     for day in range(firstRecordDay, lastRecordDay+1):
         currentRecords = pmu.loadJson(archiveFilename(day))
-        pmu.saveCsv(csvFilename(day, "fullDaily", "archive_csv"),currentRecords)
+        #pmu.saveCsv(csvFilename(day, "fullDaily", "archive_csv"),currentRecords)
         globalID, currentcaseHashes, currentMsgHashes = stampRecords(currentRecords, globalID)
 
         caseCols = collisionStats(currentcaseHashes)

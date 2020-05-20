@@ -277,9 +277,8 @@ def processData(fullCurrentTable, forDay):
     allDaysExt=sortedByRisk[:,dt.f[:].extend({"Rang": 0})]
     allDaysExt[:,"Rang"]=np.arange(1,allDaysExt.nrows+1)
     #print(allDaysExt)
+    allDaysExt.materialize()
     return allDaysExt
-
-
 
 def loadAndProcessData(fileName):
     currentFullTable, lastDay = loadData(fileName)
