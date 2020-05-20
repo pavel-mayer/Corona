@@ -208,7 +208,7 @@ def processData(fullCurrentTable, forDay):
 
     ##############################################################################
     # compute values for last 7 days for Landkreise
-    last7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 7) & (dt.f.MeldeDay > forDay - 14)), :]
+    last7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 7) & (dt.f.MeldeDay > forDay - 14)) | (dt.f.newDeathOnDay > forDay - 7), :]
     #last7daysRecs.to_csv("last7daysRecs.csv")
     last7days = last7daysRecs[:,
                 [dt.sum(dt.f.AnzahlFall),
@@ -255,8 +255,10 @@ def processData(fullCurrentTable, forDay):
     ##############################################################################
     # compute values for last 7 days before 7 days
 
-    lastWeek7daysRecs = fullTable[(dt.f.newCaseOnDay > forDay-14) & (dt.f.newCaseOnDay <= forDay-7)
-                                  & (dt.f.MeldeDay > forDay - 21)& (dt.f.MeldeDay <= forDay - 7), :]
+    lastWeek7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 14) & (dt.f.newCaseOnDay <= forDay - 7)
+                                   & (dt.f.MeldeDay > forDay - 21) & (dt.f.MeldeDay <= forDay - 7)) |
+                                  ((dt.f.newDeathOnDay > forDay - 14) & (dt.f.newDeathOnDay <= forDay - 7))
+                                  , :]
     lastWeek7days=lastWeek7daysRecs[:,
                     [dt.sum(dt.f.AnzahlFall),
                dt.sum(dt.f.FaellePro100k),
@@ -792,17 +794,20 @@ introClass="intro"
 bodyClass="bodyText"
 bodyLink="bodyLink"
 
+appTitle = "COVID Risiko Deutschland nach Ländern und Kreisen"
+versionStr="0.9.10"
+
 h_header = html.Header(
     style={
         'backgroundColor': colors['background'],
     },
     children=[
-        html.H1(className="app-header", children="COVID Risiko Deutschland nach Landkreisen", style={'color': colors['text'], 'text-decoration': 'none'}, id="title_header"),
+        html.H1(className="app-header", children=appTitle, style={'color': colors['text'], 'text-decoration': 'none'}, id="title_header"),
         html.H4(className="app-header-date",
                 children="Datenstand: {} 00:00 Uhr (wird täglich aktualisiert)".format(dataVersionDate),
                 style={'color': colors['text']}),
         html.H4(className="app-header-date",
-                children="Softwarestand: {} (UTC), Version 0.9.9".format(appDateStr),
+                children="Softwarestand: {} (UTC), Version {}".format(appDateStr, versionStr),
                 style={'color': colors['text']}),
         html.H3(html.A(html.Span("Zur Tabelle springen ⬇", className=introClass), href="#tabletop")),
     ]
@@ -856,6 +861,9 @@ h_Erlauterung=html.P([
 
 h_News=html.P([
     html.Span("News:", className=introClass),
+    html.P(
+        " Version 0.9.10: Fehlerhafte Berechnung der Todesfälle korregiert. Vielen Dank an @Stanny96 und alle Anderen, die mich auf Fehler hingewiesen haben."
+        "", className=bodyClass),
     html.P(" Version 0.9.9: Bundesländer und Deutschland tauchen jetzt als eigene Region in der Liste auf. So lassen sich"
            " sehr einfach Bundesländer untereinander oder ein Kreis mit dem Landesdurchschitt oder ein Land mit dem Bund vergleichen."
            "", className=bodyClass),
@@ -1093,7 +1101,7 @@ betterExplanation = html.Div([
     }
 )
 
-app.title = "COVID Risiko Deutschland nach Ländern und Kreisen"
+app.title = appTitle
 
 app.layout = html.Div([
     h_header,
