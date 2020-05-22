@@ -526,9 +526,9 @@ KontaktrisikoClass = {
 
 FaellePro100kLetzte7TageClass = {
     conditionDanger : '{FaellePro100kLetzte7Tage} > 50',
-    conditionTooHigh: '{FaellePro100kLetzte7Tage} > 20 && {FaellePro100kLetzte7Tage} < 50',
-    conditionSerious: '{FaellePro100kLetzte7Tage} > 5 && {FaellePro100kLetzte7Tage} < 20',
-    conditionGood: '{FaellePro100kLetzte7Tage} >= 1 && {FaellePro100kLetzte7Tage} < 5',
+    conditionTooHigh: '{FaellePro100kLetzte7Tage} > 20 && {FaellePro100kLetzte7Tage} <= 50',
+    conditionSerious: '{FaellePro100kLetzte7Tage} > 5 && {FaellePro100kLetzte7Tage} <= 20',
+    conditionGood: '{FaellePro100kLetzte7Tage} >= 1 && {FaellePro100kLetzte7Tage} <= 5',
     conditionSafe: '{FaellePro100kLetzte7Tage} < 1'
 }
 
@@ -795,7 +795,7 @@ bodyClass="bodyText"
 bodyLink="bodyLink"
 
 appTitle = "COVID Risiko Deutschland nach Ländern und Kreisen"
-versionStr="0.9.10"
+versionStr="0.9.10.1"
 
 h_header = html.Header(
     style={
@@ -1023,14 +1023,14 @@ h_TextFarben=html.Div(["Im Text", h_TextFarbenList])
 
 h_BgFarbenList = html.Ul(
     [
-        html.Li([makeColorSpan("Rot: ", conditionDanger),
+        html.Li([makeColorSpan("Super-Rot: ", conditionDanger),
                  "Lasset alle Hoffnung fahren. Die Situation ist praktisch ausser Kontrolle."
                  "Wer kürzlich da war und ungeschützte Kontakte hatte, ist mit einer Wahrscheinlichkeit von (Anzahl der Kontakte)/N infiziert."
                  "Empfehlung: Möglichst zu Hause bleiben und außer Haus bestmögliche Schutzmaßnahmen ergreifen. Gegend weiträumig meiden."
                 ],
                 style=LiStyle
         ),
-        html.Li([makeColorSpan("Grün: ",conditionSafe),
+        html.Li([makeColorSpan("Super-Grün: ",conditionSafe),
                  "Einheimische da könnten völlig entspannt sein, wenn sie keinen "
                  "ungeschützten Kontakt mit Fremden aus anderen Kreisen hätten. Empfehlung: Da bleiben und niemanden rein lassen."
                 ],

@@ -617,7 +617,6 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
         len(oldDeathRecords),len(newDeathRecords)))
     print("Day {}, {}, totalCompensated={} totalNotCompensated={}".format(currentDay, cd.dateStrFromDay(currentDay), totalCompensated, totalNotCompensated))
 
-
     return globalID, oldRecords, newRecords, oldCaseRecords, newCaseRecords, oldDeathRecords, newDeathRecords
 
 
@@ -677,6 +676,12 @@ def loadRecords():
         print("In result: Cases {} today {} yday {}, dead {} today {} yday {} allDatedRecords {}".format(
             casesinResult, casesinResultToday, casesinResultYesterday, deadinResult,
             deadinResultToday,deadinResultYesterday,len(allDatedRecords)))
+
+        casesinResult = sumField(allDatedRecords, "AnzahlFall")
+        deadinResult = sumField(allDatedRecords, "AnzahlTodesfall")
+
+        print("In allDatedRecords: Cases {} dead {} records {}".format(casesinResult, deadinResult, len(allRecords)))
+
     return allDatedRecords
 
 if REFRESH:
