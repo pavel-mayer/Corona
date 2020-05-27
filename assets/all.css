@@ -6,9 +6,7 @@ input {
   --text-color: white;
 }
 
-
 /* header.css  */
-
 
 .app-header {
     height: 60px;
@@ -45,7 +43,7 @@ a:active {
 }
 
 .intro {
-  text-decoration: underline;
+  text-decoration: none;
   font-weight: bold;
   color:lightsteelblue;
 }

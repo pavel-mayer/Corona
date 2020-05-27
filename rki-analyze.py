@@ -550,6 +550,7 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
         if neuerFallGesternUndHeute:
             # assume this is an old case
             attrs['newCaseBeforeDay'] = currentDay - 1
+            attrs['newCaseOnDay'] = currentDay
             oldCaseRecords.append(record)
             oldRecords.append(record)
 

@@ -18,6 +18,7 @@ import pm_util as pmu
 import os
 import flask
 from flask import render_template
+from flask import Response
 
 import dash
 import dash_table
@@ -32,6 +33,7 @@ import json
 import dash_table.FormatTemplate as FormatTemplate
 #import markdown
 import socket
+import time
 
 print("Running on host '{}'".format(socket.gethostname()))
 
@@ -138,6 +140,7 @@ def loadData(dataFilename):
     lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
     print("File stats: lastDay {} lastnewCaseOnDay {} cases {} dead {}".format(lastDay, lastnewCaseOnDay, cases, dead))
     newTable=fullTable[:,dt.f[:].extend({"erkMeldeDelay": dt.f.MeldeDay-dt.f.RefDay})]
+    newTable=newTable[:,dt.f[:].extend({"MeldeDelay": dt.f.newCaseOnDay - dt.f.MeldeDay})]
     return newTable, lastDay
 
 def processData(fullCurrentTable, forDay):
@@ -154,6 +157,7 @@ def processData(fullCurrentTable, forDay):
                dt.sum(dt.f.TodesfaellePro100k),
                dt.first(dt.f.Bevoelkerung),
                dt.max(dt.f.MeldeDay),
+               dt.max(dt.f.newCaseOnDay),
                dt.first(dt.f.LandkreisTyp),
                dt.first(dt.f.Bundesland)],
     dt.by(dt.f.Landkreis)]
@@ -170,6 +174,7 @@ def processData(fullCurrentTable, forDay):
                dt.first(dt.f.TodesfaellePro100k), # just create the column, will be overwritten
                dt.first(dt.f.Bevoelkerung), # just create the column, will be overwritten
                dt.max(dt.f.MeldeDay),
+               dt.max(dt.f.newCaseOnDay),
                dt.first(dt.f.LandkreisTyp), # just create the column, will be overwritten
                dt.first(dt.f.Landkreis)],
             dt.by(dt.f.Bundesland)]
@@ -195,6 +200,7 @@ def processData(fullCurrentTable, forDay):
                       dt.first(dt.f.TodesfaellePro100k),  # just create the column, will be overwritten
                       dt.first(dt.f.Bevoelkerung),  # just create the column, will be overwritten
                       dt.max(dt.f.MeldeDay),
+                      dt.max(dt.f.newCaseOnDay),
                       dt.first(dt.f.LandkreisTyp),  # just create the column, will be overwritten
                       dt.first(dt.f.Landkreis),
                       dt.first(dt.f.Bundesland)]]
@@ -297,6 +303,32 @@ def processData(fullCurrentTable, forDay):
         {"TodesfaellePro100kLetzte7TageDavor": dt.f.AnzahlTodesfallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
     lastWeek7days.rbind(lastWeek7daysDE, force=True)
 
+    ##############################################################################
+    # compute delays
+    firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
+    firstRecordDay = cd.dayFromTime(firstRecordTime)
+
+    delayRecs = fullTable[(dt.f.newCaseOnDay > firstRecordDay) | (dt.f.newDeathOnDay > firstRecordDay), :]
+    delayRecs.materialize()
+    #print(delayRecs)
+    #delayRecs.to_csv("delayRecs.csv")
+    delays = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay)], dt.by(dt.f.Landkreis)]
+    delays.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD"]
+
+    delaysBL = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay)], dt.by(dt.f.Bundesland)]
+    delaysBL.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD"]
+    delays.rbind(delaysBL)
+
+    delaysDE = delayRecs[:, [dt.first(dt.f.Landkreis), dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay)]]
+    delaysDE.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD"]
+    delaysDE[:, "Landkreis"] = "Deutschland"
+    delays.rbind(delaysDE)
+
+    #print(delaysBL)
+
+    alldays = join(alldays, delays, "Landkreis")
+    ##############################################################################
+
     # clip case count to zero
     lastWeek7days[dt.f.AnzahlFallLetzte7TageDavor <0, "AnzahlFallLetzte7TageDavor"] = 0
     lastWeek7days[dt.f.FaellePro100kLetzte7TageDavor <0, "FaellePro100kLetzte7TageDavor"] = 0
@@ -315,10 +347,11 @@ def processData(fullCurrentTable, forDay):
     allDaysExt5=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/6.25/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
     allDaysExt6 = allDaysExt5[:, dt.f[:].extend({"LetzteMeldung": forDay - dt.f.MeldeDay})]
     allDaysExt6b = allDaysExt6[:, dt.f[:].extend({"LetzteMeldungNeg": dt.f.MeldeDay - forDay})]
+    allDaysExt6c = allDaysExt6b[:, dt.f[:].extend({"LetzteZaehlungNeg": dt.f.newCaseOnDay - forDay})]
 
-    allDaysExt6b[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 99999
+    allDaysExt6c[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 99999
 
-    sortedByRisk = allDaysExt6b.sort(["Kontaktrisiko","LetzteMeldung","FaellePro100k"])
+    sortedByRisk = allDaysExt6c.sort(["Kontaktrisiko","LetzteMeldung","FaellePro100k"])
     #print(sortedByRisk)
     allDaysExt=sortedByRisk[:,dt.f[:].extend({"Rang": 0})]
     allDaysExt[:,"Rang"]=np.arange(1,allDaysExt.nrows+1)
@@ -388,7 +421,6 @@ def makeColumns():
         ('Bundesland', ['Region', 'Land'], 'text', Format(), colWidth(190)),
         ('LandkreisTyp', ['Region', 'Art'], 'text', Format(), colWidth(30)),
         ('Bevoelkerung', ['Region', 'Einwohner'], 'numeric', FormatInt, colWidth(90)),
-        ('LetzteMeldungNeg', ['Region', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
         ('AnzahlFallTrend', ['Fälle', 'RwK'], 'numeric', FormatFixed2, colWidth(70)),
         ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -397,6 +429,11 @@ def makeColumns():
         ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100kTrend', ['Fälle je 100000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100k', ['Fälle je 100000', 'total'], 'numeric', FormatFixed1, colWidth(60)),
+        ('LetzteMeldungNeg', ['Meldung', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
+        ('LetzteZaehlungNeg', ['Meldung', 'Letzte Zählung'], 'numeric', FormatInt, colWidth(70)),
+        ('DelayMean', ['Meldeverzögerung (Tage)', 'Mittel x̅'], 'numeric', FormatFixed1, colWidth(62)),
+        ('DelayMedian', ['Meldeverzögerung (Tage)', 'Median x̃'], 'numeric', FormatInt, colWidth(62)),
+        ('DelaySD', ['Meldeverzögerung (Tage)', 'Stdabw. σx'], 'numeric', FormatFixed1, colWidth(62)),
         ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -433,7 +470,6 @@ def makeColumns():
 
 server = flask.Flask(__name__)
 
-#@server.route('/covid/Landkreise/about')
 @server.route('/covid/risks/about')
 def index():
     return 'Nothing to see here!'
@@ -449,15 +485,32 @@ app = dash.Dash(
 
 fullTableFilename = "full-latest.csv"
 cacheFilename = "data-cached.feather"
+dataFilename = "data.csv"
 
 FORCE_REFRESH_CACHE = True
 
 if FORCE_REFRESH_CACHE or not os.path.isfile(cacheFilename) or os.path.getmtime(fullTableFilename) > os.path.getmtime(cacheFilename) :
     dframe = loadAndProcessData(fullTableFilename)
     dframe.to_feather(cacheFilename)
+    dframe.to_csv(dataFilename)
 else:
     print("Loading data cache from ‘"+cacheFilename+"‘")
     dframe = pd.read_feather(cacheFilename)
+
+csvData = open(dataFilename).read()
+csvFullData = open(fullTableFilename).read()
+
+dataURL = '/covid/risks/data.csv'
+
+@server.route(dataURL)
+def csv_data():
+    return Response(csvData, mimetype="text/csv")
+
+fullDataURL = '/covid/risks/full-data.csv'
+@server.route(fullDataURL)
+def csv_fulldata():
+    return Response(csvFullData, mimetype="text/csv")
+
 
 maxDay = float(dframe["MeldeDay"].max())
 #print(maxDay)
@@ -833,6 +886,7 @@ h_Hinweis=html.P([
            className=bodyLink
            ),
     html.P("Das System ist relativ neu, kann unentdeckte, subtile Fehler machen, und auch die Berechnung des Rangs kann sich durch Updates der Software derzeit noch verändern.", className=bodyClass),
+    html.P("Je nach Browser und Endgerät kann der erste Aufbau der Seite bis zu 30 sec. dauern.", className=bodyClass),
     html.Span(" Generell gilt: Die Zahlen sind mit Vorsicht zu genießen. Auf Landkreisebene sind die Zahlen niedrig, eine Handvoll neue Fälle kann viel ausmachen. Auch können hohe Zahlen Folge eines"
               " Ausbruch in einer Klinik, einem Heim oder einer Massenunterkunft sein und nicht repräsentativ für die"
               " Verteilung in der breiten Bevölkerung. Andererseits ist da noch die Dunkelziffer, die hier mit 6,25"
@@ -861,6 +915,9 @@ h_Erlauterung=html.P([
 
 h_News=html.P([
     html.Span("News:", className=introClass),
+    html.P(
+        " Version 0.9.11: Mittelwert, Median und Standardabweichung der Meldeverzögerung hinzufügt, Datendownload als .csv emöglicht."
+        "", className=bodyClass),
     html.P(
         " Version 0.9.10: Fehlerhafte Berechnung der Todesfälle korregiert. Vielen Dank an @Stanny96 und alle Anderen, die mich auf Fehler hingewiesen haben."
         "", className=bodyClass),
@@ -909,6 +966,14 @@ h_About=html.P([
 
 ])
 
+h_Downloads = html.P([
+    html.H4(html.Span("Downloads", className=introClass)),
+    html.P([html.A(html.Span("Angereicherte Ursprungsdaten als .csv herunterladen", className=bodyClass),
+                  href=fullDataURL),
+            "(Kombination der RKI/NPGEO-Daten seit 29.4.2020 mit Eingangszeitstempeln und anderen zusätzlichen Feldern versehen)"]),
+    html.P(html.A(html.Span("Tabelle als .csv herunterladen", className=bodyClass), href=dataURL)),
+])
+
 h_Benutzung = html.P([
     html.P(html.H4(html.A(html.Span("An den Seitenanfang springen ⬆", className=introClass), href="#top",id="Benutzung"))),
     html.A(html.Span("Benutzung:", className=introClass)),
@@ -927,7 +992,7 @@ h_Benutzung = html.P([
             " zu sehen, 'R', um nur Deutschland zu sehen. Weitere Werte sind 'LK' für "
            " für Landkreis, SK für Stadtkreis und LSK für Land/Stadtregionen."
            , className=bodyClass),
-    html.H4(html.A(html.Span("Ans Seitenende springen ⬇", className=introClass), href="#bottom")),
+     html.H4(html.A(html.Span("Ans Seitenende springen ⬇", className=introClass), href="#bottom")),
     html.P(html.H4(html.A(html.Span("Zu Absatz 'Benutzung' springen ⬆", className=introClass), href="#Benutzung")),
            style={'padding': '0px',
                   'backgroundColor': colors['background']}, id="tabletop"),
@@ -982,8 +1047,23 @@ N berechnet sich wie folgt:
 
 h_LetzteMeldung=makeDefinition("Letzte Meldung",
 """
- gibt an, vor wie viel Tagen die letzte Meldung erfolgt. 0 heisst, dass der Kreis am (Vor-)Tag des Datenstands Fälle 
+ gibt an, vor wie viel Tagen sich der letzte Erkrankte beim Gesundheitsamt gemeldet hat. 0 heisst, dass sich Personenen
+ in der Region am (Vor-)Tag des Datenstands beim Amt gemeldet haben, getestet wurden und die Daten am selben Tag ans RKI
+ übermittelt und dort gezählt wurden. -5 bedeutet, dass der neueste beim RKI bekannte Fall eine Person ist,
+ die sich vor 5 Tagen beim Amt gemeldet hat.
+""")
+
+h_LetzteZaehlung=makeDefinition("Letzte Zählung",
+"""
+ gibt an, vor wie viel Tagen der letzte Fall aus der Region beim RKI eingegangen ist. 0 heisst, dass die Region am (Vor-)Tag des Datenstands Fälle 
 gemeldet hat, -5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
+""")
+
+h_MeldeDelay=makeDefinition("Meldeverzögerung",
+"""
+ ist eine Auswertung der Anzahl der Tage von der Meldung beim Gesundheitsamt bis zum Eingang und Zählung
+ beim RKI als Fall in der offiziellen Statistik auf Bundesebene. Hierbei wird der Mittelwert aller Verzögerungen (Summe/Anzahl), der Median
+ (ca. die Hälfte der Verzögerungen liegt unter dem Wert, Hälfte darüber) sowie die Standardabweichung (durchschnittliche Abweichung vom Mittel) angezeigt.
 """)
 
 
@@ -1069,6 +1149,8 @@ h_Bedeutungen = html.Table([
         html.Tr([html.Td(h_RwDef), html.Td(h_TextFarben,style=cellStyleFarben)]),
         html.Tr([html.Td([h_Risiko, h_RisikoList]), html.Td(h_BgtFarben,style=cellStyleFarben)]),
         html.Tr([html.Td(h_LetzteMeldung)]),
+        html.Tr([html.Td(h_LetzteZaehlung)]),
+        html.Tr([html.Td(h_MeldeDelay)]),
 ],
 #    style={'padding': '0 0'}
 )
@@ -1090,6 +1172,7 @@ betterExplanation = html.Div([
     h_About,
     h_Hinweis,
     h_Bedeutungen,
+    h_Downloads,
     h_Benutzung
     ],
     style={'padding': '5px',
