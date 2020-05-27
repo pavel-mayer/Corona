@@ -312,15 +312,15 @@ def processData(fullCurrentTable, forDay):
     delayRecs.materialize()
     #print(delayRecs)
     #delayRecs.to_csv("delayRecs.csv")
-    delays = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay)], dt.by(dt.f.Landkreis)]
-    delays.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD"]
+    delays = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)], dt.by(dt.f.Landkreis)]
+    delays.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD", "DelayAnzahlFall"]
 
-    delaysBL = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay)], dt.by(dt.f.Bundesland)]
-    delaysBL.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD"]
+    delaysBL = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)], dt.by(dt.f.Bundesland)]
+    delaysBL.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD", "DelayAnzahlFall"]
     delays.rbind(delaysBL)
 
-    delaysDE = delayRecs[:, [dt.first(dt.f.Landkreis), dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay)]]
-    delaysDE.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD"]
+    delaysDE = delayRecs[:, [dt.first(dt.f.Landkreis), dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)]]
+    delaysDE.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD", "DelayAnzahlFall"]
     delaysDE[:, "Landkreis"] = "Deutschland"
     delays.rbind(delaysDE)
 
@@ -434,6 +434,7 @@ def makeColumns():
         ('DelayMean', ['Meldeverzögerung (Tage)', 'Mittel x̅'], 'numeric', FormatFixed1, colWidth(62)),
         ('DelayMedian', ['Meldeverzögerung (Tage)', 'Median x̃'], 'numeric', FormatInt, colWidth(62)),
         ('DelaySD', ['Meldeverzögerung (Tage)', 'Stdabw. σx'], 'numeric', FormatFixed1, colWidth(62)),
+        ('DelayAnzahlFall', ['Meldeverzögerung (Tage)', 'Anzahl'], 'numeric', FormatInt, colWidth(62)),
         ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -848,7 +849,7 @@ bodyClass="bodyText"
 bodyLink="bodyLink"
 
 appTitle = "COVID Risiko Deutschland nach Ländern und Kreisen"
-versionStr="0.9.10.1"
+versionStr="0.9.11"
 
 h_header = html.Header(
     style={
@@ -970,7 +971,7 @@ h_Downloads = html.P([
     html.H4(html.Span("Downloads", className=introClass)),
     html.P([html.A(html.Span("Angereicherte Ursprungsdaten als .csv herunterladen", className=bodyClass),
                   href=fullDataURL),
-            "(Kombination der RKI/NPGEO-Daten seit 29.4.2020 mit Eingangszeitstempeln und anderen zusätzlichen Feldern versehen)"]),
+            " (Kombination der RKI/NPGEO-Daten seit 29.4.2020 mit Eingangszeitstempeln und anderen zusätzlichen Feldern versehen)"]),
     html.P(html.A(html.Span("Tabelle als .csv herunterladen", className=bodyClass), href=dataURL)),
 ])
 
@@ -1062,8 +1063,10 @@ gemeldet hat, -5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
 h_MeldeDelay=makeDefinition("Meldeverzögerung",
 """
  ist eine Auswertung der Anzahl der Tage von der Meldung beim Gesundheitsamt bis zum Eingang und Zählung
- beim RKI als Fall in der offiziellen Statistik auf Bundesebene. Hierbei wird der Mittelwert aller Verzögerungen (Summe/Anzahl), der Median
- (ca. die Hälfte der Verzögerungen liegt unter dem Wert, Hälfte darüber) sowie die Standardabweichung (durchschnittliche Abweichung vom Mittel) angezeigt.
+ beim RKI als Fall in der offiziellen Statistik auf Bundesebene. Hierbei wird angezeigt: Der Mittelwert aller Verzögerungen 
+ (Summe/Anzahl), der Median (ca. die Hälfte der Verzögerungen liegt unter dem Wert, Hälfte darüber),
+  die Standardabweichung (durchschnittliche Abweichung vom Mittel) angezeigt sowie die Zahl der Fälle seit dem 29.4.2020,
+  die in die Berechnung eingegangen sind.
 """)
 
 
