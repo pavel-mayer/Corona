@@ -1,10 +1,11 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3
 
 # Quick hack to browse RKI-NPGEO-Data, Pavel Mayer 2020,
 # License: Use freely at your own risk.
 
 # pip install Click==7.0 Flask==1.1.1 itsdangerous==1.1.0 Jinja2==2.10.3 MarkupSafe==1.1.1 uWSGI==2.0.18 Werkzeug==0.16.0 dash=1.11.0
-# pip install: dash pandas datatable feather-format
+# pip install Click Flask itsdangerous Jinja2 MarkupSafe uWSGI Werkzeug matplotlib dash pandas datatable feather-format dash=1.11.0
+# pip install: matplotlib dash pandas datatable feather-format
 
 import locale
 
@@ -434,7 +435,7 @@ def makeColumns():
         ('DelayMean', ['Meldeverzögerung (Tage)', 'Mittel x̅'], 'numeric', FormatFixed1, colWidth(62)),
         ('DelayMedian', ['Meldeverzögerung (Tage)', 'Median x̃'], 'numeric', FormatInt, colWidth(62)),
         ('DelaySD', ['Meldeverzögerung (Tage)', 'Stdabw. σx'], 'numeric', FormatFixed1, colWidth(62)),
-        ('DelayAnzahlFall', ['Meldeverzögerung (Tage)', 'Anzahl'], 'numeric', FormatInt, colWidth(62)),
+        ('DelayAnzahlFall', ['Meldeverzögerung (Tage)', 'Anzahl Fälle'], 'numeric', FormatInt, colWidth(62)),
         ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -498,19 +499,24 @@ else:
     print("Loading data cache from ‘"+cacheFilename+"‘")
     dframe = pd.read_feather(cacheFilename)
 
-csvData = open(dataFilename).read()
-csvFullData = open(fullTableFilename).read()
+csvData = open(dataFilename,"rb").read().decode('utf-8')
+csvFullData = open(fullTableFilename,"rb").read().decode('utf-8')
 
 dataURL = '/covid/risks/data.csv'
 
+def csvResponse(data):
+    r = Response(response=data, status=200, mimetype="text/csv")
+    r.headers["Content-Type"] = "text/csv; charset=utf-8"
+    return r
+
 @server.route(dataURL)
 def csv_data():
-    return Response(csvData, mimetype="text/csv")
+    return csvResponse(csvData)
 
 fullDataURL = '/covid/risks/full-data.csv'
 @server.route(fullDataURL)
 def csv_fulldata():
-    return Response(csvFullData, mimetype="text/csv")
+    return csvResponse(csvFullData)
 
 
 maxDay = float(dframe["MeldeDay"].max())

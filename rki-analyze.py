@@ -1,20 +1,19 @@
 import os
-
+import datatable as dt
 import cov_dates as cd
 import csv
 import json
 import urllib.request
 import time
 import copy
-from datetime import timedelta
-from datetime import datetime, date
+#from datetime import timedelta
+#from datetime import datetime, date
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.animation import FuncAnimation
-from matplotlib.animation import FFMpegWriter
-from matplotlib.animation import ImageMagickWriter
-import datatable as dt
+#from matplotlib.animation import FFMpegWriter
+#from matplotlib.animation import ImageMagickWriter
 
 import pm_util as pmu
 
