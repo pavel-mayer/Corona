@@ -1211,4 +1211,5 @@ app.layout = html.Div([
 
 if __name__ == '__main__':
     debugFlag = socket.gethostname() == 'pavlator.local'
-    app.run_server(host='0.0.0.0', port=1024,debug=debugFlag)
+#    app.run_server(host='0.0.0.0', port=1024,debug=debugFlag)
+    app.run_server(host='::', port=1024,debug=debugFlag)
