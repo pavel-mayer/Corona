@@ -1,5 +1,8 @@
 import csv
 import json
+import datatable as dt
+import sys
+csv.field_size_limit(sys.maxsize)
 
 def loadJson(fileName):
     print("loadJson: Loading "+fileName)
@@ -34,6 +37,16 @@ def saveCsv(filename, records):
                 writer.writerow(record)
     except IOError:
         print("I/O error")
+
+def saveCsvTable(table, fileName, destDir="."):
+    newFile =  destDir+"/"+fileName
+    print("Saving "+newFile)
+    table.to_csv(newFile)
+
+def saveJayTable(table, fileName, destDir="."):
+    newFile =  destDir+"/"+fileName
+    print("Saving "+newFile)
+    table.to_jay(newFile)
 
 def is_int(o):
     try:
