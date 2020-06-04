@@ -49,7 +49,7 @@ def dateStrYMDFromDay(day) -> str:
 ## 23.3.
 def dateStrDMFromDay(day) -> str:
     result = dateFromDay(day)
-    return "{}.{}".format(result.day,result.month)
+    return "{}.{}.".format(result.day,result.month)
 
 ## Di, 23.3.
 def dateStrWDMFromDay(day) -> str:
@@ -96,6 +96,9 @@ def dayFromDatenstand(ds):
 
 def todayDay():
     return dayFromTime(time.localtime())
+
+#firstDumpDay = time.strptime("27.3.2020", "%d.%m.%Y")
+#firstDumpDay = dayFromTime(time.strptime("22.2.2020", "%d.%m.%Y"))
 
 FeiertagDates = ["10.4.2020", "13.4.2020", "1.5.2020"]
 Feiertage = [dayFromTime(time.strptime(f, "%d.%m.%Y")) for f in FeiertagDates]
