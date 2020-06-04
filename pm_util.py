@@ -34,3 +34,10 @@ def saveCsv(filename, records):
                 writer.writerow(record)
     except IOError:
         print("I/O error")
+
+def is_int(o):
+    try:
+        i=int(o)
+        return True
+    except ValueError:
+        return False

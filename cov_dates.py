@@ -5,14 +5,21 @@
 
 import time
 from datetime import timedelta
+from datetime import timezone
 from datetime import datetime, date
+import pytz
 
 day0 = time.strptime("22.2.2020", "%d.%m.%Y") # struct_time
 day0t = time.mktime(day0) # float timestamp since epoch
 day0d = datetime.fromtimestamp(day0t) # datetime.datetime
+#day0d = pytz.utc.localize(datetime.fromtimestamp(day0t)) # datetime.datetime
+#day0d.replace(tzinfo=timezone.utc)
 
 weekDay = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
+def datetimeFromStampStr(s) -> str:
+    dt = datetime.fromtimestamp(int(s) / 1000)
+    return dt
 
 def dateStrFromStampStr(s) -> str:
     t = time.gmtime(int(s)/1000) #time.struct_time
@@ -55,8 +62,10 @@ def dateStrWDMYFromDay(day) -> str:
     return "{}, {}.{}.{}".format(weekDay[result.weekday()],result.day, result.month, result.year)
 
 def dayFromDate(date) -> int:
+#    print("date",date)
+#    print("day0d",day0d)
     delta = date - day0d
-    return delta.days
+    return int(delta.days)
 
 def dayFromTime(t) -> int:
     return dayFromDate(datetime.fromtimestamp(time.mktime(t)))
@@ -73,9 +82,17 @@ def datetimeFromDatenstand(ds):
     sdt = datetime.fromtimestamp(stf)
     return sdt
 
+# Parse date string like "27.03.2020 00:00"
+def datetimeFromDatenstandAny(ds):
+    ds = ds.replace(",","")
+    ds = ds.replace(" Uhr","")
+    st = time.strptime(ds, "%d.%m.%Y %H:%M")
+    stf = time.mktime(st)
+    sdt = datetime.fromtimestamp(stf)
+    return sdt
+
 def dayFromDatenstand(ds):
     return dayFromDate(datetimeFromDatenstand(ds))
-
 
 def todayDay():
     return dayFromTime(time.localtime())

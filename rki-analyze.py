@@ -504,12 +504,16 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
     totalNewCases = 0
     totalDeaths = 0
     totalNewDeaths = 0
+    totalRecoveries = 0
+    totalNewRecoveries = 0
     newRecords = []
     oldRecords = []
     newCaseRecords = []
     oldCaseRecords = []
     newDeathRecords = []
     oldDeathRecords = []
+    newRecoveryRecords = []
+    oldRecoveryRecords = []
 
     totalCompensated = 0
     totalNotCompensated = 0
@@ -539,7 +543,7 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
         if neuerFallNurHeute or neuerFallGesternUndHeute:
             totalCases = totalCases+cases
             if int(attrs['AnzahlFall']) < 0:
-                print("(1) AnzahlFall unerwartert < 0", pretty(record))
+                print("(1) AnzahlFall unerwartet < 0", pretty(record))
 
         if neuerFallNurHeute or neuerFallNurGestern:
             totalNewCases = totalNewCases+cases # hier werden u.U. Fälle abgezogen
@@ -547,16 +551,21 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
             newRecords.append(record)
 
         if neuerFallGesternUndHeute:
+            attrs["NeuerFallKlar"] = "neuerFallGesternUndHeute"
             # assume this is an old case
+            attrs['newBeforeDay'] = currentDay - 1
             attrs['newCaseBeforeDay'] = currentDay - 1
-            attrs['newCaseOnDay'] = currentDay
+#            attrs['newCaseOnDay'] = currentDay
             oldCaseRecords.append(record)
             oldRecords.append(record)
 
         if neuerFallNurHeute:
+            attrs["NeuerFallKlar"] = "neuerFallNurHeute"
             attrs['newCaseOnDay'] = currentDay
+            attrs['newOnDay'] = currentDay
 
         if neuerFallNurGestern:
+            attrs["NeuerFallKlar"] = "neuerFallNurGestern"
             # wird fuer heute abgezogen die Fallzahl, weil gestern gezählt
             # Suche die Ursprungsmeldung
             candidates = caseHashes[attrs["caseHash"]]
@@ -581,9 +590,11 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
 
             if amountToCompensate > 0:
                 totalNotCompensated = totalNotCompensated + amountToCompensate
+                attrs['missingCasesInOldRecord'] = amountToCompensate
                 #print("No compensation possible missing {} cases".format(amountToCompensate))
                 #print(record)
             attrs['newCaseOnDay'] = currentDay - 1
+            attrs['newOnDay'] = currentDay - 1
 
         neuerTodesfall = int(attrs['NeuerTodesfall'])
         neuerTodesfallNurHeute = neuerTodesfall == 1
@@ -600,14 +611,33 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
             if len(newRecords) and newRecords[-1] != record:
                 newRecords.append(record)
         if neuerTodesfallGesternUndHeute:
+            attrs["NeuerTodesfallKlar"] = "neuerTodesfallGesternUndHeute"
+            attrs['newBeforeDay'] = currentDay - 1
             attrs['newDeathBeforeDay'] = currentDay - 1
             oldDeathRecords.append(record)
             if len(oldRecords) and oldRecords[-1] != record:
                 oldRecords.append(record)
         if neuerTodesfallNurHeute:
+            attrs["NeuerTodesfallKlar"] = "neuerTodesfallNurHeute"
             attrs['newDeathOnDay'] = currentDay
+            attrs['newOnDay'] = currentDay
         if neuerTodesfallNurGestern:
+            attrs["NeuerTodesfallKlar"] = "neuerTodesfallNurGestern"
             attrs['newDeathOnDay'] = currentDay - 1
+            attrs['newOnDay'] = currentDay
+
+        neuGenesen = int(attrs['NeuGenesen'])
+        neuGenesenNurHeute = neuGenesen == 1
+        neuGenesenNurGestern = neuGenesen == -1
+        neuGenesenGesternUndHeute = neuGenesen == 0
+        nichtGenesen = neuGenesen == -9
+
+        genesen = int(attrs['AnzahlGenesen'])
+
+        if 'newCaseOnDay' in attrs:
+            attrs['caseDelay'] = int(attrs['newCaseOnDay']) - int(attrs['MeldeDay'])
+        if 'newDeathOnDay' in attrs:
+            attrs['deathDelay'] = int(attrs['newDeathOnDay']) - int(attrs['MeldeDay'])
 
     print("Day {}, {}, cases={}, newCases={}, deaths={}, newDeaths={} newRecords={}".format(
         currentDay, cd.dateStrFromDay(currentDay),totalCases,totalNewCases,totalDeaths,totalNewDeaths,len(newCaseRecords)))
@@ -646,10 +676,20 @@ def loadRecords():
             for msg in removedMessages:
                 (n, hash) = msg
                 anExampleRecord = previousMsgHashes[hash][0]
+                for rm in previousMsgHashes[hash]:
+                    if "missingSinceDay" not in rm['attributes']:
+                        rm['attributes']["missingSinceDay"] = day
+                    else:
+                        rm['attributes']["missingAgainSinceDay"] = day
                 print("Removed {} times : {}".format(n,anExampleRecord))
             for msg in addedMessages:
                 (n, hash) = msg
                 anExampleRecord = currentMsgHashes[hash][0]
+                for nm in currentMsgHashes[hash]:
+                    if "poppedUpOnDay" not in nm['attributes']:
+                        nm['attributes']["poppedUpOnDay"] = day
+                    else:
+                        nm['attributes']["poppedUpAgainOnDay"] = day
                 print("Added {} times : {}".format(n,anExampleRecord))
 
         previousMsgHashes = currentMsgHashes
