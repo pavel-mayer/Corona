@@ -855,7 +855,7 @@ bodyClass="bodyText"
 bodyLink="bodyLink"
 
 appTitle = "COVID Risiko Deutschland nach Ländern und Kreisen"
-versionStr="0.9.11"
+versionStr="0.9.12"
 
 h_header = html.Header(
     style={
@@ -922,6 +922,9 @@ h_Erlauterung=html.P([
 
 h_News=html.P([
     html.Span("News:", className=introClass),
+    html.P(
+        " Version 0.9.12: Schnelleres Laden der Tabelle durch Dash-Update."
+        "", className=bodyClass),
     html.P(
         " Version 0.9.11: Mittelwert, Median und Standardabweichung der Meldeverzögerung hinzufügt, Datendownload als .csv emöglicht."
         "", className=bodyClass),
