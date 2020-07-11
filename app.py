@@ -36,7 +36,8 @@ import dash_table.FormatTemplate as FormatTemplate
 import socket
 import time
 
-print("Running on host '{}'".format(socket.gethostname()))
+debugFlag = socket.gethostname().startswith('pavlator')
+print("Running on host '{}', debug={}".format(socket.gethostname(), debugFlag))
 
 def pretty(jsonmap):
     print(json.dumps(jsonmap, sort_keys=False, indent=4, separators=(',', ': ')))
@@ -233,14 +234,11 @@ def processData(fullCurrentTable, forDay):
                  dt.sum(dt.f.Bevoelkerung)],
                   dt.by(dt.f.Bundesland)]
     last7daysBL.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage","Bevoelkerung"]
-    #print("last7daysBL", last7daysBL)
-    #print("bevoelkerung",bevoelkerung)
-    bls = last7daysBL[:,"Landkreis"].to_list()[0]
-    #print("last7daysBL-bls", bls)
 
+    bls = last7daysBL[:,"Landkreis"].to_list()[0]
     for i, bl in enumerate(bls):
         if last7daysBL[i, "Landkreis"] == bevoelkerung[i, "Bundesland"]:
-            last7daysBL[i, "Bevoelkerung"] == bevoelkerung[i, "Bevoelkerung"]
+            last7daysBL[i, "Bevoelkerung"] = bevoelkerung[i, "Bevoelkerung"]
 
     #last7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
     last7daysBL = last7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
@@ -293,11 +291,10 @@ def processData(fullCurrentTable, forDay):
                   dt.by(dt.f.Bundesland)]
     lastWeek7daysBL.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
     bls = lastWeek7daysBL[:,"Landkreis"].to_list()[0]
-    #print("last7daysBL-bls", bls)
 
     for i, bl in enumerate(bls):
         if lastWeek7daysBL[i, "Landkreis"] == bevoelkerung[i, "Bundesland"]:
-            lastWeek7daysBL[i, "Bevoelkerung"] == bevoelkerung[i, "Bevoelkerung"]
+            lastWeek7daysBL[i, "Bevoelkerung"] = bevoelkerung[i, "Bevoelkerung"]
 
     #lastWeek7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
     lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
@@ -505,7 +502,7 @@ fullTableFilename = "full-latest.csv"
 cacheFilename = "data-cached.feather"
 dataFilename = "data.csv"
 
-FORCE_REFRESH_CACHE = True
+FORCE_REFRESH_CACHE = debugFlag
 
 if FORCE_REFRESH_CACHE or not os.path.isfile(cacheFilename) or os.path.getmtime(fullTableFilename) > os.path.getmtime(cacheFilename) :
     dframe = loadAndProcessData(fullTableFilename)
@@ -871,7 +868,7 @@ bodyClass="bodyText"
 bodyLink="bodyLink"
 
 appTitle = "COVID Risiko Deutschland nach Ländern und Kreisen"
-versionStr="0.9.12"
+versionStr="0.9.13"
 
 h_header = html.Header(
     style={
@@ -938,6 +935,9 @@ h_Erlauterung=html.P([
 
 h_News=html.P([
     html.Span("News:", className=introClass),
+    html.P(
+        " Version 0.9.13: Fehler bei der Berechnung der Faelle/100k bei Bundesländern gefixt. Dank an Marcus für den Hinweis."
+        "", className=bodyClass),
     html.P(
         " Version 0.9.12: Schnelleres Laden der Tabelle durch Dash-Update."
         "", className=bodyClass),
@@ -1229,6 +1229,7 @@ app.layout = html.Div([
 ])
 
 if __name__ == '__main__':
-    debugFlag = socket.gethostname() == 'pavlator.local'
-#    app.run_server(host='0.0.0.0', port=1024,debug=debugFlag)
-    app.run_server(host='::', port=1024,debug=debugFlag)
+    if socket.gethostname() == 'westphal.uberspace.de':
+        app.run_server(host='0.0.0.0', port=1024,debug=debugFlag)
+    else:
+        app.run_server(host='::', port=1024,debug=debugFlag)
