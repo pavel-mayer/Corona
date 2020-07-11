@@ -233,7 +233,16 @@ def processData(fullCurrentTable, forDay):
                  dt.sum(dt.f.Bevoelkerung)],
                   dt.by(dt.f.Bundesland)]
     last7daysBL.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage","Bevoelkerung"]
-    last7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
+    #print("last7daysBL", last7daysBL)
+    #print("bevoelkerung",bevoelkerung)
+    bls = last7daysBL[:,"Landkreis"].to_list()[0]
+    #print("last7daysBL-bls", bls)
+
+    for i, bl in enumerate(bls):
+        if last7daysBL[i, "Landkreis"] == bevoelkerung[i, "Bundesland"]:
+            last7daysBL[i, "Bevoelkerung"] == bevoelkerung[i, "Bevoelkerung"]
+
+    #last7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
     last7daysBL = last7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
     last7daysBL = last7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
     last7days.rbind(last7daysBL, force=True)
@@ -283,7 +292,14 @@ def processData(fullCurrentTable, forDay):
                    dt.sum(dt.f.Bevoelkerung)],
                   dt.by(dt.f.Bundesland)]
     lastWeek7daysBL.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
-    lastWeek7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
+    bls = lastWeek7daysBL[:,"Landkreis"].to_list()[0]
+    #print("last7daysBL-bls", bls)
+
+    for i, bl in enumerate(bls):
+        if lastWeek7daysBL[i, "Landkreis"] == bevoelkerung[i, "Bundesland"]:
+            lastWeek7daysBL[i, "Bevoelkerung"] == bevoelkerung[i, "Bevoelkerung"]
+
+    #lastWeek7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
     lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
     lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7TageDavor": dt.f.AnzahlTodesfallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
     lastWeek7days.rbind(lastWeek7daysBL, force=True)
