@@ -84,9 +84,13 @@ def datetimeFromDatenstand(ds):
 
 # Parse date string like "27.03.2020 00:00"
 def datetimeFromDatenstandAny(ds):
-    ds = ds.replace(",","")
-    ds = ds.replace(" Uhr","")
-    st = time.strptime(ds, "%d.%m.%Y %H:%M")
+    st = None
+    try:
+        st = time.strptime(ds, "%Y-%m-%d")
+    except ValueError:
+        ds = ds.replace(",","")
+        ds = ds.replace(" Uhr","")
+        st = time.strptime(ds, "%d.%m.%Y %H:%M")
     stf = time.mktime(st)
     sdt = datetime.fromtimestamp(stf)
     return sdt

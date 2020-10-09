@@ -2,6 +2,7 @@ import csv
 import json
 import datatable as dt
 import sys
+import os
 csv.field_size_limit(sys.maxsize)
 
 def loadJson(fileName):
@@ -40,11 +41,23 @@ def saveCsv(filename, records):
 
 def saveCsvTable(table, fileName, destDir="."):
     newFile =  destDir+"/"+fileName
+    if os.path.isfile(newFile):
+        bakFile = newFile + ".bak"
+        if os.path.isfile(bakFile):
+            os.remove(bakFile)
+        os.rename(newFile, bakFile)
+
     print("Saving "+newFile)
     table.to_csv(newFile)
 
 def saveJayTable(table, fileName, destDir="."):
     newFile =  destDir+"/"+fileName
+    if os.path.isfile(newFile):
+        bakFile = newFile+".bak"
+        if os.path.isfile(bakFile):
+            os.remove(bakFile)
+        os.rename(newFile, bakFile)
+
     print("Saving "+newFile)
     table.to_jay(newFile)
 

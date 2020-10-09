@@ -174,8 +174,8 @@ def retrieveRecords(offset, length):
 
 def getRecordVersionOnServer():
     print("Retrieving version date from server")
-    ##pmu.pretty(chunk)
     chunk = retrieveRecords(0,1)
+    #pmu.pretty(chunk)
     datenStand = chunk['features'][0]['attributes']['Datenstand']
     print("Version on server is: "+datenStand)
     return datenStand

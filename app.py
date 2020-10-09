@@ -236,13 +236,19 @@ def processData(fullCurrentTable, forDay):
     last7daysBL.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage","Bevoelkerung"]
 
     bls = last7daysBL[:,"Landkreis"].to_list()[0]
+    blb = bevoelkerung[:,"Bundesland"].to_list()[0]
+    #print(bls)
+    #print(blb)
     for i, bl in enumerate(bls):
-        if last7daysBL[i, "Landkreis"] == bevoelkerung[i, "Bundesland"]:
-            last7daysBL[i, "Bevoelkerung"] = bevoelkerung[i, "Bevoelkerung"]
+        for j, bb in enumerate(blb):
+            #print(i,j)
+            if last7daysBL[i, "Landkreis"] == bevoelkerung[j, "Bundesland"]:
+                last7daysBL[i, "Bevoelkerung"] = bevoelkerung[j, "Bevoelkerung"]
 
     #last7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
     last7daysBL = last7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
     last7daysBL = last7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+    #print(last7daysBL)
     last7days.rbind(last7daysBL, force=True)
 
     # compute values for last 7 days for Germany
@@ -259,6 +265,8 @@ def processData(fullCurrentTable, forDay):
                   dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
     last7daysDE = last7daysDE[:, dt.f[:].extend(
         {"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+
+    #print(last7daysDE)
     last7days.rbind(last7daysDE, force=True)
 
     # clip case count to zero
@@ -290,11 +298,16 @@ def processData(fullCurrentTable, forDay):
                    dt.sum(dt.f.Bevoelkerung)],
                   dt.by(dt.f.Bundesland)]
     lastWeek7daysBL.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
-    bls = lastWeek7daysBL[:,"Landkreis"].to_list()[0]
 
+    bls = lastWeek7daysBL[:,"Landkreis"].to_list()[0]
+    blb = bevoelkerung[:, "Bundesland"].to_list()[0]
+    # print(bls)
+    # print(blb)
     for i, bl in enumerate(bls):
-        if lastWeek7daysBL[i, "Landkreis"] == bevoelkerung[i, "Bundesland"]:
-            lastWeek7daysBL[i, "Bevoelkerung"] = bevoelkerung[i, "Bevoelkerung"]
+        for j, bb in enumerate(blb):
+            # print(i,j)
+            if lastWeek7daysBL[i, "Landkreis"] == bevoelkerung[j, "Bundesland"]:
+                lastWeek7daysBL[i, "Bevoelkerung"] = bevoelkerung[j, "Bevoelkerung"]
 
     #lastWeek7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
     lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
@@ -868,7 +881,7 @@ bodyClass="bodyText"
 bodyLink="bodyLink"
 
 appTitle = "COVID Risiko Deutschland nach Ländern und Kreisen"
-versionStr="0.9.13"
+versionStr="0.9.14"
 
 h_header = html.Header(
     style={
@@ -935,6 +948,9 @@ h_Erlauterung=html.P([
 
 h_News=html.P([
     html.Span("News:", className=introClass),
+    html.P(
+        " Version 0.9.14: Weiteren Fehler bei der Berechnung der Faelle/100k bei Bundesländern gefixt. Dank an Andreas für den Hinweis"
+        "", className=bodyClass),
     html.P(
         " Version 0.9.13: Fehler bei der Berechnung der Faelle/100k bei Bundesländern gefixt. Dank an Marcus für den Hinweis."
         "", className=bodyClass),
@@ -1227,7 +1243,7 @@ app.layout = html.Div([
            'backgroundColor': colors['background']}, id="bottom"),
 
 ])
-
+debugFlag = False
 if __name__ == '__main__':
     if socket.gethostname() == 'westphal.uberspace.de':
         app.run_server(host='0.0.0.0', port=1024,debug=debugFlag)

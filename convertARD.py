@@ -8,6 +8,9 @@ from datetime import datetime, date
 import cov_dates as cd
 import json
 
+# cd /Users/pavel/Corona/2020-rki-archive/data/2_parsed
+# python ~/Corona/convertARD.py -d ~/Corona/archive_ard/ *.bz2
+
 # Parse date string like "19.05.2020, 00:00 Uhr"
 def datetimeFromARDFilename(ds):
     st = time.strptime(ds, "data_%Y-%m-%d-%H-%M.json.bz2")
@@ -15,19 +18,22 @@ def datetimeFromARDFilename(ds):
     sdt = datetime.fromtimestamp(stf)
     return sdt
 
-def convert(bz2csvFile, destDir="."):
+def convert(bz2csvFile, destDir=".", force = False):
     path = os.path.normpath(bz2csvFile)
     fileName = path.split(os.sep)[-1]
     date = datetimeFromARDFilename(fileName)
     day = cd.dayFromDate(date)
     newFile =  destDir+"/NPGEO-RKI-{}.csv".format(cd.dateStrYMDFromDay(day))
 
-    print("Loading " + bz2csvFile)
-    with bz2.open(bz2csvFile, "rb") as f:
-        content = json.load(f)
-        frame = dt.Frame(content)
-        print("Saving " + newFile)
-        frame.to_csv(newFile)
+    if force or not os.path.isfile(newFile):
+        print("Loading " + bz2csvFile)
+        with bz2.open(bz2csvFile, "rb") as f:
+            content = json.load(f)
+            frame = dt.Frame(content)
+            print("Saving " + newFile)
+            frame.to_csv(newFile)
+    else:
+        print("Skipping {} because {} already exists", bz2csvFile, newFile)
 
 def main():
     parser = argparse.ArgumentParser(description='Convert ARD-RKI-dumps to .csv')

@@ -8,7 +8,11 @@ import os
 import pm_util as pmu
 import csv
 import sys
+import glob
 csv.field_size_limit(sys.maxsize)
+
+# cd ~/Corona/archive_ard/
+# python ~/Corona/unify.py -d ~/Corona/archive_v2 ~/Corona/archive_ard/NPGEO-RKI-*.csv
 
 from dateutil.parser import parse
 
@@ -74,7 +78,7 @@ from dateutil.parser import parse
 #     return t
 
 
-def loadLandkreisBeveolkerung(fileName="Landkreise-Bevoelkerung.csv"):
+def loadLandkreisBeveolkerung(fileName="../Landkreise-Bevoelkerung.csv"):
     result = {}
     with open(fileName, newline='') as csvfile:
         reader = csv.DictReader(csvfile, delimiter=';')
@@ -86,7 +90,7 @@ def loadLandkreisBeveolkerung(fileName="Landkreise-Bevoelkerung.csv"):
                 result[LandkreisID] = int(BevoelkerungStr)
     return result
 
-def loadLandkreisFlaeche(fileName="covid-19-germany-landkreise.csv"):
+def loadLandkreisFlaeche(fileName="../covid-19-germany-landkreise.csv"):
     result = {}
     with open(fileName, newline='') as csvfile:
         reader = csv.DictReader(csvfile, delimiter=';')
@@ -97,7 +101,7 @@ def loadLandkreisFlaeche(fileName="covid-19-germany-landkreise.csv"):
             if FlaecheStr != "":
                 #print(FlaecheStr)
                 result[LandkreisID] = float(FlaecheStr)
-    print("Flaeche:", result)
+    #print("Flaeche:", result)
     return result
 
 def addLandkreisData(data, row, Bevoelkerung, Flaeche):
@@ -105,6 +109,12 @@ def addLandkreisData(data, row, Bevoelkerung, Flaeche):
     missingNames = []
     Landkreis = data["Landkreis"][row]
     IdLandkreis = int(data["IdLandkreis"][row])
+    if IdLandkreis == 3152:
+        # change old Landkreis ID for Göttingen to new Id
+        IdLandkreis = 3159
+        data["IdLandkreis"][row] = 3159
+        print("#Info: Changed bad Göttingen Landkreis Id from 3152 to 3159")
+
     #print(record)
     #print(record["IdLandkreis"])
     if IdLandkreis in Bevoelkerung:
@@ -163,7 +173,7 @@ def unify(table):
     t = t[:, dt.f[:].extend({"Bevoelkerung":0, "FaellePro100k":0.0, "TodesfaellePro100k":0.0, "isStadt":False})]
     t = t[:, dt.f[:].extend({"Flaeche":0.0, "FaelleProKm2":0.0, "TodesfaelleProKm2":0.0, "Dichte":0.0})]
 
-    print("unified fields", t.names)
+    #print("unified fields", t.names)
 
     Bevoelkerung = loadLandkreisBeveolkerung()
     Flaeche = loadLandkreisFlaeche()
@@ -206,11 +216,32 @@ def save(table, origFileName, destDir="."):
     print("Saving "+newFile)
     table.to_csv(newFile)
 
+def isNewData(dataFilename, daysIncluded):
+    peekTable = dt.fread(dataFilename, max_nrows=1)
+    print("Checking "+dataFilename)
+    ##print(peekTable)
+    ##datenStand = peekTable[0, dt.f.DatenstandISO]
+    dss = peekTable[0, "Datenstand"]
+    print("Datenstand", dss)
+    ds = cd.datetimeFromDatenstandAny(dss)
+    dsdy = cd.dayFromDate(ds)
+    isNew = dsdy not in daysIncluded
+    if isNew:
+        print("contains new day {}".format(dsdy))
+    else:
+        print("contains day {} already in full table".format(dsdy))
+
+    return isNew
+
 def tableData(dataFilename):
     print("Loading " + dataFilename)
     fullTable = dt.fread(dataFilename)
     print("Loading done loading table from ‘" + dataFilename + "‘, keys:")
-    print(fullTable.keys())
+    #print(fullTable.keys())
+    if "NeuerFall" not in fullTable.keys():
+        print("NeuerFall/NeuerTodesfall not in data file, creating column with default value 1 (Neuer Fall nur heute)")
+        fullTable = fullTable[:, dt.f[:].extend({"NeuerFall":1, "NeuerTodesfall":1})]
+
     cases = fullTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
     new_cases = fullTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
     dead = fullTable[(dt.f.NeuerTodesfall == 0) | (dt.f.NeuerTodesfall == 1), 'AnzahlTodesfall'].sum()[0, 0]
@@ -236,25 +267,39 @@ def checkColumns(list1, list2):
         print("missing in List2",diff21)
 
 def main():
-    parser = argparse.ArgumentParser(description='Extract number from a data file')
+    parser = argparse.ArgumentParser(description='Create a unfied data file from daily dumps')
     parser.add_argument('files', metavar='fileName', type=str, nargs='+',
                         help='.NPGEO COVID19 Germany data as .csv file')
     parser.add_argument('-d', '--output-dir', dest='outputDir', default=".")
 
     args = parser.parse_args()
-    #print(args)
+    print(args)
     fullTable = None
-    for f in args.files:
-        t = tableData(f)
-        print("Hashing " + f)
-        newTable = unify(t)
-        save(newTable,f,args.outputDir)
-        if fullTable is None:
-            fullTable = newTable
-        else:
-            print("full fields", fullTable.names)
-            checkColumns(fullTable.names, newTable.names)
-            fullTable.rbind(newTable)
+    jayPath = args.outputDir+"/all-data.jay"
+    print(jayPath)
+
+    daysIncluded = []
+    if os.path.isfile(jayPath):
+        print("Loading " + jayPath)
+        fullTable = dt.fread(jayPath)
+        daysIncluded = sorted(fullTable[:, [dt.first(dt.f.DatenstandTag)],dt.by(dt.f.DatenstandTag)].to_list()[0])
+        print("Days in full table:")
+        print(daysIncluded)
+
+    for fa in args.files:
+        files = glob.glob(fa)
+        for f in files:
+            if isNewData(f, daysIncluded):
+                t = tableData(f)
+                print("Hashing " + f)
+                newTable = unify(t)
+                save(newTable,f,args.outputDir)
+                if fullTable is None:
+                    fullTable = newTable
+                else:
+                    #print("full fields", fullTable.names)
+                    checkColumns(fullTable.names, newTable.names)
+                    fullTable.rbind(newTable)
 
     pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
     pmu.saveCsvTable(fullTable, "all-data.csv", args.outputDir)
