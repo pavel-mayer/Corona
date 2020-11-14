@@ -18,7 +18,7 @@ from matplotlib.animation import FuncAnimation
 import pm_util as pmu
 
 UPDATE = True # fetch new data for the day if it not already exist
-FORCE_UPDATE = False # fetch new data for the day even if it already exists
+FORCE_UPDATE = True # fetch new data for the day even if it already exists
 REFRESH= True or UPDATE # recreate enriched, consolidated dump
 
 def autolabel(ax, bars, color, label_range):
@@ -185,11 +185,17 @@ def retrieveAllRecords():
     offset = 0
     chunksize = 5000
     records = []
+    newRecords = None
     while ready == 0:
         chunk = retrieveRecords(offset, chunksize)
+        print("Retrieved chunk from {} count {}".format(offset, len(chunk)))
         offset = offset + chunksize
-        newRecords= chunk['features']
-        print("Retrieved chunk from {} count {}".format(offset, len(newRecords)))
+        try:
+            newRecords= chunk['features']
+        except KeyError:
+            print("feature not found in:")
+            print(newRecords)
+            exit(1)
         records = records + newRecords
         if 'exceededTransferLimit' in chunk:
             exceededTransferLimit = chunk['exceededTransferLimit']
