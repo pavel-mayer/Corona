@@ -38,7 +38,8 @@ import time
 
 versionStr="0.9.15"
 
-debugFlag = socket.gethostname().startswith('pavlator')
+# = socket.gethostname().startswith('pavlator')
+debugFlag = False
 print("Running on host '{}', debug={}".format(socket.gethostname(), debugFlag))
 
 def pretty(jsonmap):
@@ -447,8 +448,18 @@ def loadAndProcessData(fileName):
     yesterdayTable = processData(currentFullTable, lastDay-1).sort("Landkreis")
 
     #print(currentFullTable)
-    #print(todayTable)
-    #print(yesterdayTable)
+    print(todayTable)
+    print(yesterdayTable)
+
+    for i in range(yesterdayTable.nrows):
+        l_name = todayTable[i, dt.f.Landkreis].to_list()[0][0]
+        #l_id = todayTable[i, dt.f.IdLandkreis].to_list()[0][0]
+        l_new_name = yesterdayTable[i, dt.f.Landkreis].to_list()[0][0]
+        if l_name != l_new_name:
+            print("missing",l_name)
+            exit(1)
+        #else:
+        #    print("ok", l_name)
 
     resultTable=todayTable[:,dt.f[:].extend({"RangChange": 0})]
     rangChange = np.subtract(yesterdayTable[:,"Rang"],todayTable[:,"Rang"])
@@ -508,12 +519,12 @@ def makeColumns():
         ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(60)),
-        ('FaellePro100kLetzte7Tage', ['Fälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
-        ('FaellePro100kLetzte7TageDavor', ['Fälle je 100000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
-        ('FaellePro100kTrend', ['Fälle je 100000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
-        ('FaellePro100k', ['Fälle je 100000', 'total'], 'numeric', FormatFixed1, colWidth(60)),
+        ('FaellePro100kLetzte7Tage', ['Fälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('FaellePro100kLetzte7TageDavor', ['Fälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('FaellePro100kTrend', ['Fälle je 100.000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('FaellePro100k', ['Fälle je 100.000', 'total'], 'numeric', FormatFixed1, colWidth(60)),
         ('AnzahlFallLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'absolut'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('FaellePro100kLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'je 10000'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('FaellePro100kLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'je 100.000'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaelleLetzte7TageDropped', ['Fälle strikt 7 Tage', 'RKI ignoriert'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('FaelleLetzte7TageDroppedPercent', ['Fälle strikt 7 Tage', 'RKI ignoriert %'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('LetzteMeldungNeg', ['Meldung', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
@@ -525,10 +536,10 @@ def makeColumns():
         ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100000', 'letzte 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
-        ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100000', 'vorl. 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
-        ('TodesfaellePro100kTrend', ['Todesfälle je 100000', 'Diff.'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
-        ('TodesfaellePro100k', ['Todesfälle je 100000', 'total'], 'numeric', FormatFixed2, colWidth(60)),
+        ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('TodesfaellePro100kTrend', ['Todesfälle je 100.000', 'Diff.'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('TodesfaellePro100k', ['Todesfälle je 100.000', 'total'], 'numeric', FormatFixed2, colWidth(60)),
     ]
 
     orderedCols, orderedNames, orderedTypes, orderFormats, orderWidths = zip(*desiredOrder)

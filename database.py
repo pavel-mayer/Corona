@@ -211,7 +211,7 @@ def analyze(fullTable, args):
         #print(bundeslaender_numbers[i+1])
         pmu.saveCsvTable(bundeslaender_numbers[bl_id], "series-{}-{}-{}-{}.csv".format(firstDumpDay, lastDumpDay, bl_id, bl_name), args.outputDir)
 
-    landKreise, landkreise_numbers = timeSeries(fullTable, fromDay, toDay, dt.f.IdLandkreis, dt.f.Landkreis)
+    landKreise, landkreise_numbers = timeSeries(fullTable, fromDay, toDay, dt.f.IdLandkreis, dt.f.Landkreis, Altersgruppen, Geschlechter)
     print(landKreise)
     print(landkreise_numbers)
     for i in range(landKreise.nrows):

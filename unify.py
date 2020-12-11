@@ -114,6 +114,14 @@ def addLandkreisData(data, row, Bevoelkerung, Flaeche):
         IdLandkreis = 3159
         data["IdLandkreis"][row] = 3159
         print("#Info: Changed bad Göttingen Landkreis Id from 3152 to 3159")
+    if Landkreis == "LK Aachen" or IdLandkreis == 5354:
+        # change bad Landkreis for Aachen to Stadtregion
+        print("#Info: Bad record in row:",row)
+        print("#Info: Changing bad '{}' Kreis with Id {} to ‘StadtRegion Aachen‘ id 5334".format(Landkreis, IdLandkreis))
+        Landkreis = "StadtRegion Aachen"
+        IdLandkreis = 5334
+        data["Landkreis"][row] = Landkreis
+        data["IdLandkreis"][row] = IdLandkreis
 
     #print(record)
     #print(record["IdLandkreis"])

@@ -8,6 +8,7 @@ from datetime import timedelta
 from datetime import timezone
 from datetime import datetime, date
 import pytz
+import calendar
 
 day0 = time.strptime("22.2.2020", "%d.%m.%Y") # struct_time
 day0t = time.mktime(day0) # float timestamp since epoch
@@ -28,6 +29,17 @@ def dateStrFromStampStr(s) -> str:
 def dateTimeStrFromStampStr(s) -> str:
     t = time.gmtime(int(s)/1000) #time.struct_time
     return "{0}, {1:02d}.{2:02d}.{3} {4:02d}:{5:02d}".format(weekDay[t.tm_wday], t.tm_mday, t.tm_mon,t.tm_year,t.tm_hour, t.tm_min)
+
+def dateTimeStrFromAnyStampStr(s) -> str:
+    try:
+        return dateTimeStrFromStampStr(s)
+    except ValueError:
+        t = time.strptime(s, "%Y/%m/%d %H:%M:%S")
+        return "{0}, {1:02d}.{2:02d}.{3} {4:02d}:{5:02d}".format(weekDay[t.tm_wday], t.tm_mday, t.tm_mon,t.tm_year,t.tm_hour, t.tm_min)
+
+def stampFromDateStr(s):
+    t = time.strptime(s, "%Y/%m/%d %H:%M:%S")
+    return calendar.timegm(t)
 
 def dateTimeStrFromTime(tt) -> str:
     t = time.gmtime(tt) #time.struct_time
@@ -74,6 +86,21 @@ def dayFromStampStr(s) -> int:
     d = datetime.fromtimestamp(int(s) / 1000)
     delta = d - day0d
     return delta.days
+
+# Parse date string like "2020/11/25 00:00:00"
+def datetimeFromDateStr(ds):
+    st = time.strptime(ds, "%Y/%m/%d %H:%M:%S")
+    stf = time.mktime(st)
+    sdt = datetime.fromtimestamp(stf)
+    return sdt
+
+def dayFromAnyStampStr(s) -> int:
+    try:
+        return dayFromStampStr(s)
+    except ValueError:
+        d = datetimeFromDateStr(s)
+        delta = d - day0d
+        return delta.days
 
 # Parse date string like "19.05.2020, 00:00 Uhr"
 def datetimeFromDatenstand(ds):

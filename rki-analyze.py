@@ -18,7 +18,7 @@ from matplotlib.animation import FuncAnimation
 import pm_util as pmu
 
 UPDATE = True # fetch new data for the day if it not already exist
-FORCE_UPDATE = True # fetch new data for the day even if it already exists
+FORCE_UPDATE = False # fetch new data for the day even if it already exists
 REFRESH= True or UPDATE # recreate enriched, consolidated dump
 
 def autolabel(ax, bars, color, label_range):
@@ -183,26 +183,30 @@ def getRecordVersionOnServer():
 def retrieveAllRecords():
     ready = 0
     offset = 0
+    #offset = 340000
     chunksize = 5000
     records = []
     newRecords = None
     while ready == 0:
         chunk = retrieveRecords(offset, chunksize)
-        print("Retrieved chunk from {} count {}".format(offset, len(chunk)))
+        print("Retrieved chunk from {}, chunk items: {}".format(offset, len(chunk)))
         offset = offset + chunksize
         try:
             newRecords= chunk['features']
         except KeyError:
-            print("feature not found in:")
-            print(newRecords)
+            print("feature not found in newRecord:")
+            #pmu.pretty(newRecords)
             exit(1)
         records = records + newRecords
+        print("Records = {}".format(len(newRecords)))
         if 'exceededTransferLimit' in chunk:
             exceededTransferLimit = chunk['exceededTransferLimit']
             ready = not exceededTransferLimit
         else:
+            print("exceededTransferLimit flag missing")
             ready = True
     print("Done")
+    exit(1)
     return records
 
 
@@ -212,8 +216,8 @@ def addDates(records):
     sameDay = 0
     for data in records:
         record = data["attributes"]
-        record["RefdatumKlar"] = cd.dateTimeStrFromStampStr(record["Refdatum"])
-        record["MeldedatumKlar"] = cd.dateTimeStrFromStampStr(record["Meldedatum"])
+        record["RefdatumKlar"] = cd.dateTimeStrFromAnyStampStr(record["Refdatum"])
+        record["MeldedatumKlar"] = cd.dateTimeStrFromAnyStampStr(record["Meldedatum"])
         cases = cases + int(record["AnzahlFall"])
         dead = dead + int(record["AnzahlTodesfall"])
         record["AnzahlFallLfd"] = cases
@@ -252,8 +256,8 @@ def addLandkreisData(records):
         if IdLandkreis in Bevoelkerung:
             KreisBevoelkerung = Bevoelkerung[IdLandkreis]
             record["Bevoelkerung"] = KreisBevoelkerung
-            record["FaellePro100k"] = record["AnzahlFall"]*100000/KreisBevoelkerung
-            record["TodesfaellePro100k"] = record["AnzahlTodesfall"]*100000/KreisBevoelkerung
+            record["FaellePro100k"] = int(record["AnzahlFall"])*100000/KreisBevoelkerung
+            record["TodesfaellePro100k"] = int(record["AnzahlTodesfall"])*100000/KreisBevoelkerung
             isStadt = Landkreis[:2] != "LK"
             record["isStadt"] = int(isStadt)
 
@@ -286,7 +290,7 @@ def sumFieldIfDateBefore(records,fieldToSum, dateField, beforeDay):
     result = 0
     for r in records:
         attrs = r['attributes']
-        if cd.dayFromStampStr(attrs[dateField]) < beforeDay:
+        if cd.dayFromAnyStampStr(attrs[dateField]) < beforeDay:
             result = result + int(attrs[fieldToSum])
     return result
 
@@ -294,7 +298,7 @@ def sumFieldbyDayKind(records, fieldToSum, dateField, kindOfDay, dateRange=None,
     result = [0]*9
     for r in records:
         attrs = r['attributes']
-        day = cd.dayFromStampStr(attrs[dateField])
+        day = cd.dayFromAnyStampStr(attrs[dateField])
         #print("day", day)
         if day in range(len(kindOfDay)):
             #print("day1",day)
@@ -308,9 +312,9 @@ def delaysList(records,beforeDay):
     result = []
     for r in records:
         attrs = r['attributes']
-        meldedatum = cd.dayFromStampStr(attrs["Meldedatum"])
+        meldedatum = cd.dayFromAnyStampStr(attrs["Meldedatum"])
         if meldedatum < beforeDay:
-            erkdatum=cd.dayFromStampStr(attrs["Refdatum"])
+            erkdatum=cd.dayFromAnyStampStr(attrs["Refdatum"])
             result.append(meldedatum-erkdatum)
     return result
 
@@ -321,7 +325,7 @@ def includePos(day,attrs):
     return day >= 0
 
 def onlyeErkBeginDiffers(day, attrs):
-    mDay = cd.dayFromStampStr(attrs['Meldedatum'])
+    mDay = cd.dayFromAnyStampStr(attrs['Meldedatum'])
     return day >= 0 and int(attrs['IstErkrankungsbeginn']) == 1 and mDay != day
 
 def onlyErkBegin(day, attrs):
@@ -335,7 +339,7 @@ def byDate(records, whichDate, filterFunc):
     for r in records:
         attrs = r['attributes']
         dateStamp = attrs[whichDate]
-        day = cd.dayFromStampStr(dateStamp)
+        day = cd.dayFromAnyStampStr(dateStamp)
         if filterFunc(day,attrs):
             if day in result:
                 result[day].append(r)
@@ -374,15 +378,16 @@ if UPDATE or FORCE_UPDATE:
     datenStand = getRecordVersionOnServer()
     datenStandDay = cd.dayFromDatenstand(datenStand)
     afn=archiveFilename(datenStandDay)
+    cfn=csvFilename(datenStandDay,"fullDaily", "archive_csv")
 
-    if not os.path.isfile(afn):
+    if not os.path.isfile(afn) and not os.path.isfile(cfn):
         print("New data available, Stand: {} Tag: {}, downloading...".format(datenStand, datenStandDay))
     else:
         print("Data already locally exists, Stand: {} Tag: {}".format(datenStand, datenStandDay))
         if FORCE_UPDATE:
             print("Forcing Download because FORCE_UPDATE is set")
 
-    if not os.path.isfile(afn) or FORCE_UPDATE:
+    if (not os.path.isfile(afn) and not os.path.isfile(cfn)) or FORCE_UPDATE:
         allRecords = retrieveAllRecords()
         dfn = "dumps/dump-rki-"+time.strftime("%Y%m%d-%H%M%S")+"-Stand-"+cd.dateStrYMDFromDay(datenStandDay)+".json"
         pmu.saveJson(dfn, allRecords)
@@ -458,6 +463,15 @@ def stampRecords(currentRecords, globalID):
     for record in currentRecords:
         attrs = record['attributes']
 
+        if not isinstance(attrs["Meldedatum"], int):
+            attrs["Meldedatum"] = cd.stampFromDateStr(attrs["Meldedatum"])
+            attrs["Refdatum"] = cd.stampFromDateStr(attrs["Refdatum"])
+
+        if attrs["Landkreis"] == "LK Aachen":
+            print("### Changing Landkreis name form LK Aachen to StadtRegion Aachen")
+            attrs["Landkreis"] = "StadtRegion Aachen"
+            attrs["IdLandkreis"] = 5334
+
         attrs['globalID']=globalID
         globalID = globalID + 1
 
@@ -527,8 +541,8 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
     for record in currentRecords:
         attrs = record['attributes']
 
-        attrs['RefDay']=cd.dayFromStampStr(attrs["Refdatum"])
-        attrs['MeldeDay']=cd.dayFromStampStr(attrs["Meldedatum"])
+        attrs['RefDay']=cd.dayFromAnyStampStr(attrs["Refdatum"])
+        attrs['MeldeDay']=cd.dayFromAnyStampStr(attrs["Meldedatum"])
         lkTyp = attrs["Landkreis"][:2]
         if lkTyp == "SK" or lkTyp == "LK":
             attrs['LandkreisName']=attrs["Landkreis"][2:]
@@ -538,7 +552,7 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
             attrs['LandkreisTyp']="LSK"
 
         if int(attrs["IstErkrankungsbeginn"]):
-            attrs['ErkDay'] = cd.dayFromStampStr(attrs["Refdatum"])
+            attrs['ErkDay'] = cd.dayFromAnyStampStr(attrs["Refdatum"])
 
         neuerFall = int(attrs['NeuerFall'])
         neuerFallNurHeute = neuerFall == 1
@@ -658,6 +672,7 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
 
 def loadRecords():
     firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
+    firstRecordTime = time.strptime("9.10.2020", "%d.%m.%Y")  # struct_time
     #lastRecordTime = time.strptime("13.5.2020", "%d.%m.%Y")  # struct_time
     lastRecordTime = time.localtime()  # struct_time
     firstRecordDay = cd.dayFromTime(firstRecordTime)
@@ -667,7 +682,20 @@ def loadRecords():
     previousMsgHashes = None
     globalID = 1
     for day in range(firstRecordDay, lastRecordDay+1):
-        currentRecords = pmu.loadJson(archiveFilename(day))
+        currentRecords = None
+        afn = archiveFilename(day)
+        cfn = csvFilename(datenStandDay, "fullDaily", "archive_csv")
+
+        if os.path.isfile(afn):
+            currentRecords = pmu.loadJson(afn)
+        else:
+            if os.path.isfile(cfn):
+                currentRecords = pmu.loadCsv(cfn)
+            else:
+                print("no file found for day {}".format(day))
+                exit(1)
+
+
         #pmu.saveCsv(csvFilename(day, "fullDaily", "archive_csv"),currentRecords)
         globalID, currentcaseHashes, currentMsgHashes = stampRecords(currentRecords, globalID)
 
@@ -822,9 +850,9 @@ def extractDelaysBinned(records, beforeDay, kindOfDay):
     for d in sorted(records.keys()):
         for r in records[d]:
             attrs = r['attributes']
-            meldedatum = cd.dayFromStampStr(attrs["Meldedatum"])
+            meldedatum = cd.dayFromAnyStampStr(attrs["Meldedatum"])
             if meldedatum < beforeDay:
-                erkdatum = cd.dayFromStampStr(attrs["Refdatum"])
+                erkdatum = cd.dayFromAnyStampStr(attrs["Refdatum"])
                 bod = kindOfDay[meldedatum]
                 delay = meldedatum - erkdatum
                 if bod in delayBins:

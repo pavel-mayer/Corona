@@ -19,6 +19,17 @@ def saveJson(fileName, objectToSave):
 def pretty(jsonmap):
     print(json.dumps(jsonmap, sort_keys=False, indent=4, separators=(',', ': ')))
 
+def loadCsv(filename):
+    print("loadCsv: Loading "+filename)
+    records = []
+    with open(filename, 'r') as file:
+        csv_file = csv.DictReader(file)
+        for row in csv_file:
+            attributes = {"attributes" : dict(row)}
+            #print(dict(row))
+            records.append(attributes)
+    return records
+
 def saveCsv(filename, records):
     print("saveCsv: Saving "+filename)
     csv_columns = list(records[0]["attributes"].keys())
