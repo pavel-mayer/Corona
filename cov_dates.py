@@ -39,7 +39,7 @@ def dateTimeStrFromAnyStampStr(s) -> str:
 
 def stampFromDateStr(s):
     t = time.strptime(s, "%Y/%m/%d %H:%M:%S")
-    return calendar.timegm(t)
+    return calendar.timegm(t)*1000
 
 def dateTimeStrFromTime(tt) -> str:
     t = time.gmtime(tt) #time.struct_time

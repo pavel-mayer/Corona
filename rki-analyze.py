@@ -206,7 +206,6 @@ def retrieveAllRecords():
             print("exceededTransferLimit flag missing")
             ready = True
     print("Done")
-    exit(1)
     return records
 
 
@@ -216,8 +215,8 @@ def addDates(records):
     sameDay = 0
     for data in records:
         record = data["attributes"]
-        record["RefdatumKlar"] = cd.dateTimeStrFromAnyStampStr(record["Refdatum"])
-        record["MeldedatumKlar"] = cd.dateTimeStrFromAnyStampStr(record["Meldedatum"])
+        record["RefdatumKlar"] = cd.dateTimeStrFromStampStr(record["Refdatum"])
+        record["MeldedatumKlar"] = cd.dateTimeStrFromStampStr(record["Meldedatum"])
         cases = cases + int(record["AnzahlFall"])
         dead = dead + int(record["AnzahlTodesfall"])
         record["AnzahlFallLfd"] = cases
@@ -463,9 +462,14 @@ def stampRecords(currentRecords, globalID):
     for record in currentRecords:
         attrs = record['attributes']
 
-        if not isinstance(attrs["Meldedatum"], int):
-            attrs["Meldedatum"] = cd.stampFromDateStr(attrs["Meldedatum"])
-            attrs["Refdatum"] = cd.stampFromDateStr(attrs["Refdatum"])
+        md = attrs["Meldedatum"]
+        if not isinstance(md, int) and not md.isnumeric():
+            print("Meldedatum {} -> {}, Refdatum {} -> {}".format(attrs["Meldedatum"], type(attrs["Meldedatum"]), attrs["Refdatum"], type(attrs["Refdatum"])))
+            nmd = cd.stampFromDateStr(attrs["Meldedatum"])
+            nrd = cd.stampFromDateStr(attrs["Refdatum"])
+            #print("Meldedatum {} -> {}, Refdatum {} -> {}".format(attrs["Meldedatum"], nmd, attrs["Refdatum"], nrd))
+            attrs["Meldedatum"] = nmd
+            attrs["Refdatum"] = nrd
 
         if attrs["Landkreis"] == "LK Aachen":
             print("### Changing Landkreis name form LK Aachen to StadtRegion Aachen")
@@ -672,7 +676,8 @@ def enhanceRecords(currentRecords, currentDay, globalID, caseHashes):
 
 def loadRecords():
     firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
-    firstRecordTime = time.strptime("9.10.2020", "%d.%m.%Y")  # struct_time
+    firstRecordTime = time.strptime("15.10.2020", "%d.%m.%Y")  # struct_time
+    #firstRecordTime = time.strptime("15.12.2020", "%d.%m.%Y")  # struct_time
     #lastRecordTime = time.strptime("13.5.2020", "%d.%m.%Y")  # struct_time
     lastRecordTime = time.localtime()  # struct_time
     firstRecordDay = cd.dayFromTime(firstRecordTime)

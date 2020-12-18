@@ -419,7 +419,8 @@ def processData(fullCurrentTable, forDay):
 
     allDaysExt2=allDaysExt1[:,dt.f[:].extend({"AnzahlFallTrend":  Rw})]
 
-    RwSqrt = (dt.math.sqrt(dt.f.AnzahlFallTrend))
+    #RwSqrt = (dt.math.sqrt(dt.f.AnzahlFallTrend))
+    RwSqrt = (dt.math.pow(dt.f.AnzahlFallTrend, 4/7))
     allDaysExt2=allDaysExt2[:,dt.f[:].extend({"AnzahlFallTrendSqrt":  RwSqrt})]
     allDaysExt3=allDaysExt2[:,dt.f[:].extend({"FaellePro100kTrend": dt.f.FaellePro100kLetzte7Tage-dt.f.FaellePro100kLetzte7TageDavor})]
     allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
@@ -518,7 +519,7 @@ def makeColumns():
         ('AnzahlFallTrendSqrt', ['Fälle', 'R7'], 'numeric', FormatFixed2, colWidth(70)),
         ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(60)),
+        ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(90)),
         ('FaellePro100kLetzte7Tage', ['Fälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100kLetzte7TageDavor', ['Fälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100kTrend', ['Fälle je 100.000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
@@ -1018,6 +1019,9 @@ h_Erlauterung=html.P([
 h_News=html.P([
     html.Span("News:", className=introClass),
     html.P(
+        " Version 0.9.16: R7-Berechnnung von sqrt(RwK) auf RwK^(4/7) geändert."
+        "", className=bodyClass),
+    html.P(
         " Version 0.9.15: Weitere Spalten hinzugefügt, um die Anzahl von Fällen anzuzeigen, die bei der offiziellen Berechnung der"
         " 7-Tage-Inzidenz durch das RKI unter den Tisch fallen, weil sie später als 7 Tage nach der Meldung beim Gesundheitsamt ans RKI gemeldet wurden."
         " Neu ist auch die Spalte R7, die in ihrer Bedeutung und Dimension in etwa dem berühmten 7-Tage-R-Wert entspricht. Die .csv-Datei enthält jetzt Felder"
@@ -1156,7 +1160,7 @@ h_RwDef = makeDefinition(h_RwK,
 h_R7=makeDefinition("R7",
 '''
  entspricht in Dimension und Bedeutung in etwa dem dem bekannten R-Wert mit einem seriellen Intervall von 4 Tagen,
- gemittelt über 7 Tage. Die hier angezeigte Annäherung berechnet sich einfach als Quadratwurzel aus RwK.
+ gemittelt über 7 Tage. Die hier angezeigte Annäherung berechnet sich einfach aus RwK hoch 4/7.
 ''')
 
 h_Risiko=makeDefinition("Rang, Risiko 1/N",
