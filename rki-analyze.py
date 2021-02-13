@@ -18,8 +18,8 @@ from matplotlib.animation import FuncAnimation
 import pm_util as pmu
 
 UPDATE = True # fetch new data for the day if it not already exist
-FORCE_UPDATE = False # fetch new data for the day even if it already exists
-REFRESH= True or UPDATE # recreate enriched, consolidated dump
+FORCE_UPDATE = True # fetch new data for the day even if it already exists
+REFRESH= False or UPDATE # recreate enriched, consolidated dump
 
 def autolabel(ax, bars, color, label_range):
     """
@@ -375,6 +375,7 @@ allRecords = []
 
 if UPDATE or FORCE_UPDATE:
     datenStand = getRecordVersionOnServer()
+    #datenStand = "13.01.2021, 00:00 Uhr"
     datenStandDay = cd.dayFromDatenstand(datenStand)
     afn=archiveFilename(datenStandDay)
     cfn=csvFilename(datenStandDay,"fullDaily", "archive_csv")
@@ -464,7 +465,7 @@ def stampRecords(currentRecords, globalID):
 
         md = attrs["Meldedatum"]
         if not isinstance(md, int) and not md.isnumeric():
-            print("Meldedatum {} -> {}, Refdatum {} -> {}".format(attrs["Meldedatum"], type(attrs["Meldedatum"]), attrs["Refdatum"], type(attrs["Refdatum"])))
+            #print("Meldedatum {} -> {}, Refdatum {} -> {}".format(attrs["Meldedatum"], type(attrs["Meldedatum"]), attrs["Refdatum"], type(attrs["Refdatum"])))
             nmd = cd.stampFromDateStr(attrs["Meldedatum"])
             nrd = cd.stampFromDateStr(attrs["Refdatum"])
             #print("Meldedatum {} -> {}, Refdatum {} -> {}".format(attrs["Meldedatum"], nmd, attrs["Refdatum"], nrd))
@@ -475,6 +476,11 @@ def stampRecords(currentRecords, globalID):
             print("### Changing Landkreis name form LK Aachen to StadtRegion Aachen")
             attrs["Landkreis"] = "StadtRegion Aachen"
             attrs["IdLandkreis"] = 5334
+
+        if attrs["Landkreis"] == "LK Saarpfalz-Kreis":
+            print("### Changing Landkreis name form LK Saarpfalz-Kreis to LK Saar-Pfalz-Kreis")
+            attrs["Landkreis"] = "LK Saar-Pfalz-Kreis"
+            #attrs["IdLandkreis"] = 5334
 
         attrs['globalID']=globalID
         globalID = globalID + 1
@@ -682,6 +688,7 @@ def loadRecords():
     lastRecordTime = time.localtime()  # struct_time
     firstRecordDay = cd.dayFromTime(firstRecordTime)
     lastRecordDay = cd.dayFromTime(lastRecordTime)
+    firstRecordDay = lastRecordDay - 40
 
     allDatedRecords = []
     previousMsgHashes = None
@@ -689,7 +696,7 @@ def loadRecords():
     for day in range(firstRecordDay, lastRecordDay+1):
         currentRecords = None
         afn = archiveFilename(day)
-        cfn = csvFilename(datenStandDay, "fullDaily", "archive_csv")
+        cfn = csvFilename(day, "fullDaily", "archive_csv")
 
         if os.path.isfile(afn):
             currentRecords = pmu.loadJson(afn)

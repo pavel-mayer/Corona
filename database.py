@@ -195,7 +195,7 @@ def analyze(fullTable, args):
         bl_id=bundeslaender[i,dt.f.IdBundesland].to_list()[0][0]
 
         if bl_name == "Berlin":
-            ag_Berlin = {'A00-A04' : 195952, 'A05-A14':318242, 'A15-A34':826771, 'A35-A59':1489424, 'A60-A79':754139, 'A80+':169887, 'unbekannt':0}
+            ag_Berlin = {'A00-A04' : 195952, 'A05-A14':318242, 'A15-A34':826771, 'A35-A59':1489424, 'A60-A79':754139, 'A80+':198527, 'unbekannt':0}
 
             for ag in Altersgruppen:
                 srccolname = "AnzahlFallNeu-AG-"+ag

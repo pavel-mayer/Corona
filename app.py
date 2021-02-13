@@ -36,10 +36,10 @@ import dash_table.FormatTemplate as FormatTemplate
 import socket
 import time
 
-versionStr="0.9.15"
+versionStr="0.9.18"
 
 # = socket.gethostname().startswith('pavlator')
-debugFlag = False
+debugFlag = True
 print("Running on host '{}', debug={}".format(socket.gethostname(), debugFlag))
 
 def pretty(jsonmap):
@@ -423,6 +423,17 @@ def processData(fullCurrentTable, forDay):
     RwSqrt = (dt.math.pow(dt.f.AnzahlFallTrend, 4/7))
     allDaysExt2=allDaysExt2[:,dt.f[:].extend({"AnzahlFallTrendSqrt":  RwSqrt})]
     allDaysExt3=allDaysExt2[:,dt.f[:].extend({"FaellePro100kTrend": dt.f.FaellePro100kLetzte7Tage-dt.f.FaellePro100kLetzte7TageDavor})]
+    allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kPrognose": dt.f.FaellePro100kLetzte7Tage*dt.math.pow(dt.f.AnzahlFallTrend, 4)})]
+    allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kPrognose2": dt.f.FaellePro100kLetzte7Tage*dt.math.pow(dt.f.AnzahlFallTrend, 8)})]
+
+    # res = cur * trend ^ t
+    # trend ^ t = res/cur
+    # t = log(trend, res/cur)
+    # t = ln(res/cur)/ln(trend)
+
+    allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kTageBisSicher": dt.math.log(3/dt.f.FaellePro100kLetzte7Tage) / dt.math.log(dt.f.AnzahlFallTrend) * 7})]
+    allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kTageBisSicher2": dt.math.log(7/dt.f.FaellePro100kLetzte7Tage) / dt.math.log(dt.f.AnzahlFallTrend) * 7})]
+
     allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
 
     allDaysExt5=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/3.5/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
@@ -457,10 +468,10 @@ def loadAndProcessData(fileName):
         #l_id = todayTable[i, dt.f.IdLandkreis].to_list()[0][0]
         l_new_name = yesterdayTable[i, dt.f.Landkreis].to_list()[0][0]
         if l_name != l_new_name:
-            print("missing",l_name)
+            print("missing {} in today, was {} yesterday".format(l_name, l_new_name))
             exit(1)
-        #else:
-        #    print("ok", l_name)
+        else:
+            print("{}: ok: {}".format(i, l_name))
 
     resultTable=todayTable[:,dt.f[:].extend({"RangChange": 0})]
     rangChange = np.subtract(yesterdayTable[:,"Rang"],todayTable[:,"Rang"])
@@ -524,6 +535,10 @@ def makeColumns():
         ('FaellePro100kLetzte7TageDavor', ['Fälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100kTrend', ['Fälle je 100.000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100k', ['Fälle je 100.000', 'total'], 'numeric', FormatFixed1, colWidth(60)),
+        ('FaellePro100kPrognose', ['Fälle je 100.000', 'in 4 Wochen'], 'numeric', FormatFixed1, colWidth(60)),
+        ('FaellePro100kPrognose2', ['Fälle je 100.000', 'in 8 Wochen'], 'numeric', FormatFixed1, colWidth(60)),
+        ('FaellePro100kTageBisSicher2', ['Fälle je 100.000', 'Tage bis 7'], 'numeric', FormatInt, colWidth(60)),
+        ('FaellePro100kTageBisSicher', ['Fälle je 100.000', 'Tage bis 3'], 'numeric', FormatInt, colWidth(60)),
         ('AnzahlFallLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'absolut'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('FaellePro100kLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'je 100.000'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaelleLetzte7TageDropped', ['Fälle strikt 7 Tage', 'RKI ignoriert'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -690,6 +705,22 @@ FaellePro100kLetzte7TageClass = {
     conditionSafe: '{FaellePro100kLetzte7Tage} < 1'
 }
 
+FaellePro100kPrognoseClass = {
+    conditionDanger : '{FaellePro100kPrognose} > 50',
+    conditionTooHigh: '{FaellePro100kPrognose} > 20 && {FaellePro100kPrognose} <= 50',
+    conditionSerious: '{FaellePro100kPrognose} > 5 && {FaellePro100kPrognose} <= 20',
+    conditionGood: '{FaellePro100kPrognose} >= 1 && {FaellePro100kPrognose} <= 5',
+    conditionSafe: '{FaellePro100kPrognose} < 1'
+}
+
+FaellePro100kPrognose2Class = {
+    conditionDanger : '{FaellePro100kPrognose2} > 50',
+    conditionTooHigh: '{FaellePro100kPrognose2} > 20 && {FaellePro100kPrognose2} <= 50',
+    conditionSerious: '{FaellePro100kPrognose} > 5 && {FaellePro100kPrognose2} <= 20',
+    conditionGood: '{FaellePro100kPrognose2} >= 1 && {FaellePro100kPrognose2} <= 5',
+    conditionSafe: '{FaellePro100kPrognose2} < 1'
+}
+
 AnzahlFallTrendClass = {
     conditionDanger : '{AnzahlFallTrend} > 3',
     conditionTooHigh: '{AnzahlFallTrend} > 1 && {AnzahlFallTrend} <= 3',
@@ -853,6 +884,8 @@ def make_style_data_conditional():
     result = result + conditionalStyles(AnzahlFallTrendClass, 'AnzahlFallTrend')
     result = result + conditionalStyles(KontaktrisikoClass, 'Kontaktrisiko')
     result = result + conditionalStyles(LandkreisClass, 'Landkreis')
+    result = result + conditionalStyles(FaellePro100kPrognoseClass, 'FaellePro100kPrognose')
+    result = result + conditionalStyles(FaellePro100kPrognose2Class, 'FaellePro100kPrognose2')
 
     return result
 
@@ -1019,6 +1052,12 @@ h_Erlauterung=html.P([
 h_News=html.P([
     html.Span("News:", className=introClass),
     html.P(
+        " Version 0.9.18: Prognosespalten hinzugefügt für Inzidenzen in 4 und 8 Wochen und Tage bis Inzidenz 3 und 7"
+        "", className=bodyClass),
+    html.P(
+        " Version 0.9.17: Fehler in der Datenaufbereitung gefixt, der zwischen dem 16.12. und 25.12.2020 fehlerhafte Werte verursacht hat. Sorry dafür."
+        "", className=bodyClass),
+    html.P(
         " Version 0.9.16: R7-Berechnnung von sqrt(RwK) auf RwK^(4/7) geändert."
         "", className=bodyClass),
     html.P(
@@ -1113,7 +1152,7 @@ h_Benutzung = html.P([
            , className=bodyClass),
     html.P("Um nur die Bundesländer uns Deutschland zu sehen, 'B' im Feld Region/Art eingeben, '=B', um nur die Bundesländer"
             " zu sehen, 'R', um nur Deutschland zu sehen. Weitere Werte sind 'LK' für "
-           " für Landkreis, SK für Stadtkreis und LSK für Land/Stadtregionen."
+           " für Landkreis, SK für Stadtkreis und LSK für Land/Stadtregionen. Um nur Sachsen zu sehen, '=Sachsen' bei Region/Land nehmen,"
            , className=bodyClass),
      html.H4(html.A(html.Span("Ans Seitenende springen ⬇", className=introClass), href="#bottom")),
     html.P(html.H4(html.A(html.Span("Zu Absatz 'Benutzung' springen ⬆", className=introClass), href="#Benutzung")),
@@ -1171,6 +1210,21 @@ Ansteckender befinden. Rang 1 geht an den Landkreis mit der kleinsten Zahl N, al
 der praktisch nur am Tabellenende vorkommt, gewinnt der, wo der letzte Fall länger zurückliegt, bei Gleichstand auch da
 gewinnt der, wo bisher pro 100.000 die wenigsten Fälle gemeldet wurden.  
 N berechnet sich wie folgt:  
+""")
+
+h_Prognose=makeDefinition("Fälle je 100.000, in X Wochen",
+"""
+Zeigt die 7-Tage-Inzidenz in X Wochen an, falls sich der aktuelle Trend fortsetzt, also RwK gleich bleibt.
+ Das ist in der Realität in der Regel nicht so, und bei kleinen Zahlen und und auf Landkreis-Ebene ergeben
+ sich gelegentlich absurd hohe Zahlen, aber so ist nun mal die Mathematik, wenn man den aktuellen Trend fortschreibt. 
+""")
+
+h_TageBis=makeDefinition("Fälle je 100.000, Tage bis X",
+"""
+Zeigt an, wie viele Tage es dauert, bis eine Inzidenz von X erreicht ist, falls sich der aktuelle Trend fortsetzt, also RwK gleich bleibt.
+ Die Zahl ist negativ, wenn die Inzidenz unterschritten wurde und weiter fällt, oder wenn der Trend > 1, aslo steigend ist und die Inzidenz
+ höher als X ist. In beiden Fällen liegt der Zeitpunkt quasi in der Vergangenheit und gibt an, wie lange es hypothetisch her ist,
+ seit X über- oder unterschritten wurde, hätte die ganze Zeit über derselbe Trend geherrscht wie aktuell.  
 """)
 
 h_Strikt=makeDefinition("Fälle strikt 7 Tage",
@@ -1296,6 +1350,8 @@ h_Bedeutungen = html.Table([
         html.Tr([html.Td(h_LetzteMeldung)]),
         html.Tr([html.Td(h_LetzteZaehlung)]),
         html.Tr([html.Td(h_MeldeDelay)]),
+        html.Tr([html.Td(h_Prognose)]),
+        html.Tr([html.Td(h_TageBis)]),
 ],
 #    style={'padding': '0 0'}
 )
