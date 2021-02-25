@@ -39,7 +39,7 @@ import time
 versionStr="0.9.18"
 
 # = socket.gethostname().startswith('pavlator')
-debugFlag = True
+debugFlag = False
 print("Running on host '{}', debug={}".format(socket.gethostname(), debugFlag))
 
 def pretty(jsonmap):
@@ -445,6 +445,8 @@ def processData(fullCurrentTable, forDay):
     allDaysExt6c = allDaysExt6c[:, dt.f[:].extend({"Sofwareversion": versionStr})]
 
     allDaysExt6c[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 99999
+    allDaysExt6c[dt.f.FaellePro100kPrognose >= 10000, "FaellePro100kPrognose"] = 9999.9
+    allDaysExt6c[dt.f.FaellePro100kPrognose2 >= 10000, "FaellePro100kPrognose2"] = 9999.9
 
     sortedByRisk = allDaysExt6c.sort(["Kontaktrisiko","LetzteMeldung","FaellePro100k"])
     #print(sortedByRisk)
@@ -907,6 +909,7 @@ h_table = dash_table.DataTable(
     data=data,
     sort_action='native',
     filter_action='native',
+    #filter_query='{Bundesland} = Berlin',
     page_size= 500,
     style_table = {
             'minWidth': tableWidth, 'width': tableWidth, 'maxWidth': tableWidth,
@@ -1222,8 +1225,10 @@ Zeigt die 7-Tage-Inzidenz in X Wochen an, falls sich der aktuelle Trend fortsetz
 h_TageBis=makeDefinition("Fälle je 100.000, Tage bis X",
 """
 Zeigt an, wie viele Tage es dauert, bis eine Inzidenz von X erreicht ist, falls sich der aktuelle Trend fortsetzt, also RwK gleich bleibt.
- Die Zahl ist negativ, wenn die Inzidenz unterschritten wurde und weiter fällt, oder wenn der Trend > 1, aslo steigend ist und die Inzidenz
- höher als X ist. In beiden Fällen liegt der Zeitpunkt quasi in der Vergangenheit und gibt an, wie lange es hypothetisch her ist,
+ Ist die Zahl ist negativ, bedeutet dass erst mal, dass bei aktuellem Trend X niemals erreicht wird.
+ Das kann ist in verschiedenen Situation passieren: 1) wenn die aktuelle Inzidenz bereits kleiner X ist und weiter fällt oder
+ 2) wenn der Trend > 1, also steigend ist, und die aktuelle Inzidenz höher als X ist. 
+ In beiden Fällen liegt der Zeitpunkt quasi in der Vergangenheit und gibt an, wie lange es hypothetisch her ist,
  seit X über- oder unterschritten wurde, hätte die ganze Zeit über derselbe Trend geherrscht wie aktuell.  
 """)
 

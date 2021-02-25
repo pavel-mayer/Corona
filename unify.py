@@ -310,7 +310,7 @@ def main():
                     fullTable.rbind(newTable)
 
     pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
-    pmu.saveCsvTable(fullTable, "all-data.csv", args.outputDir)
+    #pmu.saveCsvTable(fullTable, "all-data.csv", args.outputDir)
 
 if __name__ == "__main__":
     # execute only if run as a script
