@@ -164,9 +164,12 @@ def processData(fullCurrentTable, forDay):
                dt.max(dt.f.MeldeDay),
                dt.max(dt.f.newCaseOnDay),
                dt.first(dt.f.LandkreisTyp),
+               dt.first(dt.f.IdLandkreis),
+               dt.first(dt.f.IdBundesland),
                dt.first(dt.f.Bundesland)],
     dt.by(dt.f.Landkreis)]
 
+    #print(alldays)
     # compute and add rows for Bundeslaender
     bevoelkerung = alldays[:, [dt.sum(dt.f.Bevoelkerung), dt.sum(dt.f.AnzahlFall), dt.sum(dt.f.AnzahlTodesfall),], dt.by(dt.f.Bundesland)]
     bevoelkerung=bevoelkerung[:,dt.f[:].extend({"FaellePro100k": dt.f.AnzahlFall * 100000 / dt.f.Bevoelkerung})]
@@ -181,6 +184,8 @@ def processData(fullCurrentTable, forDay):
                dt.max(dt.f.MeldeDay),
                dt.max(dt.f.newCaseOnDay),
                dt.first(dt.f.LandkreisTyp), # just create the column, will be overwritten
+               dt.first(dt.f.IdLandkreis),
+               dt.first(dt.f.IdBundesland),
                dt.first(dt.f.Landkreis)],
             dt.by(dt.f.Bundesland)]
 
@@ -189,6 +194,9 @@ def processData(fullCurrentTable, forDay):
     alldaysBundeslaender[:, "FaellePro100k"] = bevoelkerung[:, "FaellePro100k"]
     alldaysBundeslaender[:, "TodesfaellePro100k"] = bevoelkerung[:, "TodesfaellePro100k"]
     alldaysBundeslaender[:, "LandkreisTyp"] = "B"
+    #print(alldaysBundeslaender[:, "IdLandkreis"])
+    alldaysBundeslaender[:, "IdLandkreis"] = alldaysBundeslaender[:, "IdBundesland"]
+    #print(alldaysBundeslaender[:, ["IdLandkreis","Bundesland"]])
     alldays.rbind(alldaysBundeslaender, force=True)
 
     # compute and add row for all Germany
@@ -208,6 +216,8 @@ def processData(fullCurrentTable, forDay):
                       dt.max(dt.f.newCaseOnDay),
                       dt.first(dt.f.LandkreisTyp),  # just create the column, will be overwritten
                       dt.first(dt.f.Landkreis),
+                      dt.first(dt.f.IdLandkreis),
+                      dt.first(dt.f.IdBundesland),
                       dt.first(dt.f.Bundesland)]]
     alldaysGermany[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
     alldaysGermany[:, "Landkreis"] = "Deutschland"
@@ -215,6 +225,8 @@ def processData(fullCurrentTable, forDay):
     alldaysGermany[:, "FaellePro100k"] = bevoelkerungGermany[:, "FaellePro100k"]
     alldaysGermany[:, "TodesfaellePro100k"] = bevoelkerungGermany[:, "TodesfaellePro100k"]
     alldaysGermany[:, "LandkreisTyp"] = "BR"
+    alldaysGermany[:, "IdLandkreis"] = 0
+    alldaysGermany[:, "IdBundesland"] = 0
     alldays.rbind(alldaysGermany, force=True)
 
     ##############################################################################
@@ -605,6 +617,7 @@ cacheFilename = "data-cached.feather"
 dataFilename = "data.csv"
 
 FORCE_REFRESH_CACHE = debugFlag
+FORCE_REFRESH_CACHE = True
 
 if FORCE_REFRESH_CACHE or not os.path.isfile(cacheFilename) or os.path.getmtime(fullTableFilename) > os.path.getmtime(cacheFilename) :
     dframe = loadAndProcessData(fullTableFilename)
