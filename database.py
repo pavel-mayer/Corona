@@ -65,7 +65,7 @@ def analyzeDayRange(fullTable, fromDay, toDay):
 #def analyzeDayRangeBy(fullTable, fromDay, toDay, forIdLandkreis):
 def analyzeDaily(fullTable, filter, postfix):
 
-    print("----- analyzeDaily:"+postfix)
+    #print("----- analyzeDaily:"+postfix)
     #dayTable = fullTable[(dt.f.DatenstandTag >= fromDay) & (dt.f.DatenstandTag < toDay) & (dt.f.IdLandkreis == forIdLandkreis),:]
     dayTable = fullTable[filter,:]
 
@@ -116,7 +116,7 @@ def analyzeDaily(fullTable, filter, postfix):
 
 def analyzeDailyAltersgruppen(fullTable, byDayTable, filter, Altersgruppen, Geschlechter, postfix):
     #byDayTable = analyzeDaily(fullTable, filter, postfix)
-    print("----- analyzeDailyAltersgruppen:"+postfix)
+    #print("----- analyzeDailyAltersgruppen:"+postfix)
 
     for ag in Altersgruppen:
         print("Analyzing Altergruppe "+ ag)
@@ -156,10 +156,11 @@ def filterByDay(fromDay, toDay):
 def timeSeries(fullTable, fromDay, toDay, byCriteria, nameColumn, Altersgruppen, Geschlechter):
     regions = fullTable[:, [dt.first(nameColumn)], dt.by(byCriteria)]
     #regions = regions[:5,:]
-    print("regions")
+    print("Creating time series for regions:")
     print(regions)
     dailysByCriteria = {}
     for i, lk in enumerate(regions[:, byCriteria].to_list()[0]):
+        print("Processing Region '{}'".format(regions[i,nameColumn][0,0]))
         dailysByCriteria[lk] = analyzeDailyAltersgruppenGeschlechter(fullTable,
             filterByDayAndCriteria(fromDay, toDay, (byCriteria == lk)), Altersgruppen, Geschlechter)
         print("Done {} of {}, key = {} name = {}".format(i+1, regions.nrows, lk, regions[i,nameColumn][0,0]))
@@ -179,8 +180,7 @@ def makeIncidenceColumns(regionTable, censusTable, Altersgruppen, Geschlechter):
             censuscolname = ag + "-total"
             AnzahlFallNeu_X = dt.f[srccolname]
             ag_size = censusTable[0,censuscolname]
-            print("srccolname:{} newcolname:{} AnzahlFallNeu_X:{} ag_size:{}".format(srccolname, newcolname, AnzahlFallNeu_X,
-                  ag_size))
+            #print("srccolname:{} newcolname:{} AnzahlFallNeu_X:{} ag_size:{}".format(srccolname, newcolname, AnzahlFallNeu_X, ag_size))
             regionTable = regionTable[:, dt.f[:].extend({newcolname: (100000.0 * AnzahlFallNeu_X) / ag_size})]
     print(regionTable)
     return regionTable
@@ -214,14 +214,15 @@ def analyze(fullTable, args):
     censusDeutschland = census[dt.f.Name == "Deutschland",:]
     print(censusDeutschland)
 
-    for id in range(1,16):
-        censusBL = census[dt.f.Code == id, :]
-        print(censusBL)
+    #for id in range(1,16):
+    #    censusBL = census[dt.f.Code == id, :]
+    #    print(censusBL)
 
-    #deutschland = analyzeDailyAltersgruppenGeschlechter(fullTable, filterByDay(fromDay, toDay), Altersgruppen, Geschlechter)
-    #deutschland = makeIncidenceColumns(deutschland, censusDeutschland, Altersgruppen, Geschlechter)
-    #print(deutschland)
-    #pmu.saveCsvTable(deutschland, "series-{}-{}-{}-{}.csv".format(firstDumpDay, lastDumpDay, 0, "Deutschland"), args.outputDir)
+    print("Processing 'Deutschland'")
+    deutschland = analyzeDailyAltersgruppenGeschlechter(fullTable, filterByDay(fromDay, toDay), Altersgruppen, Geschlechter)
+    deutschland = makeIncidenceColumns(deutschland, censusDeutschland, Altersgruppen, Geschlechter)
+    print(deutschland)
+    pmu.saveCsvTable(deutschland, "series-{}-{}.csv".format(0, "Deutschland"), args.outputDir)
 
     bundeslaender, bundeslaender_numbers = timeSeries(fullTable, fromDay, toDay, dt.f.IdBundesland, dt.f.Bundesland, Altersgruppen, Geschlechter)
     for i in range(bundeslaender.nrows):
@@ -233,32 +234,20 @@ def analyze(fullTable, args):
             print(censusBL)
             bundeslaender_numbers[bl_id] = makeIncidenceColumns(bundeslaender_numbers[bl_id], censusBL, Altersgruppen, Geschlechter)
 
-        # if bl_name == "Berlin":
-        #     ag_Berlin = {'A00-A04' : 195952, 'A05-A14':318242, 'A15-A34':826771, 'A35-A59':1489424, 'A60-A79':754139, 'A80+':198527, 'unbekannt':0}
-        #
-            # for ag in Altersgruppen:
-            #     srccolname = "AnzahlFallNeu-AG-"+ag
-            #     newcolname = "Inzidenz-"+ag
-            #     AnzahlFallNeu_X = dt.f[srccolname]
-            #     ag_size = ag_Berlin[ag]
-            #     print("srccolname:{} newcolname:{} AnzahlFallNeu_X:{} ag_size:{}", srccolname, newcolname, AnzahlFallNeu_X, ag_size)
-            #     bundeslaender_numbers[bl_id] = bundeslaender_numbers[bl_id][:, dt.f[:].extend({newcolname: (100000.0 * AnzahlFallNeu_X)/ag_size})]
-            #     print(bundeslaender_numbers[bl_id])
-        #print(i)
-        #print(bl_id)
-        #print(bl_name)
-        #print(bundeslaender_numbers[i+1])
-        #pmu.saveCsvTable(bundeslaender_numbers[bl_id], "series-{}-{}-{}-{}.csv".format(firstDumpDay, lastDumpDay, bl_id, bl_name), args.outputDir)
         pmu.saveCsvTable(bundeslaender_numbers[bl_id], "series-{}-{}.csv".format(bl_id, bl_name), args.outputDir)
 
     landKreise, landkreise_numbers = timeSeries(fullTable, fromDay, toDay, dt.f.IdLandkreis, dt.f.Landkreis, Altersgruppen, Geschlechter)
-    print(landKreise)
-    print(landkreise_numbers)
+    #print(landKreise)
+    #print(landkreise_numbers)
     for i in range(landKreise.nrows):
         print(i)
         lk_name = landKreise[i, dt.f.Landkreis].to_list()[0][0]
         lk_id = landKreise[i, dt.f.IdLandkreis].to_list()[0][0]
-        #pmu.saveCsvTable(landkreise_numbers[lk_id], "series-{}-{}-{}-{}.csv".format(firstDumpDay, lastDumpDay, lk_id, lk_name), args.outputDir)
+        if lk_id > 0:
+            censusLK = census[dt.f.Code == lk_id, :]
+            print(censusLK)
+            landkreise_numbers[lk_id] = makeIncidenceColumns(landkreise_numbers[lk_id], censusLK, Altersgruppen,
+                                                                Geschlechter)
         pmu.saveCsvTable(landkreise_numbers[lk_id], "series-{}-{}.csv".format(lk_id, lk_name), args.outputDir)
     #print(landKreise)
 
