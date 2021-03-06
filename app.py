@@ -474,8 +474,12 @@ def loadAndProcessData(fileName):
     yesterdayTable = processData(currentFullTable, lastDay-1).sort("Landkreis")
 
     #print(currentFullTable)
-    print(todayTable)
-    print(yesterdayTable)
+    #print(todayTable)
+    #print(yesterdayTable)
+
+    resultTable = todayTable[:, dt.f[:].extend({"NewCasesToday": 0})]
+    change = np.subtract(todayTable[:, "AnzahlFall"],yesterdayTable[:, "AnzahlFall"])
+    resultTable[:, "NewCasesToday"] = change
 
     for i in range(yesterdayTable.nrows):
         l_name = todayTable[i, dt.f.Landkreis].to_list()[0][0]
@@ -484,10 +488,10 @@ def loadAndProcessData(fileName):
         if l_name != l_new_name:
             print("missing {} in today, was {} yesterday".format(l_name, l_new_name))
             exit(1)
-        else:
-            print("{}: ok: {}".format(i, l_name))
+        #else:
+        #    print("{}: ok: {}".format(i, l_name))
 
-    resultTable=todayTable[:,dt.f[:].extend({"RangChange": 0})]
+    resultTable=resultTable[:,dt.f[:].extend({"RangChange": 0})]
     rangChange = np.subtract(yesterdayTable[:,"Rang"],todayTable[:,"Rang"])
     resultTable[:,"RangChange"] = rangChange
 
@@ -545,6 +549,7 @@ def makeColumns():
         ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(90)),
+        ('NewCasesToday', ['Fälle', 'neu'], 'numeric', FormatInt, colWidth(90)),
         ('FaellePro100kLetzte7Tage', ['Fälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100kLetzte7TageDavor', ['Fälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaellePro100kTrend', ['Fälle je 100.000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
@@ -617,7 +622,7 @@ cacheFilename = "data-cached.feather"
 dataFilename = "data.csv"
 
 FORCE_REFRESH_CACHE = debugFlag
-FORCE_REFRESH_CACHE = True
+#FORCE_REFRESH_CACHE = True
 
 if FORCE_REFRESH_CACHE or not os.path.isfile(cacheFilename) or os.path.getmtime(fullTableFilename) > os.path.getmtime(cacheFilename) :
     dframe = loadAndProcessData(fullTableFilename)
@@ -1009,6 +1014,7 @@ h_header = html.Header(
     },
     children=[
         html.H1(className="app-header", children=appTitle, style={'color': colors['text'], 'text-decoration': 'none'}, id="title_header"),
+        html.H2(className="app-header", children="ACHTUNG: Die Zahlen in der Tabelle sind aktuell falsch. Bitte nicht verwenden. Arbeite an der Behebung.", style={'color':'red', 'text-decoration': 'none'}, id="title_alarm"),
         html.H4(className="app-header-date",
                 children="Datenstand: {} 00:00 Uhr (wird täglich aktualisiert)".format(dataVersionDate),
                 style={'color': colors['text']}),

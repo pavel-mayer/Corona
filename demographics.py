@@ -8,12 +8,15 @@ import pm_util as pmu
 def join(largerTable, smallerTable, keyFieldName, overwriteSame=False):
     sKeys = smallerTable[:, keyFieldName].to_list()[0]
     extTable = largerTable.copy()
-    for colName in smallerTable.names:
+    for ci, colName in enumerate(smallerTable.names):
         if colName != keyFieldName and (not colName in largerTable.names or overwriteSame):
             values = smallerTable[:, colName].to_list()[0]
             valuesDict = dict(zip(sKeys, values))
 
-            extTable = extTable[:, dt.f[:].extend({colName: ""})]
+            if smallerTable.stypes[ci] == dt.str32:
+                extTable = extTable[:, dt.f[:].extend({colName: ""})]
+            else:
+                extTable = extTable[:, dt.f[:].extend({colName: 0})]
 
             for i, lk in enumerate(extTable[:,keyFieldName].to_list()[0]):
                 if lk in valuesDict:
@@ -150,19 +153,23 @@ def makeRKIAgeGroups(outputFile):
     print(RKIBerlinTable)
 
     RKITable.rbind(RKIBerlinTable[1:,:])
-    print(RKITable)
-    RKITable.to_csv(outputFile)
+    #print(RKITable)
+    #RKITable.to_csv("raw.csv")
 
     ## check for consistency
     latest = dt.fread("data.csv")
-    latestList = latest[:,["IdLandkreis","Landkreis","Bundesland"]]
+    latestList = latest[:,["IdLandkreis","Landkreis","IdBundesland","Bundesland"]]
 
     RKITable.names = {"Code" : "IdLandkreis"}
-    print(RKITable)
+    #print(RKITable)
 
     check = join(RKITable, latestList, "IdLandkreis", overwriteSame=False)
+    #print(check)
+    #check.to_csv("check.csv")
+    print("Trash:\n", check[(dt.f.IdBundesland == 0) & (dt.f.Landkreis != "Deutschland"),:])
+    del check[(dt.f.IdBundesland == 0) & (dt.f.Landkreis != "Deutschland"),:]
     print(check)
-    check.to_csv("check.csv")
+    check.to_csv(outputFile)
 
 #convertCensus("demographie/Census-ALL-clean-7.csv", "Census.csv")
 #convertCensus("demographie/Berlin-Bezirke-3.csv", "Census-Berlin.csv")
