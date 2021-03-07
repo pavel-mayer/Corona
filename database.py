@@ -251,7 +251,7 @@ def analyze(fullTable, args):
     Altersgruppen = []
     if args.agegroups:
         Altersgruppen = dt.unique(fullTable[:,"Altersgruppe"]).to_list()[0]
-        
+
     print("Altersgruppen", Altersgruppen)
 
 
@@ -329,7 +329,7 @@ def main():
     #print(args)
     print("Loading " + args.file)
     fullTable = dt.fread(args.file)
-    print("Loading done loading table from ‘" + args.file + "‘")
+    print("Loading done loading table from ‘{}‘, rows: {} cols: {}".format(args.file, fullTable.nrows, fullTable.ncols))
     analyze(fullTable, args)
 
 if __name__ == "__main__":

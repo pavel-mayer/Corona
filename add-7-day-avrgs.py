@@ -46,6 +46,11 @@ def addPredictionsColumn(table, incidenceColumn, changeColumn, newColumn, weeks)
     #print(newTable)
     return newTable
 
+def addRiskColumn(table, incidencePrognosisColumn, newColumn, darkFactor):
+    incidence = dt.f[incidencePrognosisColumn]
+    newTable = table[:, dt.f[:].extend({newColumn: 100000 / (incidence * darkFactor)})]
+    #print(newTable)
+    return newTable
 
 def test():
     table = dt.Frame({"object": [1, 1, 1, 2, 2, 3,4,5,6,7,8,9,10,11,12,13,14],
@@ -60,14 +65,15 @@ def add7DayAverages(table):
     for c in candidatesColumns:
         table = add7dSumColumn(table, c, c+"-7d")
         table = add7dChangeColumn(table, c+"-7d", c+"-7d-Change")
-        if c in ["AnzahlFallNeu", "AnzahlTodesfallNeu"]:
+        if c in ["InzidenzFallNeu", "InzidenzTodesfallNeu"]:
             table = add7dWChangeColumn(table, c+"-7d", c+"-7dW")
-            if c in ["AnzahlFallNeu"]:
+            if c in ["InzidenzFallNeu"]:
                 table = add7dRColumn(table, c + "-7d-Change", c + "-7d-R")
                 table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog1W", 1)
                 table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog2W", 2)
                 table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog4W", 4)
                 table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog8W", 8)
+                table = addRiskColumn(table,"InzidenzFallNeu-Prog1W", "Risk", 3.5)
     return table
 
 def enhance(inputFile, destDir="."):
