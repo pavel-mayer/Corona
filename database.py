@@ -248,8 +248,12 @@ def analyze(fullTable, args):
     fromDay = firstDumpDay
     toDay = lastDumpDay+1
 
-    Altersgruppen = dt.unique(fullTable[:,"Altersgruppe"]).to_list()[0]
+    Altersgruppen = []
+    if args.agegroups:
+        Altersgruppen = dt.unique(fullTable[:,"Altersgruppe"]).to_list()[0]
+        
     print("Altersgruppen", Altersgruppen)
+
 
     Geschlechter = dt.unique(fullTable[:,"Geschlecht"]).to_list()[0]
     print("Geschlechter", Geschlechter)
@@ -297,15 +301,16 @@ def analyze(fullTable, args):
         print(i)
         lk_name = landKreise[i, dt.f.Landkreis].to_list()[0][0]
         lk_id = landKreise[i, dt.f.IdLandkreis].to_list()[0][0]
-        bl_name = landKreise[i, dt.f.Bundesland].to_list()[0][0]
-        bl_id = landKreise[i, dt.f.IdBundesland].to_list()[0][0]
         if lk_id > 0:
-            landkreise_numbers[lk_id] = landkreise_numbers[lk_id][:, dt.f[:].extend(
+             censusLK = census[dt.f.IdLandkreis == lk_id, :]
+             bl_name = censusLK[0,dt.f.Bundesland].to_list()[0][0]
+             bl_id = censusLK[0, dt.f.IdBundesland].to_list()[0][0]
+
+             landkreise_numbers[lk_id] = landkreise_numbers[lk_id][:, dt.f[:].extend(
                 {"IdLandkreis": lk_id, "Landkreis": lk_name, "IdBundesland": bl_id, "Bundesland": bl_name,
                  "Flaeche": flaechen[bl_id]})]
-            censusLK = census[dt.f.IdLandkreis == lk_id, :]
-            print(censusLK)
-            landkreise_numbers[lk_id] = makeIncidenceColumns(landkreise_numbers[lk_id], censusLK, Altersgruppen,
+             print(censusLK)
+             landkreise_numbers[lk_id] = makeIncidenceColumns(landkreise_numbers[lk_id], censusLK, Altersgruppen,
                                                                 Geschlechter)
         pmu.saveCsvTable(landkreise_numbers[lk_id], "series-{}-{}.csv".format(lk_id, lk_name), args.outputDir)
     #print(landKreise)
@@ -318,6 +323,7 @@ def main():
                         help='.Full unified NPGEO COVID19 Germany data as .csv or .jay file',
                         default="archive_v2/all-data.jay")
     parser.add_argument('-d', '--output-dir', dest='outputDir', default="series")
+    parser.add_argument("--agegroups", help="also create columns for all seperate age groups")
 
     args = parser.parse_args()
     #print(args)
