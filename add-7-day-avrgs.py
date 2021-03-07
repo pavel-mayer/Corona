@@ -62,11 +62,12 @@ def add7DayAverages(table):
         table = add7dChangeColumn(table, c+"-7d", c+"-7d-Change")
         if c in ["AnzahlFallNeu", "AnzahlTodesfallNeu"]:
             table = add7dWChangeColumn(table, c+"-7d", c+"-7dW")
-            table = add7dRColumn(table, c + "-7d-Change", c + "-7d-R")
-            table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog1W", 1)
-            table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog2W", 2)
-            table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog4W", 4)
-            table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog8W", 8)
+            if c in ["AnzahlFallNeu"]:
+                table = add7dRColumn(table, c + "-7d-Change", c + "-7d-R")
+                table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog1W", 1)
+                table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog2W", 2)
+                table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog4W", 4)
+                table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog8W", 8)
     return table
 
 def enhance(inputFile, destDir="."):

@@ -283,8 +283,8 @@ def analyze(fullTable, args):
 
         if bl_id > 0:
             bundeslaender_numbers[bl_id] = bundeslaender_numbers[bl_id][:, dt.f[:].extend(
-                {"IdLandkreis": bl_id, "Landkreis": bl_name, "IdBundesland": bl_id, "Bundesland": "bl_name", "Flaeche" : flaechen[bl_id]})]
-            censusBL = census[dt.f.Code == bl_id, :]
+                {"IdLandkreis": bl_id, "Landkreis": bl_name, "IdBundesland": bl_id, "Bundesland": bl_name, "Flaeche" : flaechen[bl_id]})]
+            censusBL = census[dt.f.IdLandkreis == bl_id, :]
             print(censusBL)
             bundeslaender_numbers[bl_id] = makeIncidenceColumns(bundeslaender_numbers[bl_id], censusBL, Altersgruppen, Geschlechter)
 
@@ -297,14 +297,13 @@ def analyze(fullTable, args):
         print(i)
         lk_name = landKreise[i, dt.f.Landkreis].to_list()[0][0]
         lk_id = landKreise[i, dt.f.IdLandkreis].to_list()[0][0]
-        lk_id = landKreise[i, dt.f.IdLandkreis].to_list()[0][0]
         bl_name = landKreise[i, dt.f.Bundesland].to_list()[0][0]
         bl_id = landKreise[i, dt.f.IdBundesland].to_list()[0][0]
         if lk_id > 0:
-            landkreise_numbers[bl_id] = landkreise_numbers[lk_id][:, dt.f[:].extend(
-                {"IdLandkreis": bl_id, "Landkreis": lk_name, "IdBundesland": bl_id, "Bundesland": "bl_name",
+            landkreise_numbers[lk_id] = landkreise_numbers[lk_id][:, dt.f[:].extend(
+                {"IdLandkreis": lk_id, "Landkreis": lk_name, "IdBundesland": bl_id, "Bundesland": bl_name,
                  "Flaeche": flaechen[bl_id]})]
-            censusLK = census[dt.f.Code == lk_id, :]
+            censusLK = census[dt.f.IdLandkreis == lk_id, :]
             print(censusLK)
             landkreise_numbers[lk_id] = makeIncidenceColumns(landkreise_numbers[lk_id], censusLK, Altersgruppen,
                                                                 Geschlechter)
