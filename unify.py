@@ -78,17 +78,25 @@ from dateutil.parser import parse
 #     return t
 
 
-def loadLandkreisBeveolkerung(fileName="../Landkreise-Bevoelkerung.csv"):
-    result = {}
-    with open(fileName, newline='') as csvfile:
-        reader = csv.DictReader(csvfile, delimiter=';')
-        for i, row in enumerate(reader):
-            #print(row)
-            LandkreisID = int(row['LandkreisID'])
-            BevoelkerungStr = row['Bevoelkerung']
-            if BevoelkerungStr != "-":
-                result[LandkreisID] = int(BevoelkerungStr)
-    return result
+def loadCensus(fileName="../CensusByRKIAgeGroups.csv"):
+    census = dt.fread(fileName)
+    sKeys = census[:, "IdLandkreis"].to_list()[0]
+    values = census[:, "Landkreis"].to_list()[0]
+    valuesDict = dict(zip(sKeys, values))
+    #print(valuesDict)
+    return valuesDict
+
+# def loadLandkreisBeveolkerung(fileName="../Landkreise-Bevoelkerung.csv"):
+#     result = {}
+#     with open(fileName, newline='') as csvfile:
+#         reader = csv.DictReader(csvfile, delimiter=';')
+#         for i, row in enumerate(reader):
+#             #print(row)
+#             LandkreisID = int(row['LandkreisID'])
+#             BevoelkerungStr = row['Bevoelkerung']
+#             if BevoelkerungStr != "-":
+#                 result[LandkreisID] = int(BevoelkerungStr)
+#     return result
 
 def loadLandkreisFlaeche(fileName="../covid-19-germany-landkreise.csv"):
     result = {}
@@ -104,7 +112,7 @@ def loadLandkreisFlaeche(fileName="../covid-19-germany-landkreise.csv"):
     #print("Flaeche:", result)
     return result
 
-def addLandkreisData(data, row, Bevoelkerung, Flaeche):
+def checkLandkreisData(data, row, Census, Flaeche):
     missingIds = []
     missingNames = []
     Landkreis = data["Landkreis"][row]
@@ -125,33 +133,46 @@ def addLandkreisData(data, row, Bevoelkerung, Flaeche):
 
     #print(record)
     #print(record["IdLandkreis"])
-    if IdLandkreis in Bevoelkerung:
-        KreisBevoelkerung = Bevoelkerung[IdLandkreis]
-        data["Bevoelkerung"][row] = KreisBevoelkerung
-        data["FaellePro100k"][row] = data["AnzahlFall"][row]*100000/KreisBevoelkerung
-        data["TodesfaellePro100k"][row] = data["AnzahlTodesfall"][row]*100000/KreisBevoelkerung
-        isStadt = Landkreis[:2] != "LK"
-        data["isStadt"][row] = int(isStadt)
+    #censusLK = Census[dt.f.IdLandkreis == IdLandkreis,:]
+    if IdLandkreis >= 0:
+        if IdLandkreis not in Census:
+            print("No census data for Landkreis Id: {} Name: {}".format(IdLandkreis, Landkreis))
+            exit(1)
 
-        if IdLandkreis in Flaeche:
-            KreisFlaeche = Flaeche[IdLandkreis]
-            data["Flaeche"][row] = KreisFlaeche
-            data["FaelleProKm2"][row] = data["AnzahlFall"][row]*KreisFlaeche
-            data["TodesfaelleProKm2"][row] = data["AnzahlTodesfall"][row]*KreisFlaeche
-            data["Dichte"][row] = float(KreisBevoelkerung)/float(KreisFlaeche)
-        else:
-            if IdLandkreis not in missingIds:
-                missingIds.append(IdLandkreis)
-                missingNames.append(Landkreis)
-                print("Flaeche missing:",missingIds)
-                print("Flaeche missing:",missingNames)
-    else:
-        if IdLandkreis not in missingIds:
-            missingIds.append(IdLandkreis)
-            missingNames.append(Landkreis)
-            print("Bevoelkerung missing:", missingIds)
-            print("Bevoelkerung missing:", missingNames)
+        if IdLandkreis not in Flaeche:
+            print("No area data for Landkreis Id: {} Name: {}".format(IdLandkreis, Landkreis))
+            exit(1)
+
+    #if IdLandkreis in Bevoelkerung:
+    #    KreisBevoelkerung = Bevoelkerung[IdLandkreis]
+    #    data["Bevoelkerung"][row] = KreisBevoelkerung
+    #    data["FaellePro100k"][row] = data["AnzahlFall"][row]*100000/KreisBevoelkerung
+    #    data["TodesfaellePro100k"][row] = data["AnzahlTodesfall"][row]*100000/KreisBevoelkerung
+    #    isStadt = Landkreis[:2] != "LK"
+    #    data["isStadt"][row] = int(isStadt)
+    #
+    #     if IdLandkreis in Flaeche:
+    #         KreisFlaeche = Flaeche[IdLandkreis]
+    #         data["Flaeche"][row] = KreisFlaeche
+    #         data["FaelleProKm2"][row] = data["AnzahlFall"][row]*KreisFlaeche
+    #         data["TodesfaelleProKm2"][row] = data["AnzahlTodesfall"][row]*KreisFlaeche
+    #         data["Dichte"][row] = float(KreisBevoelkerung)/float(KreisFlaeche)
+    #     else:
+    #         if IdLandkreis not in missingIds:
+    #             missingIds.append(IdLandkreis)
+    #             missingNames.append(Landkreis)
+    #             print("Flaeche missing:",missingIds)
+    #             print("Flaeche missing:",missingNames)
+    # else:
+    #     if IdLandkreis not in missingIds:
+    #         missingIds.append(IdLandkreis)
+    #         missingNames.append(Landkreis)
+    #         print("Bevoelkerung missing:", missingIds)
+    #         print("Bevoelkerung missing:", missingNames)
     return data
+
+Flaeche = loadLandkreisFlaeche()
+Census = loadCensus()
 
 # much faster than the version above
 def unify(table):
@@ -178,13 +199,14 @@ def unify(table):
 
     t = t[:, dt.f[:].extend({"FallGruppe":"", "MeldeTag":nan, "RefTag":nan, "DatenstandTag":dsdy})]
 
-    t = t[:, dt.f[:].extend({"Bevoelkerung":0, "FaellePro100k":0.0, "TodesfaellePro100k":0.0, "isStadt":False})]
-    t = t[:, dt.f[:].extend({"Flaeche":0.0, "FaelleProKm2":0.0, "TodesfaelleProKm2":0.0, "Dichte":0.0})]
+    #t = t[:, dt.f[:].extend({"Bevoelkerung":0, "FaellePro100k":0.0, "TodesfaellePro100k":0.0, "isStadt":False})]
+    #t = t[:, dt.f[:].extend({"Flaeche":0.0, "FaelleProKm2":0.0, "TodesfaelleProKm2":0.0, "Dichte":0.0})]
 
     #print("unified fields", t.names)
 
-    Bevoelkerung = loadLandkreisBeveolkerung()
-    Flaeche = loadLandkreisFlaeche()
+    #Bevoelkerung = loadLandkreisBeveolkerung()
+    #Flaeche = loadLandkreisFlaeche()
+    #Census = loadCensus()
 
     d = t.to_dict()
 
@@ -214,7 +236,7 @@ def unify(table):
             d["RefTag"][r] = rdy
             fg = fg+":"+str(rdy)
         d["FallGruppe"][r] = fg
-        addLandkreisData(d, r, Bevoelkerung, Flaeche)
+        checkLandkreisData(d, r, Census, Flaeche)
     return dt.Frame(d)
 
 def save(table, origFileName, destDir="."):
@@ -295,7 +317,7 @@ def main():
         print(daysIncluded)
 
     for fa in args.files:
-        files = glob.glob(fa)
+        files = sorted(glob.glob(fa))
         for f in files:
             if isNewData(f, daysIncluded):
                 t = tableData(f)

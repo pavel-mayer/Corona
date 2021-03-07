@@ -156,6 +156,16 @@ def makeRKIAgeGroups(outputFile):
     #print(RKITable)
     #RKITable.to_csv("raw.csv")
 
+    # add Hamburg also as Landkreis
+    Hamburg = RKITable[dt.f.Code == 2000,:]
+    if Hamburg.nrows != 1:
+        Hamburg = RKITable[dt.f.Code == 2, :]
+        if Hamburg.nrows != 1:
+            print("Hamburg not found in Census")
+            exit(1)
+        RKITable.rbind(Hamburg)
+        RKITable[RKITable.nrows-1, "Code"] = 2000
+
     ## check for consistency
     latest = dt.fread("data.csv")
     latestList = latest[:,["IdLandkreis","Landkreis","IdBundesland","Bundesland"]]

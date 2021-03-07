@@ -169,18 +169,23 @@ def timeSeries(fullTable, fromDay, toDay, byCriteria, nameColumn, Altersgruppen,
     return regions, dailysByCriteria
 
 def makeIncidenceColumns(regionTable, censusTable, Altersgruppen, Geschlechter):
-    ag_Berlin = {'A00-A04': 195952, 'A05-A14': 318242, 'A15-A34': 826771, 'A35-A59': 1489424, 'A60-A79': 754139,
-                 'A80+': 198527, 'unbekannt': 0}
+    #ag_Berlin = {'A00-A04': 195952, 'A05-A14': 318242, 'A15-A34': 826771, 'A35-A59': 1489424, 'A60-A79': 754139,
+    #             'A80+': 198527, 'unbekannt': 0}
 
     print(censusTable)
+    regionTable = regionTable[:, dt.f[:].extend({"Einwohner": censusTable[0,"Insgesamt-total"]})]
+    regionTable = regionTable[:, dt.f[:].extend({"Dichte": censusTable[0,"Insgesamt-total"] / dt.f.Flaeche})]
+    regionTable = regionTable[:, dt.f[:].extend({"InzidenzFallNeu": (100000.0 * dt.f.AnzahlFallNeu) / censusTable[0,"Insgesamt-total"]})]
+
     for ag in Altersgruppen:
         if ag != "unbekannt":
             srccolname = "AnzahlFallNeu-AG-" + ag
-            newcolname = "Inzidenz-" + ag
+            newcolname = "InzidenzFallNeu-" + ag
             censuscolname = ag + "-total"
             AnzahlFallNeu_X = dt.f[srccolname]
             ag_size = censusTable[0,censuscolname]
             #print("srccolname:{} newcolname:{} AnzahlFallNeu_X:{} ag_size:{}".format(srccolname, newcolname, AnzahlFallNeu_X, ag_size))
+            regionTable = regionTable[:, dt.f[:].extend({"Einwohner-"+ag: ag_size})]
             regionTable = regionTable[:, dt.f[:].extend({newcolname: (100000.0 * AnzahlFallNeu_X) / ag_size})]
     print(regionTable)
     return regionTable
@@ -190,6 +195,45 @@ def add7DayAverages(table):
     candidatesColumns = [name for name in  table.names if "Neu" in name]
     print(candidatesColumns)
 
+def loadCensus(fileName="../CensusByRKIAgeGroups.csv"):
+    census = dt.fread(fileName)
+    sKeys = census[:, "IdLandkreis"].to_list()[0]
+    values = census[:, "Landkreis"].to_list()[0]
+    valuesDict = dict(zip(sKeys, values))
+    #print(valuesDict)
+    return valuesDict
+
+def loadFlaechen(fileName="covid-19-germany-landkreise.csv"):
+    geodata = dt.fread(fileName)
+    sKeys = geodata[:, 'Regional code'].to_list()[0]
+    values = geodata[:, 'Cadastral area'].to_list()[0]
+
+    bundeslaenderFlaechen = geodata[:, [dt.sum(dt.f['Cadastral area'])],dt.by(dt.f['Land ID'])]
+    sKeys = sKeys + bundeslaenderFlaechen[:, 'Land ID'].to_list()[0]
+    values = values + bundeslaenderFlaechen[:, 'Cadastral area'].to_list()[0]
+
+    deutschlandFlaeche = bundeslaenderFlaechen[:,'Cadastral area'].sum()
+    sKeys = sKeys + [0]
+    values = values + deutschlandFlaeche.to_list()[0]
+
+    valuesDict = dict(zip(sKeys, values))
+    #print(valuesDict)
+    return valuesDict
+
+
+# def loadLandkreisFlaeche(fileName="../covid-19-germany-landkreise.csv"):
+#     result = {}
+#     with open(fileName, newline='') as csvfile:
+#         reader = csv.DictReader(csvfile, delimiter=';')
+#         for i, row in enumerate(reader):
+#             #print(row)
+#             LandkreisID = int(row['Regional code'])
+#             FlaecheStr = row['Cadastral area']
+#             if FlaecheStr != "":
+#                 #print(FlaecheStr)
+#                 result[LandkreisID] = float(FlaecheStr)
+#     #print("Flaeche:", result)
+#     return result
 
 def analyze(fullTable, args):
     print("Analyzing")
@@ -214,12 +258,20 @@ def analyze(fullTable, args):
     censusDeutschland = census[dt.f.Name == "Deutschland",:]
     print(censusDeutschland)
 
+    flaechen = loadFlaechen()
     #for id in range(1,16):
     #    censusBL = census[dt.f.Code == id, :]
     #    print(censusBL)
 
     print("Processing 'Deutschland'")
     deutschland = analyzeDailyAltersgruppenGeschlechter(fullTable, filterByDay(fromDay, toDay), Altersgruppen, Geschlechter)
+    deutschland = deutschland[:,dt.f[:].extend({"IdLandkreis":0,"Landkreis":"Deutschland", "IdBundesland":"0",
+                                                "Bundesland":"Deutschland", "Flaeche": flaechen[0]})]
+    #print("flaechen[0]", flaechen[0])
+    #deutschland = deutschland[:, dt.f[:].extend({"Flaeche": flaechen[0]})]
+
+    print(deutschland)
+
     deutschland = makeIncidenceColumns(deutschland, censusDeutschland, Altersgruppen, Geschlechter)
     print(deutschland)
     pmu.saveCsvTable(deutschland, "series-{}-{}.csv".format(0, "Deutschland"), args.outputDir)
@@ -230,6 +282,8 @@ def analyze(fullTable, args):
         bl_id=bundeslaender[i,dt.f.IdBundesland].to_list()[0][0]
 
         if bl_id > 0:
+            bundeslaender_numbers[bl_id] = bundeslaender_numbers[bl_id][:, dt.f[:].extend(
+                {"IdLandkreis": bl_id, "Landkreis": bl_name, "IdBundesland": bl_id, "Bundesland": "bl_name", "Flaeche" : flaechen[bl_id]})]
             censusBL = census[dt.f.Code == bl_id, :]
             print(censusBL)
             bundeslaender_numbers[bl_id] = makeIncidenceColumns(bundeslaender_numbers[bl_id], censusBL, Altersgruppen, Geschlechter)
@@ -243,7 +297,13 @@ def analyze(fullTable, args):
         print(i)
         lk_name = landKreise[i, dt.f.Landkreis].to_list()[0][0]
         lk_id = landKreise[i, dt.f.IdLandkreis].to_list()[0][0]
+        lk_id = landKreise[i, dt.f.IdLandkreis].to_list()[0][0]
+        bl_name = landKreise[i, dt.f.Bundesland].to_list()[0][0]
+        bl_id = landKreise[i, dt.f.IdBundesland].to_list()[0][0]
         if lk_id > 0:
+            landkreise_numbers[bl_id] = landkreise_numbers[lk_id][:, dt.f[:].extend(
+                {"IdLandkreis": bl_id, "Landkreis": lk_name, "IdBundesland": bl_id, "Bundesland": "bl_name",
+                 "Flaeche": flaechen[bl_id]})]
             censusLK = census[dt.f.Code == lk_id, :]
             print(censusLK)
             landkreise_numbers[lk_id] = makeIncidenceColumns(landkreise_numbers[lk_id], censusLK, Altersgruppen,

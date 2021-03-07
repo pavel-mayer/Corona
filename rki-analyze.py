@@ -18,7 +18,7 @@ from matplotlib.animation import FuncAnimation
 import pm_util as pmu
 
 UPDATE = True # fetch new data for the day if it not already exist
-FORCE_UPDATE = True # fetch new data for the day even if it already exists
+FORCE_UPDATE = False # fetch new data for the day even if it already exists
 REFRESH= False or UPDATE # recreate enriched, consolidated dump
 
 def autolabel(ax, bars, color, label_range):

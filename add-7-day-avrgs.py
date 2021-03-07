@@ -21,6 +21,32 @@ def add7dAvrgColumn(table, srcColumn, newColumn):
     #print(newTable)
     return newTable
 
+def add7dChangeColumn(table, srcColumn, newColumn):
+    src = dt.f[srcColumn]
+    newTable = table[:, dt.f[:].extend({newColumn: (src / dt.shift(src, n=7))})]
+    #print(newTable)
+    return newTable
+
+def add7dWChangeColumn(table, srcColumn, newColumn):
+    src = dt.f[srcColumn]
+    newTable = table[:, dt.f[:].extend({newColumn: (src+5) / (dt.shift(src, n=7)+5)})]
+    return newTable
+
+
+def add7dRColumn(table, srcColumn, newColumn):
+    src = dt.f[srcColumn]
+    newTable = table[:, dt.f[:].extend({newColumn: dt.math.pow(src, (4/7))})]
+    #print(newTable)
+    return newTable
+
+def addPredictionsColumn(table, incidenceColumn, changeColumn, newColumn, weeks):
+    incidence = dt.f[incidenceColumn]
+    change = dt.f[changeColumn]
+    newTable = table[:, dt.f[:].extend({newColumn: (incidence * dt.math.pow(change, weeks))})]
+    #print(newTable)
+    return newTable
+
+
 def test():
     table = dt.Frame({"object": [1, 1, 1, 2, 2, 3,4,5,6,7,8,9,10,11,12,13,14],
                       "period": [1, 2, 4, 4, 23,2,5,7,2,7,8,9,5, 18,35,17,15]})
@@ -32,7 +58,15 @@ def add7DayAverages(table):
     candidatesColumns = [name for name in  table.names if "Neu" in name or "Inzidenz" in name]
     print(candidatesColumns)
     for c in candidatesColumns:
-        table = add7dSumColumn(table, c, c+ "-7d")
+        table = add7dSumColumn(table, c, c+"-7d")
+        table = add7dChangeColumn(table, c+"-7d", c+"-7d-Change")
+        if c in ["AnzahlFallNeu", "AnzahlTodesfallNeu"]:
+            table = add7dWChangeColumn(table, c+"-7d", c+"-7dW")
+            table = add7dRColumn(table, c + "-7d-Change", c + "-7d-R")
+            table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog1W", 1)
+            table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog2W", 2)
+            table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog4W", 4)
+            table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog8W", 8)
     return table
 
 def enhance(inputFile, destDir="."):
