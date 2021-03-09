@@ -208,7 +208,11 @@ def unify(table):
     #Flaeche = loadLandkreisFlaeche()
     #Census = loadCensus()
 
+    pmu.printMemoryUsage("unify pre dict")
+
     d = t.to_dict()
+
+    pmu.printMemoryUsage("unify post dict")
 
     for r in range(t.nrows):
         mds = d["Meldedatum"][r]
@@ -237,7 +241,10 @@ def unify(table):
             fg = fg+":"+str(rdy)
         d["FallGruppe"][r] = fg
         checkLandkreisData(d, r, Census, Flaeche)
-    return dt.Frame(d)
+    pmu.printMemoryUsage("end of unify, pre frame")
+    t = dt.Frame(d)
+    pmu.printMemoryUsage("end of unify, post frame")
+    return t
 
 def save(table, origFileName, destDir="."):
     path = os.path.normpath(origFileName)
@@ -247,6 +254,7 @@ def save(table, origFileName, destDir="."):
     table.to_csv(newFile)
 
 def isNewData(dataFilename, daysIncluded):
+    pmu.printMemoryUsage("begin of isNewData")
     peekTable = dt.fread(dataFilename, max_nrows=1)
     print("Checking "+dataFilename)
     ##print(peekTable)
@@ -255,11 +263,13 @@ def isNewData(dataFilename, daysIncluded):
     print("Datenstand", dss)
     ds = cd.datetimeFromDatenstandAny(dss)
     dsdy = cd.dayFromDate(ds)
+    pmu.printMemoryUsage("isNewData")
     isNew = dsdy not in daysIncluded
     if isNew:
         print("contains new day {}".format(dsdy))
     else:
         print("contains day {} already in full table".format(dsdy))
+    pmu.printMemoryUsage("end of isNewData")
 
     return isNew
 
@@ -301,37 +311,73 @@ def main():
     parser.add_argument('files', metavar='fileName', type=str, nargs='+',
                         help='.NPGEO COVID19 Germany data as .csv file')
     parser.add_argument('-d', '--output-dir', dest='outputDir', default=".")
+    parser.add_argument("--flushmemfull", help="flush full table to disk for lower memory footprint",
+                        action="store_true")
+    parser.add_argument("--flushmemnew", help="flush new table to disk for lower memory footprint",
+                        action="store_true")
+    parser.add_argument("--noflush", help="run with higer memory footprint",
+                        action="store_true")
+
 
     args = parser.parse_args()
     print(args)
+    print("args.flushmemfull",args.flushmemfull)
+    print("args.flushmemnew",args.flushmemnew)
+    print("args.noflush",args.noflush)
+
     fullTable = None
     jayPath = args.outputDir+"/all-data.jay"
     print(jayPath)
+    pmu.printMemoryUsage("after start")
 
     daysIncluded = []
     if os.path.isfile(jayPath):
         print("Loading " + jayPath)
         fullTable = dt.fread(jayPath)
+        pmu.printMemoryUsage("after load")
         daysIncluded = sorted(fullTable[:, [dt.first(dt.f.DatenstandTag)],dt.by(dt.f.DatenstandTag)].to_list()[0])
         print("Days in full table:")
         print(daysIncluded)
+        pmu.printMemoryUsage("after first query")
 
     for fa in args.files:
         files = sorted(glob.glob(fa))
         for f in files:
             if isNewData(f, daysIncluded):
+                pmu.printMemoryUsage("after isNewData query")
                 t = tableData(f)
+                pmu.printMemoryUsage("after tabledata query")
+
                 print("Hashing " + f)
                 newTable = unify(t)
+                pmu.printMemoryUsage("after hashing")
                 save(newTable,f,args.outputDir)
+                pmu.printMemoryUsage("after newTable save")
                 if fullTable is None:
                     fullTable = newTable
                 else:
                     #print("full fields", fullTable.names)
                     checkColumns(fullTable.names, newTable.names)
-                    fullTable.rbind(newTable)
+                    pmu.printMemoryUsage("after checkColumns")
+                    if args.flushmemfull:
+                        fullTable.materialize(to_memory=False)
+                        pmu.printMemoryUsage("after materialize fullTable")
+                    if args.flushmemnew:
+                        newTable.materialize(to_memory=False)
+                        pmu.printMemoryUsage("after materialize newTable")
+                    if args.noflush:
+                        pmu.printMemoryUsage("before fulltable rbind (noflush)")
+                        fullTable.rbind(newTable)  # memory gets used here
+                    else:
+                        pmu.printMemoryUsage("before fulltable rbind (flush)")
+                        fullTable = fullTable.rbind(newTable)  # memory gets used here
 
+                    #fullTable = newTable.rbind(fullTable) # memory gets used here
+                    #fullTable = fullTable.rbind(newTable) # memory gets used here
+                    pmu.printMemoryUsage("after rbind")
+    pmu.printMemoryUsage("before full save")
     pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
+    pmu.printMemoryUsage("after full save")
     #pmu.saveCsvTable(fullTable, "all-data.csv", args.outputDir)
 
 if __name__ == "__main__":

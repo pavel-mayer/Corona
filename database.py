@@ -323,13 +323,15 @@ def main():
                         help='.Full unified NPGEO COVID19 Germany data as .csv or .jay file',
                         default="archive_v2/all-data.jay")
     parser.add_argument('-d', '--output-dir', dest='outputDir', default="series")
-    parser.add_argument("--agegroups", help="also create columns for all seperate age groups")
+    parser.add_argument("--agegroups", help="also create columns for all seperate age groups", action="store_true")
 
     args = parser.parse_args()
     #print(args)
+    pmu.printMemoryUsage("after start")
     print("Loading " + args.file)
     fullTable = dt.fread(args.file)
     print("Loading done loading table from ‘{}‘, rows: {} cols: {}".format(args.file, fullTable.nrows, fullTable.ncols))
+    pmu.printMemoryUsage("after load")
     analyze(fullTable, args)
 
 if __name__ == "__main__":

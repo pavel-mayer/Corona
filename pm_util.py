@@ -3,6 +3,8 @@ import json
 import datatable as dt
 import sys
 import os
+import psutil
+
 csv.field_size_limit(sys.maxsize)
 
 def loadJson(fileName):
@@ -78,3 +80,7 @@ def is_int(o):
         return True
     except ValueError:
         return False
+
+def printMemoryUsage(where):
+    process = psutil.Process(os.getpid())
+    print("Memory Usage @ {}: {:.3f} GB".format(where, process.memory_info().rss/1024/1024/1024))  # in bytes
