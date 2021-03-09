@@ -9,6 +9,7 @@ import pm_util as pmu
 import csv
 import sys
 import glob
+import time
 csv.field_size_limit(sys.maxsize)
 
 # cd ~/Corona/archive_ard/
@@ -208,12 +209,14 @@ def unify(table):
     #Flaeche = loadLandkreisFlaeche()
     #Census = loadCensus()
 
+    pmu.printMemoryUsage("unify pre realize ")
+    t.materialize(to_memory=True)
     pmu.printMemoryUsage("unify pre dict")
-
     d = t.to_dict()
-
     pmu.printMemoryUsage("unify post dict")
 
+    print("> iterating through {} rows".format(t.nrows))
+    start = time.perf_counter()
     for r in range(t.nrows):
         mds = d["Meldedatum"][r]
         if pmu.is_int(mds):
@@ -241,6 +244,11 @@ def unify(table):
             fg = fg+":"+str(rdy)
         d["FallGruppe"][r] = fg
         checkLandkreisData(d, r, Census, Flaeche)
+
+    finish = time.perf_counter()
+
+    print("< iterating through {} rows done, {:.1f} rows/sec".format(t.nrows, t.nrows/(finish-start)))
+
     pmu.printMemoryUsage("end of unify, pre frame")
     t = dt.Frame(d)
     pmu.printMemoryUsage("end of unify, post frame")
@@ -307,6 +315,7 @@ def checkColumns(list1, list2):
         print("missing in List2",diff21)
 
 def main():
+    start = time.perf_counter()
     parser = argparse.ArgumentParser(description='Create a unfied data file from daily dumps')
     parser.add_argument('files', metavar='fileName', type=str, nargs='+',
                         help='.NPGEO COVID19 Germany data as .csv file')
@@ -344,6 +353,7 @@ def main():
         files = sorted(glob.glob(fa))
         for f in files:
             if isNewData(f, daysIncluded):
+                fstart = time.perf_counter()
                 pmu.printMemoryUsage("after isNewData query")
                 t = tableData(f)
                 pmu.printMemoryUsage("after tabledata query")
@@ -375,11 +385,26 @@ def main():
                     #fullTable = newTable.rbind(fullTable) # memory gets used here
                     #fullTable = fullTable.rbind(newTable) # memory gets used here
                     pmu.printMemoryUsage("after rbind")
+                ffinish = time.perf_counter()
+                secs = ffinish - fstart
+                print("-> File time {:.1f} secs or {:.1f} mins or {:.1f} hours".format(secs, secs/60, secs/60/60))
     pmu.printMemoryUsage("before full save")
     pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
     pmu.printMemoryUsage("after full save")
     #pmu.saveCsvTable(fullTable, "all-data.csv", args.outputDir)
+    finish = time.perf_counter()
+    secs = finish - start
+    print("--> Wall time {:.1f} secs or {:.1f} mins or {:.1f} hours".format(secs, secs/60, secs/60/60))
 
 if __name__ == "__main__":
     # execute only if run as a script
     main()
+
+
+
+'''
+Tue Mar  9 18:15:46 CET 2021
+Memory Usage @ after full save: 28.922 GB
+Tue Mar  9 19:08:01 CET 2021
+
+'''
