@@ -73,6 +73,7 @@ def saveJayTable(table, fileName, destDir="."):
 
     print("Saving "+newFile)
     table.to_jay(newFile)
+    print("Saving done "+newFile)
 
 def is_int(o):
     try:

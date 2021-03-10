@@ -10,6 +10,8 @@ import csv
 import sys
 import glob
 import time
+import pandas as pd # pd.to_datetime(ds)
+
 csv.field_size_limit(sys.maxsize)
 
 # cd ~/Corona/archive_ard/
@@ -172,6 +174,66 @@ def checkLandkreisData(data, row, Census, Flaeche):
     #         print("Bevoelkerung missing:", missingNames)
     return data
 
+def datetimeFromAnyDateStr2(s) -> str:
+    dt = dateutil.parser.parse(s)
+    dt = dt.replace(tzinfo=None)
+    return dt
+
+def datetimeFromAnyDateStr(s) -> str:
+    dt = pd.to_datetime(s)
+    dt = dt.replace(tzinfo=None)
+    #dt2 = datetimeFromAnyDateStr2(s)
+    #print(s)
+    #if cd.dayFromDate(dt) != cd.dayFromDate(dt2):
+    #    print("bad date parse '{}' dt={} dt2={}".format(s,dt,dt2))
+    return dt
+
+from datetime import datetime
+
+def datetimeFrom(st):
+    stf = time.mktime(st)
+    sdt = datetime.fromtimestamp(stf, tz=None)
+    return sdt
+
+# Parse date string like "2020/11/25 00:00:00"
+def datetimeFromDateStr3(ds):
+    st = None
+    if ds.endswith("T00:00:00.000Z"):
+        st = time.strptime(ds, "%Y-%m-%dT00:00:00.000Z")
+        return datetimeFrom(st)
+    elif ds.endswith("T00:00:00Z"):
+        st = time.strptime(ds, "%Y-%m-%dT00:00:00Z")
+        return datetimeFrom(st)
+    elif ds.endswith(" 00:00:00+00:00"):
+        st = time.strptime(ds, "%Y-%m-%d 00:00:00+00:00")
+        return datetimeFrom(st)
+    elif ds.endswith(" 12:00:00 AM"):
+        st = time.strptime(ds, "%m/%d/%Y 12:00:00 AM")
+        return datetimeFrom(st)
+    elif ds.endswith(" 00:00:00") and ds[4] == '/':
+        st = time.strptime(ds, "%Y/%m/%d 00:00:00")
+        return datetimeFrom(st)
+    elif len(ds) == 10:
+        st = time.strptime(ds, "%Y-%m-%d")
+        return datetimeFrom(st)
+    else:
+        print(ds)
+        dt = dateutil.parser.parse(ds)
+        dt = dt.replace(tzinfo=None)
+        return dt
+
+import timeit
+
+def testDatePerf():
+    s = "2020-03-15T00:00:00.000Z"
+    n = 10000
+    r = 3
+    #print("usecs:",[t/n*1000000 for t in timeit.repeat(lambda: datetimeFromAnyDateStr(s), number = n, repeat = r)])
+    print("per sec:",[n/t for t in timeit.repeat(lambda: datetimeFromAnyDateStr(s), number = n, repeat = r)])
+    print("per sec:",[n/t for t in timeit.repeat(lambda: datetimeFromAnyDateStr2(s), number = n, repeat = r)])
+    print("per sec:",[n/t for t in timeit.repeat(lambda: datetimeFromDateStr3(s), number = n, repeat = r)])
+    exit(1)
+
 Flaeche = loadLandkreisFlaeche()
 Census = loadCensus()
 
@@ -209,8 +271,9 @@ def unify(table):
     #Flaeche = loadLandkreisFlaeche()
     #Census = loadCensus()
 
-    pmu.printMemoryUsage("unify pre realize ")
-    t.materialize(to_memory=True)
+    #pmu.printMemoryUsage("unify pre realize ")
+    #t.materialize(to_memory=True)
+
     pmu.printMemoryUsage("unify pre dict")
     d = t.to_dict()
     pmu.printMemoryUsage("unify post dict")
@@ -222,8 +285,7 @@ def unify(table):
         if pmu.is_int(mds):
             md = cd.datetimeFromStampStr(mds)
         else:
-            md = dateutil.parser.parse(mds)
-            md = md.replace(tzinfo=None)
+            md = datetimeFromDateStr3(mds)
         mdy = cd.dayFromDate(md)
         d["MeldeTag"][r] = mdy
         if not hasRefdatum:
@@ -237,8 +299,7 @@ def unify(table):
             if pmu.is_int(rds):
                 rd = cd.datetimeFromStampStr(rds)
             else:
-                rd = dateutil.parser.parse(rds)
-                rd = rd.replace(tzinfo=None)
+                rd = datetimeFromDateStr3(rds)
             rdy = cd.dayFromDate(rd)
             d["RefTag"][r] = rdy
             fg = fg+":"+str(rdy)
@@ -315,24 +376,28 @@ def checkColumns(list1, list2):
         print("missing in List2",diff21)
 
 def main():
+    #testDatePerf()
     start = time.perf_counter()
+    lastCheckPointTime = start
     parser = argparse.ArgumentParser(description='Create a unfied data file from daily dumps')
     parser.add_argument('files', metavar='fileName', type=str, nargs='+',
                         help='.NPGEO COVID19 Germany data as .csv file')
     parser.add_argument('-d', '--output-dir', dest='outputDir', default=".")
-    parser.add_argument("--flushmemfull", help="flush full table to disk for lower memory footprint",
+    #parser.add_argument("--flushmemfull", help="flush full table to disk for lower memory footprint",
+    #                    action="store_true")
+    parser.add_argument("--materializeNew", help="materialize new table to disk for lower memory footprint",
                         action="store_true")
-    parser.add_argument("--flushmemnew", help="flush new table to disk for lower memory footprint",
+    parser.add_argument("--noMaterialize", help="run with higher memory footprint, or much higher memory footprint with --in-memory",
                         action="store_true")
-    parser.add_argument("--noflush", help="run with higer memory footprint",
+    parser.add_argument("--inMemory", help="run faster but with higher memory footprint",
                         action="store_true")
-
+    parser.add_argument("--checkpoint", help="write checkpoint after amount of minutes elapsed", default = 5)
 
     args = parser.parse_args()
     print(args)
-    print("args.flushmemfull",args.flushmemfull)
-    print("args.flushmemnew",args.flushmemnew)
-    print("args.noflush",args.noflush)
+    print("args.inMemory",args.inMemory)
+    print("args.materializeNew",args.materializeNew)
+    print("args.noMaterialize",args.noMaterialize)
 
     fullTable = None
     jayPath = args.outputDir+"/all-data.jay"
@@ -369,25 +434,28 @@ def main():
                     #print("full fields", fullTable.names)
                     checkColumns(fullTable.names, newTable.names)
                     pmu.printMemoryUsage("after checkColumns")
-                    if args.flushmemfull:
-                        fullTable.materialize(to_memory=False)
+                    if not args.noMaterialize:
+                        fullTable.materialize(to_memory=args.inMemory)
                         pmu.printMemoryUsage("after materialize fullTable")
-                    if args.flushmemnew:
-                        newTable.materialize(to_memory=False)
+                    if args.materializeNew:
+                        newTable.materialize(to_memory=args.inMemory)
                         pmu.printMemoryUsage("after materialize newTable")
-                    if args.noflush:
-                        pmu.printMemoryUsage("before fulltable rbind (noflush)")
-                        fullTable.rbind(newTable)  # memory gets used here
-                    else:
-                        pmu.printMemoryUsage("before fulltable rbind (flush)")
-                        fullTable = fullTable.rbind(newTable)  # memory gets used here
 
-                    #fullTable = newTable.rbind(fullTable) # memory gets used here
-                    #fullTable = fullTable.rbind(newTable) # memory gets used here
+                    pmu.printMemoryUsage("before fulltable rbind")
+                    fullTable.rbind(newTable)  # memory gets used here
                     pmu.printMemoryUsage("after rbind")
                 ffinish = time.perf_counter()
                 secs = ffinish - fstart
+                #print("fullTable", fullTable)
+                print("newTable rows = {}".format(newTable.nrows))
+                print("fullTable rows = {}".format(fullTable.nrows))
                 print("-> File time {:.1f} secs or {:.1f} mins or {:.1f} hours".format(secs, secs/60, secs/60/60))
+                if time.perf_counter() - lastCheckPointTime > float(args.checkpoint) * 60:
+                    checkname = args.outputDir+"/"+"all-data.check.jay"
+                    print("Saving checkpoint: " + checkname)
+                    fullTable.to_jay(checkname)
+                    print("Saving done:" + checkname)
+                    lastCheckPointTime = time.perf_counter()
     pmu.printMemoryUsage("before full save")
     pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
     pmu.printMemoryUsage("after full save")

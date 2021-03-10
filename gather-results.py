@@ -88,17 +88,22 @@ def enhance(inputFile, destDir="."):
 
 
 def main():
-    #test()
-    #exit(0)
-    parser = argparse.ArgumentParser(description='Add columns with 7-day-averages')
+    parser = argparse.ArgumentParser(description='Gather daily tables and save in a single file')
     parser.add_argument('files', metavar='fileName', type=str, nargs='+',
-                        help='.csv-File produced by database.py')
-    parser.add_argument('-d', '--output-dir', dest='outputDir', default=".")
+                        help='.csv-File produced by enhance.py')
+    parser.add_argument('-o', '--output-file', dest='outputFile', default="gathered.csv")
     args = parser.parse_args()
     print(args)
+    result = None
     for f in args.files:
-        enhance(f, args.outputDir)
+        table = dt.fread(f)
+        if result is None:
+            result = table
+        else
+            result = result.rbind(table)
 
+    if result is not None:
+        result.to_csv(args.outputFile)
 
 
 if __name__ == "__main__":
