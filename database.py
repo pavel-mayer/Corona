@@ -7,6 +7,8 @@ import dateutil.parser
 import os
 import pm_util as pmu
 from dateutil.parser import parse
+import time
+
 
 def cval(tableCell):
     return tableCell.to_list()[0][0]
@@ -159,10 +161,19 @@ def timeSeries(fullTable, fromDay, toDay, byCriteria, nameColumn, Altersgruppen,
     print("Creating time series for regions:")
     print(regions)
     dailysByCriteria = {}
+    start = time.perf_counter()
     for i, lk in enumerate(regions[:, byCriteria].to_list()[0]):
         print("Processing Region '{}'".format(regions[i,nameColumn][0,0]))
+        start_region = time.perf_counter()
+
+        pmu.printMemoryUsage("pre analyzeDailyAltersgruppenGeschlechter")
         dailysByCriteria[lk] = analyzeDailyAltersgruppenGeschlechter(fullTable,
             filterByDayAndCriteria(fromDay, toDay, (byCriteria == lk)), Altersgruppen, Geschlechter)
+        finish = time.perf_counter()
+        duration = finish - start
+        print("Region took {:.2f} seconds, elapsed {:.2f} minutes, time to completion: {:.2f} minutes".format(finish-start_region, duration/60, duration/(i+1) * (regions.nrows - i)/60))
+
+        pmu.printMemoryUsage("post analyzeDailyAltersgruppenGeschlechter")
         print("Done {} of {}, key = {} name = {}".format(i+1, regions.nrows, lk, regions[i,nameColumn][0,0]))
         #if lk >= 0:
         #    break
@@ -237,6 +248,7 @@ def loadFlaechen(fileName="covid-19-germany-landkreise.csv"):
 
 def analyze(fullTable, args):
     print("Analyzing")
+    pmu.printMemoryUsage("begin analyze")
     print("Keys:")
     print(fullTable.keys())
     firstDumpDay = cint(fullTable[:,"DatenstandTag"].min())
@@ -268,6 +280,7 @@ def analyze(fullTable, args):
     #    print(censusBL)
 
     print("Processing 'Deutschland'")
+    pmu.printMemoryUsage("begin Deutschland")
     deutschland = analyzeDailyAltersgruppenGeschlechter(fullTable, filterByDay(fromDay, toDay), Altersgruppen, Geschlechter)
     deutschland = deutschland[:,dt.f[:].extend({"IdLandkreis":0,"Landkreis":"Deutschland", "IdBundesland":"0",
                                                 "Bundesland":"Deutschland", "Flaeche": flaechen[0]})]
@@ -275,12 +288,18 @@ def analyze(fullTable, args):
     #deutschland = deutschland[:, dt.f[:].extend({"Flaeche": flaechen[0]})]
 
     print(deutschland)
+    pmu.printMemoryUsage("pre makeIncidenceColumns")
 
     deutschland = makeIncidenceColumns(deutschland, censusDeutschland, Altersgruppen, Geschlechter)
     print(deutschland)
+    pmu.printMemoryUsage("pre save")
     pmu.saveCsvTable(deutschland, "series-{}-{}.csv".format(0, "Deutschland"), args.outputDir)
+    pmu.printMemoryUsage("post save")
+    deutschland = None
 
+    print("Processing Bundesländer")
     bundeslaender, bundeslaender_numbers = timeSeries(fullTable, fromDay, toDay, dt.f.IdBundesland, dt.f.Bundesland, Altersgruppen, Geschlechter)
+    pmu.printMemoryUsage("post Bundesländer timeSeries")
     for i in range(bundeslaender.nrows):
         bl_name=bundeslaender[i,dt.f.Bundesland].to_list()[0][0]
         bl_id=bundeslaender[i,dt.f.IdBundesland].to_list()[0][0]
@@ -291,10 +310,15 @@ def analyze(fullTable, args):
             censusBL = census[dt.f.IdLandkreis == bl_id, :]
             print(censusBL)
             bundeslaender_numbers[bl_id] = makeIncidenceColumns(bundeslaender_numbers[bl_id], censusBL, Altersgruppen, Geschlechter)
+        pmu.printMemoryUsage("pre save {}".format(bl_name))
 
         pmu.saveCsvTable(bundeslaender_numbers[bl_id], "series-{}-{}.csv".format(bl_id, bl_name), args.outputDir)
+    bundeslaender = None
+    bundeslaender_numbers = None
 
+    print("Processing Landkreise'")
     landKreise, landkreise_numbers = timeSeries(fullTable, fromDay, toDay, dt.f.IdLandkreis, dt.f.Landkreis, Altersgruppen, Geschlechter)
+    pmu.printMemoryUsage("post Landkreise timeSeries")
     #print(landKreise)
     #print(landkreise_numbers)
     for i in range(landKreise.nrows):
@@ -312,6 +336,7 @@ def analyze(fullTable, args):
              print(censusLK)
              landkreise_numbers[lk_id] = makeIncidenceColumns(landkreise_numbers[lk_id], censusLK, Altersgruppen,
                                                                 Geschlechter)
+        pmu.printMemoryUsage("pre save {}".format(lk_name))
         pmu.saveCsvTable(landkreise_numbers[lk_id], "series-{}-{}.csv".format(lk_id, lk_name), args.outputDir)
     #print(landKreise)
 
@@ -332,6 +357,12 @@ def main():
     fullTable = dt.fread(args.file)
     print("Loading done loading table from ‘{}‘, rows: {} cols: {}".format(args.file, fullTable.nrows, fullTable.ncols))
     pmu.printMemoryUsage("after load")
+
+    if False:
+        print("Materializing fullTable")
+        fullTable.materialize(to_memory=True)
+        pmu.printMemoryUsage("after materialize")
+
     analyze(fullTable, args)
 
 if __name__ == "__main__":
