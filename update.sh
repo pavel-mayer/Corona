@@ -21,4 +21,4 @@ cd $CORONA/
 python $CORONA/enhance.py -d $CORONA/series-enhanced series/series-*.csv
 
 cd $CORONA/
-python $CORONA/enhance.py -d $CORONA/series-enhanced series/series-*.csv
+python $CORONA/gather-results.py -o all-series.csv series-enhanced/enhanced-series-*.csv
