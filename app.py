@@ -157,6 +157,9 @@ def getRankedTable(fullTable, day, sortColumns):
     result[:,"Rang"]=np.arange(1,result.nrows+1)
     return result
 
+def clip(table, colName, maxValue):
+    table[dt.f[colName] > maxValue, colName] = maxValue
+    return table
 
 def getTableForDay(fullTable, day):
     #sortColumns = ["Risk","LetzteMeldung","InzidenzFallNeu-7-Tage"]
@@ -210,6 +213,13 @@ def getTableForDay(fullTable, day):
 
     #print("Column names frame order:", list(enumerate(resultTable.names)))
     todayTableById = todayTableById.sort("Rang")
+
+    todayTableById[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 99999
+    clip(todayTableById, "InzidenzFallNeu-Tage-bis-50", 9999.9)
+    clip(todayTableById, "InzidenzFallNeu-Tage-bis-100", 9999.9)
+    clip(todayTableById, "InzidenzFallNeu-Prognose-4-Wochen", 9999.9)
+    clip(todayTableById, "InzidenzFallNeu-Prognose-8-Wochen", 9999.9)
+
     return todayTableById
 
 
@@ -612,17 +622,17 @@ def makeColumns():
         ('InzidenzFallNeu-7-Tage-Trend-Spezial', ['Fälle', 'RwK'], 'numeric', FormatFixed2, colWidth(70)),
         ('InzidenzFallNeu-7-Tage-R', ['Fälle', 'R7'], 'numeric', FormatFixed2, colWidth(70)),
         ('AnzahlFallNeu-7-Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('AnzahlTodesfallNeu-7-Tage-7-Tage-davor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('AnzahlFallNeu-7-Tage-7-Tage-davor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(90)),
-        ('AnzahlFallNeu', ['Fälle', 'neu'], 'numeric', FormatInt, colWidth(90)),
+        ('AnzahlFallNeu', ['Fälle', 'neu'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('InzidenzFallNeu-7-Tage', ['Fälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('InzidenzFallNeu-7-Tage-7-Tage-davor', ['Fälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         #('FaellePro100kTrend', ['Fälle je 100.000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('InzidenzFall', ['Fälle je 100.000', 'total'], 'numeric', FormatFixed1, colWidth(60)),
         ('InzidenzFallNeu-Prognose-4-Wochen', ['Fälle je 100.000', 'in 4 Wochen'], 'numeric', FormatFixed1, colWidth(60)),
         ('InzidenzFallNeu-Prognose-8-Wochen', ['Fälle je 100.000', 'in 8 Wochen'], 'numeric', FormatFixed1, colWidth(60)),
-        ('FaellePro100kTageBisSicher2', ['Fälle je 100.000', 'Tage bis 7'], 'numeric', FormatInt, colWidth(60)),
-        ('FaellePro100kTageBisSicher', ['Fälle je 100.000', 'Tage bis 3'], 'numeric', FormatInt, colWidth(60)),
+        ('InzidenzFallNeu-Tage-bis-50', ['Fälle je 100.000', 'Tage bis 50'], 'numeric', FormatInt, colWidth(60)),
+        ('InzidenzFallNeu-Tage-bis-100', ['Fälle je 100.000', 'Tage bis 100'], 'numeric', FormatInt, colWidth(60)),
         ('AnzahlFallLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'absolut'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('FaellePro100kLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'je 100.000'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('FaelleLetzte7TageDropped', ['Fälle strikt 7 Tage', 'RKI ignoriert'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -791,35 +801,35 @@ KontaktrisikoClass = {
 }
 
 FaellePro100kLetzte7TageClass = {
-    conditionDanger : '{FaellePro100kLetzte7Tage} > 50',
-    conditionTooHigh: '{FaellePro100kLetzte7Tage} > 20 && {FaellePro100kLetzte7Tage} <= 50',
-    conditionSerious: '{FaellePro100kLetzte7Tage} > 5 && {FaellePro100kLetzte7Tage} <= 20',
-    conditionGood: '{FaellePro100kLetzte7Tage} >= 1 && {FaellePro100kLetzte7Tage} <= 5',
-    conditionSafe: '{FaellePro100kLetzte7Tage} < 1'
+    conditionDanger : '{InzidenzFallNeu-7-Tage} > 50',
+    conditionTooHigh: '{InzidenzFallNeu-7-Tage} > 20 && {InzidenzFallNeu-7-Tage} <= 50',
+    conditionSerious: '{InzidenzFallNeu-7-Tage} > 5 && {InzidenzFallNeu-7-Tage} <= 20',
+    conditionGood: '{InzidenzFallNeu-7-Tage} >= 1 && {InzidenzFallNeu-7-Tage} <= 5',
+    conditionSafe: '{InzidenzFallNeu-7-Tage} < 1'
 }
 
 FaellePro100kPrognoseClass = {
-    conditionDanger : '{FaellePro100kPrognose} > 50',
-    conditionTooHigh: '{FaellePro100kPrognose} > 20 && {FaellePro100kPrognose} <= 50',
-    conditionSerious: '{FaellePro100kPrognose} > 5 && {FaellePro100kPrognose} <= 20',
-    conditionGood: '{FaellePro100kPrognose} >= 1 && {FaellePro100kPrognose} <= 5',
-    conditionSafe: '{FaellePro100kPrognose} < 1'
+    conditionDanger : '{InzidenzFallNeu-Prognose-4-Wochen} > 50',
+    conditionTooHigh: '{InzidenzFallNeu-Prognose-4-Wochen} > 20 && {InzidenzFallNeu-Prognose-4-Wochen} <= 50',
+    conditionSerious: '{InzidenzFallNeu-Prognose-4-Wochen} > 5 && {InzidenzFallNeu-Prognose-4-Wochen} <= 20',
+    conditionGood: '{InzidenzFallNeu-Prognose-4-Wochen} >= 1 && {InzidenzFallNeu-Prognose-4-Wochen} <= 5',
+    conditionSafe: '{InzidenzFallNeu-Prognose-4-Wochen} < 1'
 }
 
 FaellePro100kPrognose2Class = {
-    conditionDanger : '{FaellePro100kPrognose2} > 50',
-    conditionTooHigh: '{FaellePro100kPrognose2} > 20 && {FaellePro100kPrognose2} <= 50',
-    conditionSerious: '{FaellePro100kPrognose} > 5 && {FaellePro100kPrognose2} <= 20',
-    conditionGood: '{FaellePro100kPrognose2} >= 1 && {FaellePro100kPrognose2} <= 5',
-    conditionSafe: '{FaellePro100kPrognose2} < 1'
+    conditionDanger : '{InzidenzFallNeu-Prognose-8-Wochen} > 50',
+    conditionTooHigh: '{InzidenzFallNeu-Prognose-8-Wochen} > 20 && {InzidenzFallNeu-Prognose-8-Wochen} <= 50',
+    conditionSerious: '{InzidenzFallNeu-Prognose-8-Wochen} > 5 && {InzidenzFallNeu-Prognose-8-Wochen} <= 20',
+    conditionGood: '{InzidenzFallNeu-Prognose-8-Wochen} >= 1 && {InzidenzFallNeu-Prognose-8-Wochen} <= 5',
+    conditionSafe: '{InzidenzFallNeu-Prognose-8-Wochen} < 1'
 }
 
 AnzahlFallTrendClass = {
-    conditionDanger : '{AnzahlFallTrend} > 3',
-    conditionTooHigh: '{AnzahlFallTrend} > 1 && {AnzahlFallTrend} <= 3',
-    conditionSerious: '{AnzahlFallTrend} > 0.9 && {AnzahlFallTrend} <= 1',
-    conditionGood: '{AnzahlFallTrend} > 0.3 && {AnzahlFallTrend} <= 0.9',
-    conditionSafe: '{AnzahlFallTrend} < 0.3'
+    conditionDanger : '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 3',
+    conditionTooHigh: '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 1 && {InzidenzFallNeu-7-Tage-Trend-Spezial} <= 3',
+    conditionSerious: '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 0.9 && {InzidenzFallNeu-7-Tage-Trend-Spezial} <= 1',
+    conditionGood: '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 0.3 && {InzidenzFallNeu-7-Tage-Trend-Spezial} <= 0.9',
+    conditionSafe: '{InzidenzFallNeu-7-Tage-Trend-Spezial} < 0.3'
 }
 
 LandkreisClass = {
@@ -973,12 +983,12 @@ def make_style_data_conditional():
     # result = result + conditionalStyles(AnzahlFallTrendClass, ['AnzahlFallTrend'])
     # result = result + conditionalStyles(KontaktrisikoClass, ['Kontaktrisiko'])
     # result = result + conditionalStyles(LandkreisClass, ['Landkreis'])
-    result = result + conditionalStyles(FaellePro100kLetzte7TageClass, 'FaellePro100kLetzte7Tage')
-    result = result + conditionalStyles(AnzahlFallTrendClass, 'AnzahlFallTrend')
+    result = result + conditionalStyles(FaellePro100kLetzte7TageClass, 'InzidenzFallNeu-7-Tage')
+    result = result + conditionalStyles(AnzahlFallTrendClass, 'InzidenzFallNeu-7-Tage-Trend-Spezial')
     result = result + conditionalStyles(KontaktrisikoClass, 'Kontaktrisiko')
     result = result + conditionalStyles(LandkreisClass, 'Landkreis')
-    result = result + conditionalStyles(FaellePro100kPrognoseClass, 'FaellePro100kPrognose')
-    result = result + conditionalStyles(FaellePro100kPrognose2Class, 'FaellePro100kPrognose2')
+    result = result + conditionalStyles(FaellePro100kPrognoseClass, 'InzidenzFallNeu-Prognose-4-Wochen')
+    result = result + conditionalStyles(FaellePro100kPrognose2Class, 'InzidenzFallNeu-Prognose-8-Wochen')
 
     return result
 

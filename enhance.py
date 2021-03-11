@@ -67,6 +67,16 @@ def addIncidenceColumn(table, srcColumn, newColumn):
     newTable = table[:, dt.f[:].extend({newColumn: src / dt.f.Einwohner * 100000})]
     return newTable
 
+# goal = incidence * trend ^ t
+# trend ^ t = goal/incidence
+# t = log(trend, goal/incidence)
+# t = ln(res/incidence)/ln(trend)
+def addGoalColumn(table, incidenceColumn, trendColumn, newColumn, goal, scale = 7):
+    incidence = dt.f[incidenceColumn]
+    trend = dt.f[trendColumn]
+        # print(list(zip(table.names, table.stypes)))
+    newTable = table[:, dt.f[:].extend({newColumn: dt.math.log(goal / incidence) / dt.math.log(trend) * scale})]
+    return newTable
 
 def fillEmptyCellsWithZeroes(table, columns):
     for col in columns:
@@ -110,6 +120,10 @@ def add7DayAverages(table):
                 table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-2-Wochen", 2)
                 table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-4-Wochen", 4)
                 table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-8-Wochen", 8)
+
+                table = addGoalColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Tage-bis-50", 50)
+                table = addGoalColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Tage-bis-100", 100)
+
                 table = addRiskColumn(table,"InzidenzFallNeu-Prognose-1-Wochen", "Kontaktrisiko", 3.5)
     return table
 
