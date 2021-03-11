@@ -14,5 +14,11 @@ python $CORONA/unify.py -d $CORONA/archive_v2 $CORONA/archive_ard/NPGEO-RKI-*.cs
 
 cd $CORONA/
 python $CORONA/database.py -d $CORONA/series
-
+oder:
 python $CORONA/database.py --agegroups -d $CORONA/series
+
+cd $CORONA/
+python $CORONA/enhance.py -d $CORONA/series-enhanced series/series-*.csv
+
+cd $CORONA/
+python $CORONA/enhance.py -d $CORONA/series-enhanced series/series-*.csv

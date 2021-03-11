@@ -7,7 +7,7 @@ import glob
 def add7dSumColumn(table, srcColumn, newColumn):
     src = dt.f[srcColumn]
     #src_na = dt.math.isna(src)
-    src_na = src > 0
+    src_na = dt.math.isna(src)
     table[src_na, src] = 0
 
     newTable = table[:, dt.f[:].extend({newColumn: src + dt.shift(src, n=1) + dt.shift(src, n=2) + dt.shift(src, n=3)+
@@ -22,13 +22,19 @@ def add7dAvrgColumn(table, srcColumn, newColumn):
     #print(newTable)
     return newTable
 
-def add7dChangeColumn(table, srcColumn, newColumn):
+def add7dBeforeColumn(table, srcColumn, newColumn):
+    src = dt.f[srcColumn]
+    newTable = table[:, dt.f[:].extend({newColumn: dt.shift(src, n=7)})]
+    #print(newTable)
+    return newTable
+
+def add7dTrendColumn(table, srcColumn, newColumn):
     src = dt.f[srcColumn]
     newTable = table[:, dt.f[:].extend({newColumn: (src / dt.shift(src, n=7))})]
     #print(newTable)
     return newTable
 
-def add7dWChangeColumn(table, srcColumn, newColumn):
+def add7dWTrendColumn(table, srcColumn, newColumn):
     src = dt.f[srcColumn]
     newTable = table[:, dt.f[:].extend({newColumn: (src+5) / (dt.shift(src, n=7)+5)})]
     return newTable
@@ -40,10 +46,10 @@ def add7dRColumn(table, srcColumn, newColumn):
     #print(newTable)
     return newTable
 
-def addPredictionsColumn(table, incidenceColumn, changeColumn, newColumn, weeks):
+def addPredictionsColumn(table, incidenceColumn, trendColumn, newColumn, weeks):
     incidence = dt.f[incidenceColumn]
-    change = dt.f[changeColumn]
-    newTable = table[:, dt.f[:].extend({newColumn: (incidence * dt.math.pow(change, weeks))})]
+    trend = dt.f[trendColumn]
+    newTable = table[:, dt.f[:].extend({newColumn: (incidence * dt.math.pow(trend, weeks))})]
     #print(newTable)
     return newTable
 
@@ -53,34 +59,81 @@ def addRiskColumn(table, incidencePrognosisColumn, newColumn, darkFactor):
     #print(newTable)
     return newTable
 
+
+def addIncidenceColumn(table, srcColumn, newColumn):
+    src = dt.f[srcColumn]
+    #print("srcColumn",srcColumn)
+    #print(list(zip(table.names, table.stypes)))
+    newTable = table[:, dt.f[:].extend({newColumn: src / dt.f.Einwohner * 100000})]
+    return newTable
+
+
+def fillEmptyCellsWithZeroes(table, columns):
+    for col in columns:
+        src = dt.f[col]
+        src_na = dt.math.isna(src)
+        table[src_na, src] = 0
+    return table
+
 def test():
     table = dt.Frame({"object": [1, 1, 1, 2, 2, 3,4,5,6,7,8,9,10,11,12,13,14],
                       "period": [1, 2, 4, 4, 23,2,5,7,2,7,8,9,5, 18,35,17,15]})
     table = add7dSumColumn(table, "period", "sumPeriod")
     add7dAvrgColumn(table, "period", "avPeriod")
 
+def addIncidences(table):
+    table = addIncidenceColumn(table, "AnzahlTodesfallNeu", "InzidenzTodesfallNeu")
+
+    candidatesColumns = [name for name in table.names if ("AnzahlFall" in name or "AnzahlTodesfall" in name) and not "Neu" in name]
+    print("addIncidences candidates:", candidatesColumns)
+    for c in candidatesColumns:
+        newColName = c.replace("Anzahl","Inzidenz")
+        table = addIncidenceColumn(table, c, newColName)
+
+    return table
+
+
 def add7DayAverages(table):
     print(table.names)
-    candidatesColumns = [name for name in  table.names if "Neu" in name or "Inzidenz" in name]
+    candidatesColumns = [name for name in  table.names if "Neu" in name]
     print(candidatesColumns)
     for c in candidatesColumns:
-        table = add7dSumColumn(table, c, c+"-7d")
-        table = add7dChangeColumn(table, c+"-7d", c+"-7d-Change")
+        table = add7dSumColumn(table, c, c+"-7-Tage")
+        table = add7dTrendColumn(table, c+"-7-Tage", c+"-7-Tage-Trend")
+        if c in ["AnzahlFallNeu","InzidenzFallNeu","AnzahlTodesfallNeu","InzidenzTodesfallNeu"]:
+            table = add7dBeforeColumn(table, c + "-7-Tage", c + "-7-Tage-7-Tage-davor")
         if c in ["InzidenzFallNeu", "InzidenzTodesfallNeu"]:
-            table = add7dWChangeColumn(table, c+"-7d", c+"-7dW")
+            table = add7dWTrendColumn(table, c+"-7-Tage", c+"-7-Tage-Trend-Spezial")
             if c in ["InzidenzFallNeu"]:
-                table = add7dRColumn(table, c + "-7d-Change", c + "-7d-R")
-                table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog1W", 1)
-                table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog2W", 2)
-                table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog4W", 4)
-                table = addPredictionsColumn(table, c + "-7d", c + "-7dW", c + "-Prog8W", 8)
-                table = addRiskColumn(table,"InzidenzFallNeu-Prog1W", "Risk", 3.5)
+                table = add7dRColumn(table, c + "-7-Tage-Trend", c + "-7-Tage-R")
+                table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-1-Wochen", 1)
+                table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-2-Wochen", 2)
+                table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-4-Wochen", 4)
+                table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-8-Wochen", 8)
+                table = addRiskColumn(table,"InzidenzFallNeu-Prognose-1-Wochen", "Kontaktrisiko", 3.5)
     return table
 
 def enhance(inputFile, destDir="."):
     table = dt.fread(inputFile)
-    newTable = add7DayAverages(table)
-    print(newTable)
+    print(table.names)
+    print(table.stypes)
+    print(list(zip(table.names, table.stypes)))
+    print("----------------------------------------")
+
+    typedict = {}
+    for i, name in enumerate(table.names):
+        if table.stypes[i] == dt.stype.bool8:
+            typedict[name] = dt.stype.int32
+    print(typedict)
+    table = dt.fread(inputFile, columns=typedict)
+    print(table.names)
+    print(table.stypes)
+
+    numericColumns = [name for name in table.names if "Anzahl" in name or "Inzidenz" in name]
+    fillEmptyCellsWithZeroes(table, numericColumns)
+
+    newTable = addIncidences(table)
+    newTable = add7DayAverages(newTable)
 
     path = os.path.normpath(inputFile)
     fileName = path.split(os.sep)[-1]
@@ -101,8 +154,9 @@ def main():
         files = sorted(glob.glob(fa))
 
         for f in files:
-            print("Enhancing {}".format(f))
-            enhance(f, args.outputDir)
+            if not f.endswith("--nicht erhoben-.csv"):
+                print("Enhancing {}".format(f))
+                enhance(f, args.outputDir)
 
 if __name__ == "__main__":
     # execute only if run as a script

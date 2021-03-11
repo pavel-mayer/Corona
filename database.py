@@ -246,6 +246,27 @@ def loadFlaechen(fileName="covid-19-germany-landkreise.csv"):
 #     #print("Flaeche:", result)
 #     return result
 
+def insertDates(table):
+    days = table[:,"DatenstandTag"].to_list()[0]
+    dates = [cd.dateStrFromDay(day) for day in days]
+    result = table[:,dt.f["DatenstandTag"].extend({"Datum": ""})]
+    result[:,"Datum"] = dt.Frame(dates)
+    result.cbind(table[:,1:])
+    return result
+
+def insertRegionInfo(table,IdLandkreis, Landkreis, LandkreisTyp, IdBundesland, Bundesland, Flaeche):
+    result = table[:, dt.f[:2].extend({"IdLandkreis": IdLandkreis, "Landkreis": Landkreis, "LandkreisTyp": LandkreisTyp, "IdBundesland": IdBundesland,
+                                   "Bundesland": Bundesland, "Flaeche": Flaeche})]
+    result.cbind(table[:,2:])
+    return result
+
+def landKreisTyp(lk_id, lk_name):
+    lk_Typ = lk_name[:2]
+    if lk_Typ == "SK" or lk_Typ == "LK":
+        return lk_Typ
+    else:
+        return "LSK"
+
 def analyze(fullTable, args):
     print("Analyzing")
     pmu.printMemoryUsage("begin analyze")
@@ -266,7 +287,6 @@ def analyze(fullTable, args):
 
     print("Altersgruppen", Altersgruppen)
 
-
     Geschlechter = dt.unique(fullTable[:,"Geschlecht"]).to_list()[0]
     print("Geschlechter", Geschlechter)
 
@@ -282,10 +302,8 @@ def analyze(fullTable, args):
     print("Processing 'Deutschland'")
     pmu.printMemoryUsage("begin Deutschland")
     deutschland = analyzeDailyAltersgruppenGeschlechter(fullTable, filterByDay(fromDay, toDay), Altersgruppen, Geschlechter)
-    deutschland = deutschland[:,dt.f[:].extend({"IdLandkreis":0,"Landkreis":"Deutschland", "IdBundesland":"0",
-                                                "Bundesland":"Deutschland", "Flaeche": flaechen[0]})]
-    #print("flaechen[0]", flaechen[0])
-    #deutschland = deutschland[:, dt.f[:].extend({"Flaeche": flaechen[0]})]
+    deutschland = insertDates(deutschland)
+    deutschland = insertRegionInfo(deutschland, 0, "Deutschland", "BR", 0, "Deutschland", flaechen[0])
 
     print(deutschland)
     pmu.printMemoryUsage("pre makeIncidenceColumns")
@@ -305,8 +323,10 @@ def analyze(fullTable, args):
         bl_id=bundeslaender[i,dt.f.IdBundesland].to_list()[0][0]
 
         if bl_id > 0:
-            bundeslaender_numbers[bl_id] = bundeslaender_numbers[bl_id][:, dt.f[:].extend(
-                {"IdLandkreis": bl_id, "Landkreis": bl_name, "IdBundesland": bl_id, "Bundesland": bl_name, "Flaeche" : flaechen[bl_id]})]
+            #bundeslaender_numbers[bl_id] = bundeslaender_numbers[bl_id][:, dt.f[:].extend(
+            #    {"IdLandkreis": bl_id, "Landkreis": bl_name, "IdBundesland": bl_id, "Bundesland": bl_name, "Flaeche" : flaechen[bl_id]})]
+            bundeslaender_numbers[bl_id] = insertDates(bundeslaender_numbers[bl_id])
+            bundeslaender_numbers[bl_id] = insertRegionInfo(bundeslaender_numbers[bl_id], bl_id, bl_name, "BL", bl_id, bl_name, flaechen[0])
             censusBL = census[dt.f.IdLandkreis == bl_id, :]
             print(censusBL)
             bundeslaender_numbers[bl_id] = makeIncidenceColumns(bundeslaender_numbers[bl_id], censusBL, Altersgruppen, Geschlechter)
@@ -329,10 +349,14 @@ def analyze(fullTable, args):
              censusLK = census[dt.f.IdLandkreis == lk_id, :]
              bl_name = censusLK[0,dt.f.Bundesland].to_list()[0][0]
              bl_id = censusLK[0, dt.f.IdBundesland].to_list()[0][0]
+             lk_typ = landKreisTyp(lk_id, lk_name)
 
-             landkreise_numbers[lk_id] = landkreise_numbers[lk_id][:, dt.f[:].extend(
-                {"IdLandkreis": lk_id, "Landkreis": lk_name, "IdBundesland": bl_id, "Bundesland": bl_name,
-                 "Flaeche": flaechen[bl_id]})]
+             landkreise_numbers[lk_id] = insertDates(landkreise_numbers[lk_id])
+             landkreise_numbers[lk_id] = insertRegionInfo(landkreise_numbers[lk_id], lk_id, lk_name, lk_typ, bl_id,
+                                                             bl_name, flaechen[lk_id])
+             #landkreise_numbers[lk_id] = landkreise_numbers[lk_id][:, dt.f[:].extend(
+             #   {"IdLandkreis": lk_id, "Landkreis": lk_name, "IdBundesland": bl_id, "Bundesland": bl_name,
+             #    "Flaeche": flaechen[lk_id]})]
              print(censusLK)
              landkreise_numbers[lk_id] = makeIncidenceColumns(landkreise_numbers[lk_id], censusLK, Altersgruppen,
                                                                 Geschlechter)

@@ -139,366 +139,59 @@ def loadData(dataFilename):
     fullTable = dt.fread(dataFilename)
     print("Loading done loading table from ‘" + dataFilename + "‘, keys:")
     print(fullTable.keys())
-    cases = fullTable[:, 'AnzahlFall'].sum()[0, 0]
-    dead = fullTable[:, 'AnzahlTodesfall'].sum()[0, 0]
-    lastDay=fullTable[:,'MeldeDay'].max()[0,0]
-    lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
-    print("File stats: lastDay {} lastnewCaseOnDay {} cases {} dead {}".format(lastDay, lastnewCaseOnDay, cases, dead))
-    newTable=fullTable[:,dt.f[:].extend({"erkMeldeDelay": dt.f.MeldeDay-dt.f.RefDay})]
-    newTable=newTable[:,dt.f[:].extend({"MeldeDelay": dt.f.newCaseOnDay - dt.f.MeldeDay})]
-    return newTable, lastDay
+    return fullTable
+    #
+    # lastDay=fullTable[:,'MeldeDay'].max()[0,0]
+    # cases = fullTable[:, 'AnzahlFall'].sum()[0, 0]
+    # dead = fullTable[:, 'AnzahlTodesfall'].sum()[0, 0]
+    # lastDay=fullTable[:,'MeldeDay'].max()[0,0]
+    # lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
+    # print("File stats: lastDay {} lastnewCaseOnDay {} cases {} dead {}".format(lastDay, lastnewCaseOnDay, cases, dead))
+    # newTable=fullTable[:,dt.f[:].extend({"erkMeldeDelay": dt.f.MeldeDay-dt.f.RefDay})]
+    # newTable=newTable[:,dt.f[:].extend({"MeldeDelay": dt.f.newCaseOnDay - dt.f.MeldeDay})]
+    # return newTable, lastDay
 
-def processData(fullCurrentTable, forDay):
+def getRankedTable(fullTable, day, sortColumns):
+    result = fullTable[dt.f.DatenstandTag == day,:].sort(sortColumns)
+    result=result[:,dt.f[:].extend({"Rang": 0})]
+    result[:,"Rang"]=np.arange(1,result.nrows+1)
+    return result
 
-    fullTable = fullCurrentTable[(dt.f.newCaseOnDay <= forDay) | (dt.f.newCaseBeforeDay < forDay),:]
 
-    #lastDay = fullTable[:, 'MeldeDay'].max()[0, 0]
-    #lastnewCaseOnDay = fullTable[:, 'newCaseOnDay'].max()[0, 0]
+def getTableForDay(fullTable, day):
+    #sortColumns = ["Risk","LetzteMeldung","InzidenzFallNeu-7-Tage"]
+    sortColumns = ["Kontaktrisiko","InzidenzFallNeu-7-Tage"]
+    todayTable = getRankedTable(fullTable, day, sortColumns)
+    yesterdayTable = getRankedTable(fullTable, day-1, sortColumns)
+    print(todayTable)
+    print(yesterdayTable)
+    todayTableById = todayTable.sort("IdLandkreis")
+    yesterdayTableById = yesterdayTable.sort("IdLandkreis")
+    print(todayTableById.nrows)
+    print(yesterdayTableById.nrows)
 
-    alldays=fullTable[:,
-              [dt.sum(dt.f.AnzahlFall),
-               dt.sum(dt.f.FaellePro100k),
-               dt.sum(dt.f.AnzahlTodesfall),
-               dt.sum(dt.f.TodesfaellePro100k),
-               dt.first(dt.f.Bevoelkerung),
-               dt.max(dt.f.MeldeDay),
-               dt.max(dt.f.newCaseOnDay),
-               dt.first(dt.f.LandkreisTyp),
-               dt.first(dt.f.IdLandkreis),
-               dt.first(dt.f.IdBundesland),
-               dt.first(dt.f.Bundesland)],
-    dt.by(dt.f.Landkreis)]
-
-    #print(alldays)
-    # compute and add rows for Bundeslaender
-    bevoelkerung = alldays[:, [dt.sum(dt.f.Bevoelkerung), dt.sum(dt.f.AnzahlFall), dt.sum(dt.f.AnzahlTodesfall),], dt.by(dt.f.Bundesland)]
-    bevoelkerung=bevoelkerung[:,dt.f[:].extend({"FaellePro100k": dt.f.AnzahlFall * 100000 / dt.f.Bevoelkerung})]
-    bevoelkerung=bevoelkerung[:,dt.f[:].extend({"TodesfaellePro100k": dt.f.AnzahlTodesfall * 100000 / dt.f.Bevoelkerung})]
-
-    alldaysBundeslaender = fullTable[:,
-              [dt.sum(dt.f.AnzahlFall),
-               dt.first(dt.f.FaellePro100k), # just create the column, will be overwritten
-               dt.sum(dt.f.AnzahlTodesfall),
-               dt.first(dt.f.TodesfaellePro100k), # just create the column, will be overwritten
-               dt.first(dt.f.Bevoelkerung), # just create the column, will be overwritten
-               dt.max(dt.f.MeldeDay),
-               dt.max(dt.f.newCaseOnDay),
-               dt.first(dt.f.LandkreisTyp), # just create the column, will be overwritten
-               dt.first(dt.f.IdLandkreis),
-               dt.first(dt.f.IdBundesland),
-               dt.first(dt.f.Landkreis)],
-            dt.by(dt.f.Bundesland)]
-
-    alldaysBundeslaender[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
-    alldaysBundeslaender[:, "Landkreis"] = bevoelkerung[:, "Bundesland"]
-    alldaysBundeslaender[:, "FaellePro100k"] = bevoelkerung[:, "FaellePro100k"]
-    alldaysBundeslaender[:, "TodesfaellePro100k"] = bevoelkerung[:, "TodesfaellePro100k"]
-    alldaysBundeslaender[:, "LandkreisTyp"] = "B"
-    #print(alldaysBundeslaender[:, "IdLandkreis"])
-    alldaysBundeslaender[:, "IdLandkreis"] = alldaysBundeslaender[:, "IdBundesland"]
-    #print(alldaysBundeslaender[:, ["IdLandkreis","Bundesland"]])
-    alldays.rbind(alldaysBundeslaender, force=True)
-
-    # compute and add row for all Germany
-    bevoelkerungGermany = alldays[dt.f.Landkreis != dt.f.Bundesland, [dt.sum(dt.f.Bevoelkerung), dt.sum(dt.f.AnzahlFall), dt.sum(dt.f.AnzahlTodesfall)]]
-    bevoelkerungGermany = bevoelkerungGermany[:,
-                          dt.f[:].extend({"FaellePro100k": dt.f.AnzahlFall * 100000 / dt.f.Bevoelkerung})]
-    bevoelkerungGermany = bevoelkerungGermany[:,
-                          dt.f[:].extend({"TodesfaellePro100k": dt.f.AnzahlTodesfall * 100000 / dt.f.Bevoelkerung})]
-
-    alldaysGermany = fullTable[dt.f.Landkreis != dt.f.Bundesland,
-                     [dt.sum(dt.f.AnzahlFall),
-                      dt.first(dt.f.FaellePro100k),  # just create the column, will be overwritten
-                      dt.sum(dt.f.AnzahlTodesfall),
-                      dt.first(dt.f.TodesfaellePro100k),  # just create the column, will be overwritten
-                      dt.first(dt.f.Bevoelkerung),  # just create the column, will be overwritten
-                      dt.max(dt.f.MeldeDay),
-                      dt.max(dt.f.newCaseOnDay),
-                      dt.first(dt.f.LandkreisTyp),  # just create the column, will be overwritten
-                      dt.first(dt.f.Landkreis),
-                      dt.first(dt.f.IdLandkreis),
-                      dt.first(dt.f.IdBundesland),
-                      dt.first(dt.f.Bundesland)]]
-    alldaysGermany[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
-    alldaysGermany[:, "Landkreis"] = "Deutschland"
-    alldaysGermany[:, "Bundesland"] = "Deutschland"
-    alldaysGermany[:, "FaellePro100k"] = bevoelkerungGermany[:, "FaellePro100k"]
-    alldaysGermany[:, "TodesfaellePro100k"] = bevoelkerungGermany[:, "TodesfaellePro100k"]
-    alldaysGermany[:, "LandkreisTyp"] = "BR"
-    alldaysGermany[:, "IdLandkreis"] = 0
-    alldaysGermany[:, "IdBundesland"] = 0
-    alldays.rbind(alldaysGermany, force=True)
-
-    ##############################################################################
-    # compute values for last 7 days for Landkreise
-    last7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 7) & (dt.f.MeldeDay > forDay - 14)) | (dt.f.newDeathOnDay > forDay - 7), :]
-    strictLast7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 7) & (dt.f.MeldeDay > forDay - 7)) | (dt.f.newDeathOnDay > forDay - 7), :]
-    #last7daysRecs.to_csv("last7daysRecs.csv")
-    last7days = last7daysRecs[:,
-                [dt.sum(dt.f.AnzahlFall),
-               dt.sum(dt.f.FaellePro100k),
-               dt.sum(dt.f.AnzahlTodesfall),
-               dt.sum(dt.f.TodesfaellePro100k)],
-                dt.by(dt.f.Landkreis)]
-    last7days.names=["Landkreis","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage",
-                     "TodesfaellePro100kLetzte7Tage"]
-
-    strictLast7days = strictLast7daysRecs[:,
-                [dt.sum(dt.f.AnzahlFall),
-                 dt.sum(dt.f.FaellePro100k)],
-                dt.by(dt.f.Landkreis)]
-    strictLast7days.names = ["Landkreis", "AnzahlFallLetzte7TageStrikt", "FaellePro100kLetzte7TageStrikt"]
-    #print(strictLast7days)
-    last7days = join(last7days,strictLast7days, "Landkreis" )
-    #print(last7days)
-
-    # compute values for last 7 days for Bundesländer
-    last7daysBL = last7daysRecs[:,
-                [dt.sum(dt.f.AnzahlFall),
-                 dt.sum(dt.f.AnzahlTodesfall),
-                 dt.sum(dt.f.Bevoelkerung)],
-                  dt.by(dt.f.Bundesland)]
-    last7daysBL.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage","Bevoelkerung"]
-    strictLast7daysBL = strictLast7daysRecs[:,
-                [dt.sum(dt.f.AnzahlFall),
-                 dt.sum(dt.f.Bevoelkerung)],
-                  dt.by(dt.f.Bundesland)]
-    strictLast7daysBL.names = ["Landkreis", "AnzahlFallLetzte7TageStrikt", "Bevoelkerung"]
-
-    bls = last7daysBL[:,"Landkreis"].to_list()[0]
-    blb = bevoelkerung[:,"Bundesland"].to_list()[0]
-    #print(bls)
-    #print(blb)
-    for i, bl in enumerate(bls):
-        for j, bb in enumerate(blb):
-            #print(i,j)
-            if last7daysBL[i, "Landkreis"] == bevoelkerung[j, "Bundesland"]:
-                last7daysBL[i, "Bevoelkerung"] = bevoelkerung[j, "Bevoelkerung"]
-            if strictLast7daysBL[i, "Landkreis"] == bevoelkerung[j, "Bundesland"]:
-                strictLast7daysBL[i, "Bevoelkerung"] = bevoelkerung[j, "Bevoelkerung"]
-
-    #last7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
-    last7daysBL = last7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
-    last7daysBL = last7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
-    #print(last7daysBL)
-    last7days.rbind(last7daysBL, force=True)
-    #print(last7days)
-
-    strictLast7daysBL = strictLast7daysBL[:,
-                  dt.f[:].extend({"FaellePro100kLetzte7TageStrikt": dt.f.AnzahlFallLetzte7TageStrikt * 100000 / dt.f.Bevoelkerung})]
-    strictLast7daysBL = strictLast7daysBL[:, ["Landkreis","AnzahlFallLetzte7TageStrikt","FaellePro100kLetzte7TageStrikt"]]
-    #print(strictLast7daysBL)
-    last7days = merge(last7days,strictLast7daysBL, "Landkreis" )
-    #print(last7days)
-
-    # compute values for last 7 days for Germany
-    last7daysDE = last7daysRecs[:,
-                  [dt.first(dt.f.Landkreis),
-                   dt.sum(dt.f.AnzahlFall),
-                   dt.sum(dt.f.AnzahlTodesfall),
-                   dt.first(dt.f.Bevoelkerung),
-                   ]]
-    last7daysDE.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage", "Bevoelkerung"]
-    last7daysDE[:, "Landkreis"] = "Deutschland"
-    last7daysDE[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
-    last7daysDE = last7daysDE[:,
-                  dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
-    last7daysDE = last7daysDE[:, dt.f[:].extend(
-        {"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
-
-    #print(last7daysDE)
-    last7days.rbind(last7daysDE, force=True)
-
-    strictLast7daysDE = strictLast7daysRecs[:,
-                  [dt.first(dt.f.Landkreis),
-                   dt.sum(dt.f.AnzahlFall),
-                   dt.first(dt.f.Bevoelkerung),
-                   ]]
-    strictLast7daysDE.names = ["Landkreis", "AnzahlFallLetzte7TageStrikt", "Bevoelkerung"]
-    strictLast7daysDE[:, "Landkreis"] = "Deutschland"
-    strictLast7daysDE[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
-    strictLast7daysDE = strictLast7daysDE[:,
-                  dt.f[:].extend({"FaellePro100kLetzte7TageStrikt": dt.f.AnzahlFallLetzte7TageStrikt * 100000 / dt.f.Bevoelkerung})]
-    last7days = merge(last7days,strictLast7daysDE, "Landkreis" )
-
-    last7days = last7days[:, dt.f[:].extend({"FaelleLetzte7TageDropped": dt.f.AnzahlFallLetzte7Tage - dt.f.AnzahlFallLetzte7TageStrikt})]
-    last7days = last7days[:, dt.f[:].extend({"FaelleLetzte7TageDroppedPercent": dt.f.FaelleLetzte7TageDropped * 100/dt.f.AnzahlFallLetzte7Tage})]
-
-    # clip case count to zero
-    last7days[dt.f.AnzahlFallLetzte7Tage <0, "AnzahlFallLetzte7Tage"] = 0
-    last7days[dt.f.FaellePro100kLetzte7Tage <0, "FaellePro100kLetzte7Tage"] = 0
-    last7days[dt.f.AnzahlTodesfallLetzte7Tage <0, "AnzahlTodesfallLetzte7Tage"] = 0
-    last7days[dt.f.TodesfaellePro100kLetzte7Tage <0, "TodesfaellePro100kLetzte7Tage"] = 0
-
-    last7days[dt.f.AnzahlFallLetzte7TageStrikt < 0, "AnzahlFallLetzte7TageStrikt"] = 0
-    last7days[dt.f.FaellePro100kLetzte7TageStrikt < 0, "FaellePro100kLetzte7TageStrikt"] = 0
-    last7days[dt.f.FaelleLetzte7TageDropped < 0, "FaelleLetzte7TageDropped"] = 0
-    last7days[dt.f.FaelleLetzte7TageDroppedPercent < 0, "FaelleLetzte7TageDroppedPercent"] = 0
-
-    ##############################################################################
-    # compute values for last 7 days before 7 days
-
-    lastWeek7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 14) & (dt.f.newCaseOnDay <= forDay - 7)
-                                   & (dt.f.MeldeDay > forDay - 21) & (dt.f.MeldeDay <= forDay - 7)) |
-                                  ((dt.f.newDeathOnDay > forDay - 14) & (dt.f.newDeathOnDay <= forDay - 7))
-                                  , :]
-    lastWeek7days=lastWeek7daysRecs[:,
-                    [dt.sum(dt.f.AnzahlFall),
-               dt.sum(dt.f.FaellePro100k),
-               dt.sum(dt.f.AnzahlTodesfall),
-               dt.sum(dt.f.TodesfaellePro100k)],
-       dt.by(dt.f.Landkreis)]
-    #lastWeek7days[dt.f[1:] < 0, dt.f[1:]] = 0
-    lastWeek7days.names=["Landkreis","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor",
-                         "AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
-
-    # compute values for last 7 days before 7 days for Bundesländer
-    lastWeek7daysBL = lastWeek7daysRecs[:,
-                  [dt.sum(dt.f.AnzahlFall),
-                   dt.sum(dt.f.AnzahlTodesfall),
-                   dt.sum(dt.f.Bevoelkerung)],
-                  dt.by(dt.f.Bundesland)]
-    lastWeek7daysBL.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
-
-    bls = lastWeek7daysBL[:,"Landkreis"].to_list()[0]
-    blb = bevoelkerung[:, "Bundesland"].to_list()[0]
-    # print(bls)
-    # print(blb)
-    for i, bl in enumerate(bls):
-        for j, bb in enumerate(blb):
-            # print(i,j)
-            if lastWeek7daysBL[i, "Landkreis"] == bevoelkerung[j, "Bundesland"]:
-                lastWeek7daysBL[i, "Bevoelkerung"] = bevoelkerung[j, "Bevoelkerung"]
-
-    #lastWeek7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
-    lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
-    lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7TageDavor": dt.f.AnzahlTodesfallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
-    lastWeek7days.rbind(lastWeek7daysBL, force=True)
-
-    # compute values for last 7 days for Germany
-    lastWeek7daysDE = lastWeek7daysRecs[:,
-                  [dt.first(dt.f.Landkreis),
-                   dt.sum(dt.f.AnzahlFall),
-                   dt.sum(dt.f.AnzahlTodesfall),
-                   dt.first(dt.f.Bevoelkerung),
-                   ]]
-    lastWeek7daysDE.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
-    lastWeek7daysDE[:, "Landkreis"] = "Deutschland"
-    lastWeek7daysDE[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
-    lastWeek7daysDE = lastWeek7daysDE[:,
-                  dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
-    lastWeek7daysDE = lastWeek7daysDE[:, dt.f[:].extend(
-        {"TodesfaellePro100kLetzte7TageDavor": dt.f.AnzahlTodesfallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
-    lastWeek7days.rbind(lastWeek7daysDE, force=True)
-
-    ##############################################################################
-    # compute delays
-    firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
-    firstRecordDay = cd.dayFromTime(firstRecordTime)
-    firstRecordDay = forDay - 21
-
-    delayRecs = fullTable[(dt.f.newCaseOnDay > firstRecordDay) | (dt.f.newDeathOnDay > firstRecordDay), :]
-    delayRecs.materialize()
-    #print(delayRecs)
-    #delayRecs.to_csv("delayRecs.csv")
-    delays = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)], dt.by(dt.f.Landkreis)]
-    delays.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD", "DelayAnzahlFall"]
-
-    delaysBL = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)], dt.by(dt.f.Bundesland)]
-    delaysBL.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD", "DelayAnzahlFall"]
-    delays.rbind(delaysBL)
-
-    delaysDE = delayRecs[:, [dt.first(dt.f.Landkreis), dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)]]
-    delaysDE.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD", "DelayAnzahlFall"]
-    delaysDE[:, "Landkreis"] = "Deutschland"
-    delays.rbind(delaysDE)
-
-    #print(delaysBL)
-
-    alldays = join(alldays, delays, "Landkreis")
-    ##############################################################################
-
-    # clip case count to zero
-    lastWeek7days[dt.f.AnzahlFallLetzte7TageDavor <0, "AnzahlFallLetzte7TageDavor"] = 0
-    lastWeek7days[dt.f.FaellePro100kLetzte7TageDavor <0, "FaellePro100kLetzte7TageDavor"] = 0
-    lastWeek7days[dt.f.AnzahlTodesfallLetzte7TageDavor <0, "AnzahlTodesfallLetzte7TageDavor"] = 0
-    lastWeek7days[dt.f.TodesfaellePro100kLetzte7TageDavor <0, "TodesfaellePro100kLetzte7TageDavor"] = 0
-
-    allDaysExt0 = join(alldays, last7days, "Landkreis")
-    allDaysExt1 = join(allDaysExt0, lastWeek7days, "Landkreis")
-
-    Rw = (dt.f.AnzahlFallLetzte7Tage+5)/(dt.f.AnzahlFallLetzte7TageDavor + 5)
-
-    allDaysExt2=allDaysExt1[:,dt.f[:].extend({"AnzahlFallTrend":  Rw})]
-
-    #RwSqrt = (dt.math.sqrt(dt.f.AnzahlFallTrend))
-    RwSqrt = (dt.math.pow(dt.f.AnzahlFallTrend, 4/7))
-    allDaysExt2=allDaysExt2[:,dt.f[:].extend({"AnzahlFallTrendSqrt":  RwSqrt})]
-    allDaysExt3=allDaysExt2[:,dt.f[:].extend({"FaellePro100kTrend": dt.f.FaellePro100kLetzte7Tage-dt.f.FaellePro100kLetzte7TageDavor})]
-    allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kPrognose": dt.f.FaellePro100kLetzte7Tage*dt.math.pow(dt.f.AnzahlFallTrend, 4)})]
-    allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kPrognose2": dt.f.FaellePro100kLetzte7Tage*dt.math.pow(dt.f.AnzahlFallTrend, 8)})]
-
-    # res = cur * trend ^ t
-    # trend ^ t = res/cur
-    # t = log(trend, res/cur)
-    # t = ln(res/cur)/ln(trend)
-
-    allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kTageBisSicher": dt.math.log(3/dt.f.FaellePro100kLetzte7Tage) / dt.math.log(dt.f.AnzahlFallTrend) * 7})]
-    allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kTageBisSicher2": dt.math.log(7/dt.f.FaellePro100kLetzte7Tage) / dt.math.log(dt.f.AnzahlFallTrend) * 7})]
-
-    allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
-
-    allDaysExt5=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/3.5/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
-    allDaysExt6 = allDaysExt5[:, dt.f[:].extend({"LetzteMeldung": forDay - dt.f.MeldeDay})]
-    allDaysExt6b = allDaysExt6[:, dt.f[:].extend({"LetzteMeldungNeg": dt.f.MeldeDay - forDay})]
-    allDaysExt6c = allDaysExt6b[:, dt.f[:].extend({"LetzteZaehlungNeg": dt.f.newCaseOnDay - forDay})]
-    datenStand = cd.dateStrYMDFromDay(forDay+1)
-    allDaysExt6c = allDaysExt6c[:, dt.f[:].extend({"Datenstand": datenStand})]
-    allDaysExt6c = allDaysExt6c[:, dt.f[:].extend({"Sofwareversion": versionStr})]
-
-    allDaysExt6c[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 99999
-    allDaysExt6c[dt.f.FaellePro100kPrognose >= 10000, "FaellePro100kPrognose"] = 9999.9
-    allDaysExt6c[dt.f.FaellePro100kPrognose2 >= 10000, "FaellePro100kPrognose2"] = 9999.9
-
-    sortedByRisk = allDaysExt6c.sort(["Kontaktrisiko","LetzteMeldung","FaellePro100k"])
-    #print(sortedByRisk)
-    allDaysExt=sortedByRisk[:,dt.f[:].extend({"Rang": 0})]
-    allDaysExt[:,"Rang"]=np.arange(1,allDaysExt.nrows+1)
-    #print(allDaysExt)
-    #allDaysExt.materialize()
-    return allDaysExt
-
-def loadAndProcessData(fileName):
-    currentFullTable, lastDay = loadData(fileName)
-    todayTable = processData(currentFullTable, lastDay).sort("Landkreis")
-    yesterdayTable = processData(currentFullTable, lastDay-1).sort("Landkreis")
-
-    #print(currentFullTable)
-    #print(todayTable)
-    #print(yesterdayTable)
-
-    resultTable = todayTable[:, dt.f[:].extend({"NewCasesToday": 0})]
-    change = np.subtract(todayTable[:, "AnzahlFall"],yesterdayTable[:, "AnzahlFall"])
-    resultTable[:, "NewCasesToday"] = change
-
-    for i in range(yesterdayTable.nrows):
-        l_name = todayTable[i, dt.f.Landkreis].to_list()[0][0]
-        #l_id = todayTable[i, dt.f.IdLandkreis].to_list()[0][0]
-        l_new_name = yesterdayTable[i, dt.f.Landkreis].to_list()[0][0]
-        if l_name != l_new_name:
-            print("missing {} in today, was {} yesterday".format(l_name, l_new_name))
+    # check if all entries today and yesterday do match
+    for i in range(yesterdayTableById.nrows):
+        l_id = todayTableById[i, dt.f.IdLandkreis].to_list()[0][0]
+        l_name = todayTableById[i, dt.f.Landkreis].to_list()[0][0]
+        l_new_id = yesterdayTableById[i, dt.f.IdLandkreis].to_list()[0][0]
+        l_new_name = yesterdayTableById[i, dt.f.Landkreis].to_list()[0][0]
+        #print("{}: ? {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
+        if l_id != l_new_id:
+            print("missing id {} ({}) in today, was {} ({}) yesterday".format(l_id, l_name, l_new_id, l_new_name))
+            #print("{}: BAD: {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
             exit(1)
         #else:
-        #    print("{}: ok: {}".format(i, l_name))
+        #    print("{}: ok : {} {} == {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
 
-    resultTable=resultTable[:,dt.f[:].extend({"RangChange": 0})]
-    rangChange = np.subtract(yesterdayTable[:,"Rang"],todayTable[:,"Rang"])
-    resultTable[:,"RangChange"] = rangChange
+    todayTableById=todayTableById[:,dt.f[:].extend({"RangChange": 0})]
+    rangChange = np.subtract(yesterdayTableById[:,"Rang"],todayTableById[:,"Rang"])
+    todayTableById[:,"RangChange"] = rangChange
 
-    resultTable=resultTable[:,dt.f[:].extend({"RangYesterday": 0})]
-    resultTable[:,"RangYesterday"] = yesterdayTable[:,"Rang"]
+    todayTableById=todayTableById[:,dt.f[:].extend({"RangYesterday": 0})]
+    todayTableById[:,"RangYesterday"] = yesterdayTableById[:,"Rang"]
 
-    resultTable=resultTable[:,dt.f[:].extend({"RangChangeStr": "-"})]
+    todayTableById=todayTableById[:,dt.f[:].extend({"RangChangeStr": "-"})]
 
     rangChangeStrs = np.full(len(rangChange), "*")
     for i, rc in enumerate(rangChange):
@@ -510,18 +203,390 @@ def loadAndProcessData(fileName):
         if rc < 0:
             rangChangeStr = "▼"
 
-        resultTable[i, "RangChangeStr"] = rangChangeStr
+        todayTableById[i, "RangChangeStr"] = rangChangeStr
         rangChangeStrs[i] = rangChangeStr
 
     #print(rangChangeStrs)
 
     #print("Column names frame order:", list(enumerate(resultTable.names)))
-    resultTable2 = resultTable.sort("Rang")
-    #print(resultTable2)
-    data = resultTable2.to_pandas()
-    #print(data)
+    todayTableById = todayTableById.sort("Rang")
+    return todayTableById
 
-    return data
+
+# def processData(fullCurrentTable, forDay):
+#
+#     fullTable = fullCurrentTable[(dt.f.newCaseOnDay <= forDay) | (dt.f.newCaseBeforeDay < forDay),:]
+#
+#     #lastDay = fullTable[:, 'MeldeDay'].max()[0, 0]
+#     #lastnewCaseOnDay = fullTable[:, 'newCaseOnDay'].max()[0, 0]
+#
+#     alldays=fullTable[:,
+#               [dt.sum(dt.f.AnzahlFall),
+#                dt.sum(dt.f.FaellePro100k),
+#                dt.sum(dt.f.AnzahlTodesfall),
+#                dt.sum(dt.f.TodesfaellePro100k),
+#                dt.first(dt.f.Bevoelkerung),
+#                dt.max(dt.f.MeldeDay),
+#                dt.max(dt.f.newCaseOnDay),
+#                dt.first(dt.f.LandkreisTyp),
+#                dt.first(dt.f.IdLandkreis),
+#                dt.first(dt.f.IdBundesland),
+#                dt.first(dt.f.Bundesland)],
+#     dt.by(dt.f.Landkreis)]
+#
+#     #print(alldays)
+#     # compute and add rows for Bundeslaender
+#     bevoelkerung = alldays[:, [dt.sum(dt.f.Bevoelkerung), dt.sum(dt.f.AnzahlFall), dt.sum(dt.f.AnzahlTodesfall),], dt.by(dt.f.Bundesland)]
+#     bevoelkerung=bevoelkerung[:,dt.f[:].extend({"FaellePro100k": dt.f.AnzahlFall * 100000 / dt.f.Bevoelkerung})]
+#     bevoelkerung=bevoelkerung[:,dt.f[:].extend({"TodesfaellePro100k": dt.f.AnzahlTodesfall * 100000 / dt.f.Bevoelkerung})]
+#
+#     alldaysBundeslaender = fullTable[:,
+#               [dt.sum(dt.f.AnzahlFall),
+#                dt.first(dt.f.FaellePro100k), # just create the column, will be overwritten
+#                dt.sum(dt.f.AnzahlTodesfall),
+#                dt.first(dt.f.TodesfaellePro100k), # just create the column, will be overwritten
+#                dt.first(dt.f.Bevoelkerung), # just create the column, will be overwritten
+#                dt.max(dt.f.MeldeDay),
+#                dt.max(dt.f.newCaseOnDay),
+#                dt.first(dt.f.LandkreisTyp), # just create the column, will be overwritten
+#                dt.first(dt.f.IdLandkreis),
+#                dt.first(dt.f.IdBundesland),
+#                dt.first(dt.f.Landkreis)],
+#             dt.by(dt.f.Bundesland)]
+#
+#     alldaysBundeslaender[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
+#     alldaysBundeslaender[:, "Landkreis"] = bevoelkerung[:, "Bundesland"]
+#     alldaysBundeslaender[:, "FaellePro100k"] = bevoelkerung[:, "FaellePro100k"]
+#     alldaysBundeslaender[:, "TodesfaellePro100k"] = bevoelkerung[:, "TodesfaellePro100k"]
+#     alldaysBundeslaender[:, "LandkreisTyp"] = "B"
+#     #print(alldaysBundeslaender[:, "IdLandkreis"])
+#     alldaysBundeslaender[:, "IdLandkreis"] = alldaysBundeslaender[:, "IdBundesland"]
+#     #print(alldaysBundeslaender[:, ["IdLandkreis","Bundesland"]])
+#     alldays.rbind(alldaysBundeslaender, force=True)
+#
+#     # compute and add row for all Germany
+#     bevoelkerungGermany = alldays[dt.f.Landkreis != dt.f.Bundesland, [dt.sum(dt.f.Bevoelkerung), dt.sum(dt.f.AnzahlFall), dt.sum(dt.f.AnzahlTodesfall)]]
+#     bevoelkerungGermany = bevoelkerungGermany[:,
+#                           dt.f[:].extend({"FaellePro100k": dt.f.AnzahlFall * 100000 / dt.f.Bevoelkerung})]
+#     bevoelkerungGermany = bevoelkerungGermany[:,
+#                           dt.f[:].extend({"TodesfaellePro100k": dt.f.AnzahlTodesfall * 100000 / dt.f.Bevoelkerung})]
+#
+#     alldaysGermany = fullTable[dt.f.Landkreis != dt.f.Bundesland,
+#                      [dt.sum(dt.f.AnzahlFall),
+#                       dt.first(dt.f.FaellePro100k),  # just create the column, will be overwritten
+#                       dt.sum(dt.f.AnzahlTodesfall),
+#                       dt.first(dt.f.TodesfaellePro100k),  # just create the column, will be overwritten
+#                       dt.first(dt.f.Bevoelkerung),  # just create the column, will be overwritten
+#                       dt.max(dt.f.MeldeDay),
+#                       dt.max(dt.f.newCaseOnDay),
+#                       dt.first(dt.f.LandkreisTyp),  # just create the column, will be overwritten
+#                       dt.first(dt.f.Landkreis),
+#                       dt.first(dt.f.IdLandkreis),
+#                       dt.first(dt.f.IdBundesland),
+#                       dt.first(dt.f.Bundesland)]]
+#     alldaysGermany[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
+#     alldaysGermany[:, "Landkreis"] = "Deutschland"
+#     alldaysGermany[:, "Bundesland"] = "Deutschland"
+#     alldaysGermany[:, "FaellePro100k"] = bevoelkerungGermany[:, "FaellePro100k"]
+#     alldaysGermany[:, "TodesfaellePro100k"] = bevoelkerungGermany[:, "TodesfaellePro100k"]
+#     alldaysGermany[:, "LandkreisTyp"] = "BR"
+#     alldaysGermany[:, "IdLandkreis"] = 0
+#     alldaysGermany[:, "IdBundesland"] = 0
+#     alldays.rbind(alldaysGermany, force=True)
+#
+#     ##############################################################################
+#     # compute values for last 7 days for Landkreise
+#     last7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 7) & (dt.f.MeldeDay > forDay - 14)) | (dt.f.newDeathOnDay > forDay - 7), :]
+#     strictLast7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 7) & (dt.f.MeldeDay > forDay - 7)) | (dt.f.newDeathOnDay > forDay - 7), :]
+#     #last7daysRecs.to_csv("last7daysRecs.csv")
+#     last7days = last7daysRecs[:,
+#                 [dt.sum(dt.f.AnzahlFall),
+#                dt.sum(dt.f.FaellePro100k),
+#                dt.sum(dt.f.AnzahlTodesfall),
+#                dt.sum(dt.f.TodesfaellePro100k)],
+#                 dt.by(dt.f.Landkreis)]
+#     last7days.names=["Landkreis","AnzahlFallLetzte7Tage","FaellePro100kLetzte7Tage","AnzahlTodesfallLetzte7Tage",
+#                      "TodesfaellePro100kLetzte7Tage"]
+#
+#     strictLast7days = strictLast7daysRecs[:,
+#                 [dt.sum(dt.f.AnzahlFall),
+#                  dt.sum(dt.f.FaellePro100k)],
+#                 dt.by(dt.f.Landkreis)]
+#     strictLast7days.names = ["Landkreis", "AnzahlFallLetzte7TageStrikt", "FaellePro100kLetzte7TageStrikt"]
+#     #print(strictLast7days)
+#     last7days = join(last7days,strictLast7days, "Landkreis" )
+#     #print(last7days)
+#
+#     # compute values for last 7 days for Bundesländer
+#     last7daysBL = last7daysRecs[:,
+#                 [dt.sum(dt.f.AnzahlFall),
+#                  dt.sum(dt.f.AnzahlTodesfall),
+#                  dt.sum(dt.f.Bevoelkerung)],
+#                   dt.by(dt.f.Bundesland)]
+#     last7daysBL.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage","Bevoelkerung"]
+#     strictLast7daysBL = strictLast7daysRecs[:,
+#                 [dt.sum(dt.f.AnzahlFall),
+#                  dt.sum(dt.f.Bevoelkerung)],
+#                   dt.by(dt.f.Bundesland)]
+#     strictLast7daysBL.names = ["Landkreis", "AnzahlFallLetzte7TageStrikt", "Bevoelkerung"]
+#
+#     bls = last7daysBL[:,"Landkreis"].to_list()[0]
+#     blb = bevoelkerung[:,"Bundesland"].to_list()[0]
+#     #print(bls)
+#     #print(blb)
+#     for i, bl in enumerate(bls):
+#         for j, bb in enumerate(blb):
+#             #print(i,j)
+#             if last7daysBL[i, "Landkreis"] == bevoelkerung[j, "Bundesland"]:
+#                 last7daysBL[i, "Bevoelkerung"] = bevoelkerung[j, "Bevoelkerung"]
+#             if strictLast7daysBL[i, "Landkreis"] == bevoelkerung[j, "Bundesland"]:
+#                 strictLast7daysBL[i, "Bevoelkerung"] = bevoelkerung[j, "Bevoelkerung"]
+#
+#     #last7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
+#     last7daysBL = last7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+#     last7daysBL = last7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+#     #print(last7daysBL)
+#     last7days.rbind(last7daysBL, force=True)
+#     #print(last7days)
+#
+#     strictLast7daysBL = strictLast7daysBL[:,
+#                   dt.f[:].extend({"FaellePro100kLetzte7TageStrikt": dt.f.AnzahlFallLetzte7TageStrikt * 100000 / dt.f.Bevoelkerung})]
+#     strictLast7daysBL = strictLast7daysBL[:, ["Landkreis","AnzahlFallLetzte7TageStrikt","FaellePro100kLetzte7TageStrikt"]]
+#     #print(strictLast7daysBL)
+#     last7days = merge(last7days,strictLast7daysBL, "Landkreis" )
+#     #print(last7days)
+#
+#     # compute values for last 7 days for Germany
+#     last7daysDE = last7daysRecs[:,
+#                   [dt.first(dt.f.Landkreis),
+#                    dt.sum(dt.f.AnzahlFall),
+#                    dt.sum(dt.f.AnzahlTodesfall),
+#                    dt.first(dt.f.Bevoelkerung),
+#                    ]]
+#     last7daysDE.names = ["Landkreis", "AnzahlFallLetzte7Tage", "AnzahlTodesfallLetzte7Tage", "Bevoelkerung"]
+#     last7daysDE[:, "Landkreis"] = "Deutschland"
+#     last7daysDE[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
+#     last7daysDE = last7daysDE[:,
+#                   dt.f[:].extend({"FaellePro100kLetzte7Tage": dt.f.AnzahlFallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+#     last7daysDE = last7daysDE[:, dt.f[:].extend(
+#         {"TodesfaellePro100kLetzte7Tage": dt.f.AnzahlTodesfallLetzte7Tage * 100000 / dt.f.Bevoelkerung})]
+#
+#     #print(last7daysDE)
+#     last7days.rbind(last7daysDE, force=True)
+#
+#     strictLast7daysDE = strictLast7daysRecs[:,
+#                   [dt.first(dt.f.Landkreis),
+#                    dt.sum(dt.f.AnzahlFall),
+#                    dt.first(dt.f.Bevoelkerung),
+#                    ]]
+#     strictLast7daysDE.names = ["Landkreis", "AnzahlFallLetzte7TageStrikt", "Bevoelkerung"]
+#     strictLast7daysDE[:, "Landkreis"] = "Deutschland"
+#     strictLast7daysDE[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
+#     strictLast7daysDE = strictLast7daysDE[:,
+#                   dt.f[:].extend({"FaellePro100kLetzte7TageStrikt": dt.f.AnzahlFallLetzte7TageStrikt * 100000 / dt.f.Bevoelkerung})]
+#     last7days = merge(last7days,strictLast7daysDE, "Landkreis" )
+#
+#     last7days = last7days[:, dt.f[:].extend({"FaelleLetzte7TageDropped": dt.f.AnzahlFallLetzte7Tage - dt.f.AnzahlFallLetzte7TageStrikt})]
+#     last7days = last7days[:, dt.f[:].extend({"FaelleLetzte7TageDroppedPercent": dt.f.FaelleLetzte7TageDropped * 100/dt.f.AnzahlFallLetzte7Tage})]
+#
+#     # clip case count to zero
+#     last7days[dt.f.AnzahlFallLetzte7Tage <0, "AnzahlFallLetzte7Tage"] = 0
+#     last7days[dt.f.FaellePro100kLetzte7Tage <0, "FaellePro100kLetzte7Tage"] = 0
+#     last7days[dt.f.AnzahlTodesfallLetzte7Tage <0, "AnzahlTodesfallLetzte7Tage"] = 0
+#     last7days[dt.f.TodesfaellePro100kLetzte7Tage <0, "TodesfaellePro100kLetzte7Tage"] = 0
+#
+#     last7days[dt.f.AnzahlFallLetzte7TageStrikt < 0, "AnzahlFallLetzte7TageStrikt"] = 0
+#     last7days[dt.f.FaellePro100kLetzte7TageStrikt < 0, "FaellePro100kLetzte7TageStrikt"] = 0
+#     last7days[dt.f.FaelleLetzte7TageDropped < 0, "FaelleLetzte7TageDropped"] = 0
+#     last7days[dt.f.FaelleLetzte7TageDroppedPercent < 0, "FaelleLetzte7TageDroppedPercent"] = 0
+#
+#     ##############################################################################
+#     # compute values for last 7 days before 7 days
+#
+#     lastWeek7daysRecs = fullTable[((dt.f.newCaseOnDay > forDay - 14) & (dt.f.newCaseOnDay <= forDay - 7)
+#                                    & (dt.f.MeldeDay > forDay - 21) & (dt.f.MeldeDay <= forDay - 7)) |
+#                                   ((dt.f.newDeathOnDay > forDay - 14) & (dt.f.newDeathOnDay <= forDay - 7))
+#                                   , :]
+#     lastWeek7days=lastWeek7daysRecs[:,
+#                     [dt.sum(dt.f.AnzahlFall),
+#                dt.sum(dt.f.FaellePro100k),
+#                dt.sum(dt.f.AnzahlTodesfall),
+#                dt.sum(dt.f.TodesfaellePro100k)],
+#        dt.by(dt.f.Landkreis)]
+#     #lastWeek7days[dt.f[1:] < 0, dt.f[1:]] = 0
+#     lastWeek7days.names=["Landkreis","AnzahlFallLetzte7TageDavor","FaellePro100kLetzte7TageDavor",
+#                          "AnzahlTodesfallLetzte7TageDavor","TodesfaellePro100kLetzte7TageDavor"]
+#
+#     # compute values for last 7 days before 7 days for Bundesländer
+#     lastWeek7daysBL = lastWeek7daysRecs[:,
+#                   [dt.sum(dt.f.AnzahlFall),
+#                    dt.sum(dt.f.AnzahlTodesfall),
+#                    dt.sum(dt.f.Bevoelkerung)],
+#                   dt.by(dt.f.Bundesland)]
+#     lastWeek7daysBL.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
+#
+#     bls = lastWeek7daysBL[:,"Landkreis"].to_list()[0]
+#     blb = bevoelkerung[:, "Bundesland"].to_list()[0]
+#     # print(bls)
+#     # print(blb)
+#     for i, bl in enumerate(bls):
+#         for j, bb in enumerate(blb):
+#             # print(i,j)
+#             if lastWeek7daysBL[i, "Landkreis"] == bevoelkerung[j, "Bundesland"]:
+#                 lastWeek7daysBL[i, "Bevoelkerung"] = bevoelkerung[j, "Bevoelkerung"]
+#
+#     #lastWeek7daysBL[:, "Bevoelkerung"] = bevoelkerung[:, "Bevoelkerung"]
+#     lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
+#     lastWeek7daysBL = lastWeek7daysBL[:, dt.f[:].extend({"TodesfaellePro100kLetzte7TageDavor": dt.f.AnzahlTodesfallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
+#     lastWeek7days.rbind(lastWeek7daysBL, force=True)
+#
+#     # compute values for last 7 days for Germany
+#     lastWeek7daysDE = lastWeek7daysRecs[:,
+#                   [dt.first(dt.f.Landkreis),
+#                    dt.sum(dt.f.AnzahlFall),
+#                    dt.sum(dt.f.AnzahlTodesfall),
+#                    dt.first(dt.f.Bevoelkerung),
+#                    ]]
+#     lastWeek7daysDE.names = ["Landkreis", "AnzahlFallLetzte7TageDavor", "AnzahlTodesfallLetzte7TageDavor", "Bevoelkerung"]
+#     lastWeek7daysDE[:, "Landkreis"] = "Deutschland"
+#     lastWeek7daysDE[:, "Bevoelkerung"] = bevoelkerungGermany[:, "Bevoelkerung"]
+#     lastWeek7daysDE = lastWeek7daysDE[:,
+#                   dt.f[:].extend({"FaellePro100kLetzte7TageDavor": dt.f.AnzahlFallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
+#     lastWeek7daysDE = lastWeek7daysDE[:, dt.f[:].extend(
+#         {"TodesfaellePro100kLetzte7TageDavor": dt.f.AnzahlTodesfallLetzte7TageDavor * 100000 / dt.f.Bevoelkerung})]
+#     lastWeek7days.rbind(lastWeek7daysDE, force=True)
+#
+#     ##############################################################################
+#     # compute delays
+#     firstRecordTime = time.strptime("29.4.2020", "%d.%m.%Y")  # struct_time
+#     firstRecordDay = cd.dayFromTime(firstRecordTime)
+#     firstRecordDay = forDay - 21
+#
+#     delayRecs = fullTable[(dt.f.newCaseOnDay > firstRecordDay) | (dt.f.newDeathOnDay > firstRecordDay), :]
+#     delayRecs.materialize()
+#     #print(delayRecs)
+#     #delayRecs.to_csv("delayRecs.csv")
+#     delays = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)], dt.by(dt.f.Landkreis)]
+#     delays.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD", "DelayAnzahlFall"]
+#
+#     delaysBL = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)], dt.by(dt.f.Bundesland)]
+#     delaysBL.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD", "DelayAnzahlFall"]
+#     delays.rbind(delaysBL)
+#
+#     delaysDE = delayRecs[:, [dt.first(dt.f.Landkreis), dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)]]
+#     delaysDE.names = ["Landkreis", "DelayMean", "DelayMedian", "DelaySD", "DelayAnzahlFall"]
+#     delaysDE[:, "Landkreis"] = "Deutschland"
+#     delays.rbind(delaysDE)
+#
+#     #print(delaysBL)
+#
+#     alldays = join(alldays, delays, "Landkreis")
+#     ##############################################################################
+#
+#     # clip case count to zero
+#     lastWeek7days[dt.f.AnzahlFallLetzte7TageDavor <0, "AnzahlFallLetzte7TageDavor"] = 0
+#     lastWeek7days[dt.f.FaellePro100kLetzte7TageDavor <0, "FaellePro100kLetzte7TageDavor"] = 0
+#     lastWeek7days[dt.f.AnzahlTodesfallLetzte7TageDavor <0, "AnzahlTodesfallLetzte7TageDavor"] = 0
+#     lastWeek7days[dt.f.TodesfaellePro100kLetzte7TageDavor <0, "TodesfaellePro100kLetzte7TageDavor"] = 0
+#
+#     allDaysExt0 = join(alldays, last7days, "Landkreis")
+#     allDaysExt1 = join(allDaysExt0, lastWeek7days, "Landkreis")
+#
+#     Rw = (dt.f.AnzahlFallLetzte7Tage+5)/(dt.f.AnzahlFallLetzte7TageDavor + 5)
+#
+#     allDaysExt2=allDaysExt1[:,dt.f[:].extend({"AnzahlFallTrend":  Rw})]
+#
+#     #RwSqrt = (dt.math.sqrt(dt.f.AnzahlFallTrend))
+#     RwSqrt = (dt.math.pow(dt.f.AnzahlFallTrend, 4/7))
+#     allDaysExt2=allDaysExt2[:,dt.f[:].extend({"AnzahlFallTrendSqrt":  RwSqrt})]
+#     allDaysExt3=allDaysExt2[:,dt.f[:].extend({"FaellePro100kTrend": dt.f.FaellePro100kLetzte7Tage-dt.f.FaellePro100kLetzte7TageDavor})]
+#     allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kPrognose": dt.f.FaellePro100kLetzte7Tage*dt.math.pow(dt.f.AnzahlFallTrend, 4)})]
+#     allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kPrognose2": dt.f.FaellePro100kLetzte7Tage*dt.math.pow(dt.f.AnzahlFallTrend, 8)})]
+#
+#     # res = cur * trend ^ t
+#     # trend ^ t = res/cur
+#     # t = log(trend, res/cur)
+#     # t = ln(res/cur)/ln(trend)
+#
+#     allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kTageBisSicher": dt.math.log(3/dt.f.FaellePro100kLetzte7Tage) / dt.math.log(dt.f.AnzahlFallTrend) * 7})]
+#     allDaysExt3=allDaysExt3[:,dt.f[:].extend({"FaellePro100kTageBisSicher2": dt.math.log(7/dt.f.FaellePro100kLetzte7Tage) / dt.math.log(dt.f.AnzahlFallTrend) * 7})]
+#
+#     allDaysExt4=allDaysExt3[:,dt.f[:].extend({"TodesfaellePro100kTrend": dt.f.TodesfaellePro100kLetzte7Tage-dt.f.TodesfaellePro100kLetzte7TageDavor})]
+#
+#     allDaysExt5=allDaysExt4[:,dt.f[:].extend({"Kontaktrisiko": dt.f.Bevoelkerung/3.5/((dt.f.AnzahlFallLetzte7Tage+dt.f.AnzahlFallLetzte7TageDavor)*Rw)})]
+#     allDaysExt6 = allDaysExt5[:, dt.f[:].extend({"LetzteMeldung": forDay - dt.f.MeldeDay})]
+#     allDaysExt6b = allDaysExt6[:, dt.f[:].extend({"LetzteMeldungNeg": dt.f.MeldeDay - forDay})]
+#     allDaysExt6c = allDaysExt6b[:, dt.f[:].extend({"LetzteZaehlungNeg": dt.f.newCaseOnDay - forDay})]
+#     datenStand = cd.dateStrYMDFromDay(forDay+1)
+#     allDaysExt6c = allDaysExt6c[:, dt.f[:].extend({"Datenstand": datenStand})]
+#     allDaysExt6c = allDaysExt6c[:, dt.f[:].extend({"Sofwareversion": versionStr})]
+#
+#     allDaysExt6c[dt.f.Kontaktrisiko * 2 == dt.f.Kontaktrisiko, "Kontaktrisiko"] = 99999
+#     allDaysExt6c[dt.f.FaellePro100kPrognose >= 10000, "FaellePro100kPrognose"] = 9999.9
+#     allDaysExt6c[dt.f.FaellePro100kPrognose2 >= 10000, "FaellePro100kPrognose2"] = 9999.9
+#
+#     sortedByRisk = allDaysExt6c.sort(["Kontaktrisiko","LetzteMeldung","FaellePro100k"])
+#     #print(sortedByRisk)
+#     allDaysExt=sortedByRisk[:,dt.f[:].extend({"Rang": 0})]
+#     allDaysExt[:,"Rang"]=np.arange(1,allDaysExt.nrows+1)
+#     #print(allDaysExt)
+#     #allDaysExt.materialize()
+#     return allDaysExt
+#
+# def loadAndProcessData(fileName):
+#     currentFullTable, lastDay = loadData(fileName)
+#     todayTable = processData(currentFullTable, lastDay).sort("Landkreis")
+#     yesterdayTable = processData(currentFullTable, lastDay-1).sort("Landkreis")
+#
+#     #print(currentFullTable)
+#     #print(todayTable)
+#     #print(yesterdayTable)
+#
+#     resultTable = todayTable[:, dt.f[:].extend({"NewCasesToday": 0})]
+#     change = np.subtract(todayTable[:, "AnzahlFall"],yesterdayTable[:, "AnzahlFall"])
+#     resultTable[:, "NewCasesToday"] = change
+#
+#     for i in range(yesterdayTable.nrows):
+#         l_name = todayTable[i, dt.f.Landkreis].to_list()[0][0]
+#         #l_id = todayTable[i, dt.f.IdLandkreis].to_list()[0][0]
+#         l_new_name = yesterdayTable[i, dt.f.Landkreis].to_list()[0][0]
+#         if l_name != l_new_name:
+#             print("missing {} in today, was {} yesterday".format(l_name, l_new_name))
+#             exit(1)
+#         #else:
+#         #    print("{}: ok: {}".format(i, l_name))
+#
+#     resultTable=resultTable[:,dt.f[:].extend({"RangChange": 0})]
+#     rangChange = np.subtract(yesterdayTable[:,"Rang"],todayTable[:,"Rang"])
+#     resultTable[:,"RangChange"] = rangChange
+#
+#     resultTable=resultTable[:,dt.f[:].extend({"RangYesterday": 0})]
+#     resultTable[:,"RangYesterday"] = yesterdayTable[:,"Rang"]
+#
+#     resultTable=resultTable[:,dt.f[:].extend({"RangChangeStr": "-"})]
+#
+#     rangChangeStrs = np.full(len(rangChange), "*")
+#     for i, rc in enumerate(rangChange):
+#         #print(i, rc)
+#
+#         rangChangeStr = ""
+#         if rc > 0:
+#             rangChangeStr = "▲"
+#         if rc < 0:
+#             rangChangeStr = "▼"
+#
+#         resultTable[i, "RangChangeStr"] = rangChangeStr
+#         rangChangeStrs[i] = rangChangeStr
+#
+#     #print(rangChangeStrs)
+#
+#     #print("Column names frame order:", list(enumerate(resultTable.names)))
+#     resultTable2 = resultTable.sort("Rang")
+#     #print(resultTable2)
+#     data = resultTable2.to_pandas()
+#     #print(data)
+#
+#     return data
 
 defaultColWidth=70
 #charWidth=7
@@ -543,19 +608,19 @@ def makeColumns():
         ('Landkreis', ['Region', 'Name'], 'text', Format(), colWidth(298)),
         ('Bundesland', ['Region', 'Land'], 'text', Format(), colWidth(190)),
         ('LandkreisTyp', ['Region', 'Art'], 'text', Format(), colWidth(30)),
-        ('Bevoelkerung', ['Region', 'Einwohner'], 'numeric', FormatInt, colWidth(90)),
-        ('AnzahlFallTrend', ['Fälle', 'RwK'], 'numeric', FormatFixed2, colWidth(70)),
-        ('AnzahlFallTrendSqrt', ['Fälle', 'R7'], 'numeric', FormatFixed2, colWidth(70)),
-        ('AnzahlFallLetzte7Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('AnzahlFallLetzte7TageDavor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('Einwohner', ['Region', 'Einwohner'], 'numeric', FormatInt, colWidth(90)),
+        ('InzidenzFallNeu-7-Tage-Trend-Spezial', ['Fälle', 'RwK'], 'numeric', FormatFixed2, colWidth(70)),
+        ('InzidenzFallNeu-7-Tage-R', ['Fälle', 'R7'], 'numeric', FormatFixed2, colWidth(70)),
+        ('AnzahlFallNeu-7-Tage', ['Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('AnzahlTodesfallNeu-7-Tage-7-Tage-davor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(90)),
-        ('NewCasesToday', ['Fälle', 'neu'], 'numeric', FormatInt, colWidth(90)),
-        ('FaellePro100kLetzte7Tage', ['Fälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
-        ('FaellePro100kLetzte7TageDavor', ['Fälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
-        ('FaellePro100kTrend', ['Fälle je 100.000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
-        ('FaellePro100k', ['Fälle je 100.000', 'total'], 'numeric', FormatFixed1, colWidth(60)),
-        ('FaellePro100kPrognose', ['Fälle je 100.000', 'in 4 Wochen'], 'numeric', FormatFixed1, colWidth(60)),
-        ('FaellePro100kPrognose2', ['Fälle je 100.000', 'in 8 Wochen'], 'numeric', FormatFixed1, colWidth(60)),
+        ('AnzahlFallNeu', ['Fälle', 'neu'], 'numeric', FormatInt, colWidth(90)),
+        ('InzidenzFallNeu-7-Tage', ['Fälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('InzidenzFallNeu-7-Tage-7-Tage-davor', ['Fälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        #('FaellePro100kTrend', ['Fälle je 100.000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('InzidenzFall', ['Fälle je 100.000', 'total'], 'numeric', FormatFixed1, colWidth(60)),
+        ('InzidenzFallNeu-Prognose-4-Wochen', ['Fälle je 100.000', 'in 4 Wochen'], 'numeric', FormatFixed1, colWidth(60)),
+        ('InzidenzFallNeu-Prognose-8-Wochen', ['Fälle je 100.000', 'in 8 Wochen'], 'numeric', FormatFixed1, colWidth(60)),
         ('FaellePro100kTageBisSicher2', ['Fälle je 100.000', 'Tage bis 7'], 'numeric', FormatInt, colWidth(60)),
         ('FaellePro100kTageBisSicher', ['Fälle je 100.000', 'Tage bis 3'], 'numeric', FormatInt, colWidth(60)),
         ('AnzahlFallLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'absolut'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -568,13 +633,13 @@ def makeColumns():
         ('DelayMedian', ['Meldeverzögerung (Tage)', 'Median x̃'], 'numeric', FormatInt, colWidth(62)),
         ('DelaySD', ['Meldeverzögerung (Tage)', 'Stdabw. σx'], 'numeric', FormatFixed1, colWidth(62)),
         ('DelayAnzahlFall', ['Meldeverzögerung (Tage)', 'Anzahl Fälle'], 'numeric', FormatInt, colWidth(62)),
-        ('AnzahlTodesfallLetzte7Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('AnzahlTodesfallLetzte7TageDavor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('AnzahlTodesfallNeu-7-Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('AnzahlTodesfallNeu-7-Tage-7-Tage-davor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('TodesfaellePro100kLetzte7Tage', ['Todesfälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
-        ('TodesfaellePro100kLetzte7TageDavor', ['Todesfälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
-        ('TodesfaellePro100kTrend', ['Todesfälle je 100.000', 'Diff.'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
-        ('TodesfaellePro100k', ['Todesfälle je 100.000', 'total'], 'numeric', FormatFixed2, colWidth(60)),
+        ('InzidenzTodesfallNeu-7-Tage', ['Todesfälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('InzidenzTodesfallNeu-7-Tage-7-Tage-davor', ['Todesfälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('InzidenzTodesfallNeu-7-Tage-Trend-Spezial', ['Todesfälle je 100.000', 'Trend'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('InzidenzTodesfall', ['Todesfälle je 100.000', 'total'], 'numeric', FormatFixed2, colWidth(60)),
     ]
 
     orderedCols, orderedNames, orderedTypes, orderFormats, orderWidths = zip(*desiredOrder)
@@ -617,23 +682,23 @@ app = dash.Dash(
 )
 #app.css.append_css({'external_url': 'assets/reset.css'})
 
-fullTableFilename = "full-latest.csv"
-cacheFilename = "data-cached.feather"
-dataFilename = "data.csv"
-
-FORCE_REFRESH_CACHE = debugFlag
-#FORCE_REFRESH_CACHE = True
-
-if FORCE_REFRESH_CACHE or not os.path.isfile(cacheFilename) or os.path.getmtime(fullTableFilename) > os.path.getmtime(cacheFilename) :
-    dframe = loadAndProcessData(fullTableFilename)
-    dframe.to_feather(cacheFilename)
-    dframe.to_csv(dataFilename)
-else:
-    print("Loading data cache from ‘"+cacheFilename+"‘")
-    dframe = pd.read_feather(cacheFilename)
-
-csvData = open(dataFilename,"rb").read().decode('utf-8')
-csvFullData = open(fullTableFilename,"rb").read().decode('utf-8')
+# fullTableFilename = "full-latest.csv"
+# cacheFilename = "data-cached.feather"
+# dataFilename = "data.csv"
+#
+# FORCE_REFRESH_CACHE = debugFlag
+# #FORCE_REFRESH_CACHE = True
+#
+# if FORCE_REFRESH_CACHE or not os.path.isfile(cacheFilename) or os.path.getmtime(fullTableFilename) > os.path.getmtime(cacheFilename) :
+#     dframe = loadAndProcessData(fullTableFilename)
+#     dframe.to_feather(cacheFilename)
+#     dframe.to_csv(dataFilename)
+# else:
+#     print("Loading data cache from ‘"+cacheFilename+"‘")
+#     dframe = pd.read_feather(cacheFilename)
+#
+# csvData = open(dataFilename,"rb").read().decode('utf-8')
+# csvFullData = open(fullTableFilename,"rb").read().decode('utf-8')
 
 dataURL = '/covid/risks/data.csv'
 
@@ -651,18 +716,26 @@ fullDataURL = '/covid/risks/full-data.csv'
 def csv_fulldata():
     return csvResponse(csvFullData)
 
-
-maxDay = float(dframe["MeldeDay"].max())
-#print(maxDay)
-dataVersionDate = cd.dateStrWDMYFromDay(maxDay+1)
-print("Loading done, max Day {} date {}".format(maxDay, dataVersionDate))
-
-print("Creating Datatable")
-data = dframe.to_dict("records")
+###########################################################################################
+# Start of table initialization
 columns, colWidths, totalWidth, minWidth, maxWidth = makeColumns()
 totalWidthStr = colWidthStr(totalWidth)
 minWidthStr = colWidthStr(minWidth)
 maxWidthStr = colWidthStr(maxWidth)
+
+# load table
+fullTable = loadData("all-series.csv")
+
+#maxDay = float(dframe["MeldeDay"].max())
+maxDay = fullTable[:,"DatenstandTag"].max().to_list()[0][0]
+print(maxDay)
+dataVersionDate = cd.dateStrWDMYFromDay(maxDay+1)
+print("Loading done, max Day {} date {}".format(maxDay, dataVersionDate))
+
+print("Creating Datatable")
+
+table = getTableForDay(fullTable, maxDay)
+data = table.to_pandas().to_dict("records")
 
 # print("colWidths", colWidths)
 # print("totalWidthStr",totalWidthStr)
