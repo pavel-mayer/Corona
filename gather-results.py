@@ -92,7 +92,7 @@ def main():
     parser = argparse.ArgumentParser(description='Gather daily tables and save in a single file')
     parser.add_argument('files', metavar='fileName', type=str, nargs='+',
                         help='.csv-File produced by enhance.py')
-    parser.add_argument('-o', '--output-file', dest='outputFile', default="gathered.csv")
+    parser.add_argument('-o', '--output-file', dest='outputFile', default="all-series.csv")
     args = parser.parse_args()
     print(args)
     result = None
@@ -100,15 +100,18 @@ def main():
         files = sorted(glob.glob(fa))
         print(files)
         for f in files:
-            print("Gathering {}".format(f))
-            table = dt.fread(f)
-            #print(table.names)
-            #print(table.stypes)
-            print(list(zip(table.names, table.stypes)))
-            if result is None:
-                result = table
+            if not "nicht erhoben" in f:
+                print("Gathering {}".format(f))
+                table = dt.fread(f)
+                #print(table.names)
+                #print(table.stypes)
+                print(list(zip(table.names, table.stypes)))
+                if result is None:
+                    result = table
+                else:
+                    result.rbind(table)
             else:
-                result.rbind(table)
+                print("Ignoring {}".format(f))
     print(result)
     if result is not None:
         print("Saving {}".format(args.outputFile))

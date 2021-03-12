@@ -56,6 +56,7 @@ def analyzeDayRange(fullTable, fromDay, toDay):
         recovered = recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
         new_recovered_to_count = dayTable[(dt.f.NeuGenesen == -1) | (dt.f.NeuGenesen == 1),:]
         new_recovered = new_recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
+
     #lastDay=fullTable[:,'MeldeDay'].max()[0,0]
     #lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
     print("From {}-{} Day {}-{}: cases {} (+{}), dead {} (+{}), recovered {} (+{})".format(
@@ -75,14 +76,52 @@ def analyzeDaily(fullTable, filter, postfix):
     cases = cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
     cases.names = ["DatenstandTag", "AnzahlFall"+postfix]
     cases.key = "DatenstandTag"
-    print("cases rows = {}".format(cases.nrows))
+    print("cases rows = {}, cases_to_count = {}".format(cases.nrows, cases_to_count.nrows))
     #print(cases)
 
     new_cases_to_count = dayTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1),:]
     new_cases = new_cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
     new_cases.names = ["DatenstandTag", "AnzahlFallNeu"+postfix]
     new_cases.key = "DatenstandTag"
-    #print("new_cases rows = {}".format(new_cases.nrows))
+    print("new_cases rows = {}, new_cases_to_count = {}".format(new_cases.nrows, new_cases_to_count.nrows))
+    #new_cases_to_count.to_csv("new_cases_to_count.csv")
+
+    new_cases_to_count_delay = new_cases_to_count[(dt.f.AnzahlFall > 0),:] # measure delay only for positive cases
+    new_cases_to_count_delay.materialize()
+    new_cases_delay = new_cases_to_count_delay[:, [dt.min(dt.f.MeldeDelay),dt.max(dt.f.MeldeDelay),
+                      dt.mean(dt.f.MeldeDelay),dt.median(dt.f.MeldeDelay),
+                      dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall),
+                      dt.max(dt.f.DatenstandTag)],dt.by(dt.f.DatenstandTag)]
+    new_cases_delay.names = ["DatenstandTag",
+                             "MeldeDauerFallNeu-Min" + postfix,"MeldeDauerFallNeu-Max" + postfix,
+                             "MeldeDauerFallNeu-Schnitt" + postfix, "MeldeDauerFallNeu-Median" + postfix,
+                             "MeldeDauerFallNeu-StdAbw" + postfix, "MeldeDauerFallNeu-Fallbasis" + postfix,
+                             "DatenstandTag-Max" + postfix]
+    new_cases_delay.key = "DatenstandTag"
+    print("new_cases_delay rows = {}, new_cases_to_count_delay = {}".format(new_cases_delay.nrows, new_cases_to_count_delay.nrows))
+    #new_cases_delay = new_cases_to_count_delay[:, [dt.mean(dt.f.DatenstandTag-dt.f.MeldeTag)],dt.by(dt.f.DatenstandTag)]
+
+    #     delays = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)], dt.by(dt.f.Landkreis)]
+
+    # new_cases_stddev = new_cases_to_count_delay[:, [dt.mean(dt.f.DatenstandTag - dt.f.MeldeTag)],
+    #                   dt.by(dt.f.DatenstandTag)]
+    # new_cases_delay.names = ["DatenstandTag", "AnzahlFallNeu-MeldeDauer" + postfix]
+    # new_cases_delay.key = "DatenstandTag"
+    # print("new_cases_delay rows = {}, new_cases_to_count_delay = {}".format(new_cases_delay.nrows,
+    #                                                                         new_cases_to_count_delay.nrows))
+
+    new_cases_to_count_strict = new_cases_to_count[(dt.f.DatenstandTag - dt.f.MeldeTag < 7) | (dt.f.AnzahlFall < 0) ,:]
+    new_cases_strict = new_cases_to_count_strict[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
+    new_cases_strict.names = ["DatenstandTag", "AnzahlFallNeu-Meldung-letze-7-Tage"+postfix]
+    new_cases_strict.key = "DatenstandTag"
+    print("new_cases_strict rows = {}, new_cases_to_count_strict = {}".format(new_cases_strict.nrows, new_cases_to_count_strict.nrows))
+    #new_cases_to_count_strict.to_csv("new_cases_to_count_strict.csv")
+
+    new_cases_to_count_strict_14 = new_cases_to_count[(dt.f.DatenstandTag - dt.f.MeldeTag < 14) | (dt.f.AnzahlFall < 0) ,:]
+    new_cases_strict_14 = new_cases_to_count_strict_14[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
+    new_cases_strict_14.names = ["DatenstandTag", "AnzahlFallNeu-Meldung-letze-14-Tage"+postfix]
+    new_cases_strict_14.key = "DatenstandTag"
+    print("new_cases_strict_14 rows = {}, new_cases_to_count_strict_14 = {}".format(new_cases_strict_14.nrows, new_cases_to_count_strict_14.nrows))
 
     dead_to_count = dayTable[(dt.f.NeuerTodesfall == 0) | (dt.f.NeuerTodesfall == 1),:]
     dead = dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(dt.f.DatenstandTag)]
@@ -108,10 +147,12 @@ def analyzeDaily(fullTable, filter, postfix):
     new_recovered.key = "DatenstandTag"
     #print("new_recovered rows = {}".format(new_recovered.nrows))
 
-    byDayTable = cases[:,:,dt.join(new_cases)][:,:,dt.join(dead)][:,:,dt.join(new_dead)][:,:,dt.join(recovered)][:,:,dt.join(new_recovered)]
+    byDayTable = cases[:,:,dt.join(new_cases)]\
+                     [:,:,dt.join(dead)][:,:,dt.join(new_dead)][:,:,dt.join(recovered)][:,:,dt.join(new_recovered)]\
+        [:,:,dt.join(new_cases_strict)][:,:,dt.join(new_cases_strict_14)][:,:,dt.join(new_cases_delay)]
     byDayTable.key = "DatenstandTag"
     #print("byDayTable rows = {}".format(byDayTable.nrows))
-    #print(byDayTable)
+    print(byDayTable)
 
     return byDayTable
 
@@ -268,6 +309,7 @@ def landKreisTyp(lk_id, lk_name):
         return "LSK"
 
 def analyze(fullTable, args):
+    #fullTable = fullTable[dt.f.DatenstandTag > 382 - 20,:]
     print("Analyzing")
     pmu.printMemoryUsage("begin analyze")
     print("Keys:")
@@ -280,6 +322,10 @@ def analyze(fullTable, args):
     #fromDay = lastDumpDay-27
     fromDay = firstDumpDay
     toDay = lastDumpDay+1
+
+    fullTable = fullTable[:, dt.f[:].extend({"MeldeDelay": dt.f.DatenstandTag-dt.f.MeldeTag-1})]
+    fullTable = fullTable[:, dt.f[:].extend({"RefDelay": dt.f.DatenstandTag-dt.f.RefTag-1})]
+    fullTable.materialize()
 
     Altersgruppen = []
     if args.agegroups:
@@ -314,6 +360,8 @@ def analyze(fullTable, args):
     pmu.saveCsvTable(deutschland, "series-{}-{}.csv".format(0, "Deutschland"), args.outputDir)
     pmu.printMemoryUsage("post save")
     deutschland = None
+
+    #exit(0)
 
     print("Processing Bundesländer")
     bundeslaender, bundeslaender_numbers = timeSeries(fullTable, fromDay, toDay, dt.f.IdBundesland, dt.f.Bundesland, Altersgruppen, Geschlechter)

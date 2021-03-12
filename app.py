@@ -625,6 +625,7 @@ def makeColumns():
         ('AnzahlFallNeu-7-Tage-7-Tage-davor', ['Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlFall', ['Fälle', 'total'], 'numeric', FormatInt, colWidth(90)),
         ('AnzahlFallNeu', ['Fälle', 'neu'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+
         ('InzidenzFallNeu-7-Tage', ['Fälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('InzidenzFallNeu-7-Tage-7-Tage-davor', ['Fälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         #('FaellePro100kTrend', ['Fälle je 100.000', 'Diff.'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
@@ -633,16 +634,19 @@ def makeColumns():
         ('InzidenzFallNeu-Prognose-8-Wochen', ['Fälle je 100.000', 'in 8 Wochen'], 'numeric', FormatFixed1, colWidth(60)),
         ('InzidenzFallNeu-Tage-bis-50', ['Fälle je 100.000', 'Tage bis 50'], 'numeric', FormatInt, colWidth(60)),
         ('InzidenzFallNeu-Tage-bis-100', ['Fälle je 100.000', 'Tage bis 100'], 'numeric', FormatInt, colWidth(60)),
-        ('AnzahlFallLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'absolut'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('FaellePro100kLetzte7TageStrikt', ['Fälle strikt 7 Tage', 'je 100.000'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
-        ('FaelleLetzte7TageDropped', ['Fälle strikt 7 Tage', 'RKI ignoriert'], 'numeric', FormatInt, colWidth(defaultColWidth)),
-        ('FaelleLetzte7TageDroppedPercent', ['Fälle strikt 7 Tage', 'RKI ignoriert %'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
-        ('LetzteMeldungNeg', ['Meldung', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
-        ('LetzteZaehlungNeg', ['Meldung', 'Letzte Zählung'], 'numeric', FormatInt, colWidth(70)),
-        ('DelayMean', ['Meldeverzögerung (Tage)', 'Mittel x̅'], 'numeric', FormatFixed1, colWidth(62)),
-        ('DelayMedian', ['Meldeverzögerung (Tage)', 'Median x̃'], 'numeric', FormatInt, colWidth(62)),
-        ('DelaySD', ['Meldeverzögerung (Tage)', 'Stdabw. σx'], 'numeric', FormatFixed1, colWidth(62)),
-        ('DelayAnzahlFall', ['Meldeverzögerung (Tage)', 'Anzahl Fälle'], 'numeric', FormatInt, colWidth(62)),
+
+        ('AnzahlFallNeu-Meldung-letze-7-Tage-7-Tage', ['Fälle strikt 7 Tage', 'absolut'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('InzidenzFallNeu-Meldung-letze-7-Tage-7-Tage', ['Fälle strikt 7 Tage', 'je 100.000'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('AnzahlFallNeu-7-Tage-Dropped', ['Fälle strikt 7 Tage', 'RKI ignoriert'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('ProzentFallNeu-7-Tage-Dropped', ['Fälle strikt 7 Tage', 'RKI ignoriert %'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+
+        ('DatenstandTag-Max', ['Meldung', 'Letzte Zählung'], 'numeric', FormatInt, colWidth(70)),
+        ('MeldeDauerFallNeu-Min', ['Meldung', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
+        ('MeldeDauerFallNeu-Max', ['Meldeverzögerung (Tage)', 'Max.'], 'numeric', FormatFixed1, colWidth(62)),
+        ('MeldeDauerFallNeu-Schnitt', ['Meldeverzögerung (Tage)', 'Mittel x̅'], 'numeric', FormatFixed1, colWidth(62)),
+        ('MeldeDauerFallNeu-Median', ['Meldeverzögerung (Tage)', 'Median x̃'], 'numeric', FormatInt, colWidth(62)),
+        ('MeldeDauerFallNeu-StdAbw', ['Meldeverzögerung (Tage)', 'Stdabw. σx'], 'numeric', FormatFixed1, colWidth(62)),
+        ('MeldeDauerFallNeu-Fallbasis', ['Meldeverzögerung (Tage)', 'Anzahl Fälle'], 'numeric', FormatInt, colWidth(62)),
         ('AnzahlTodesfallNeu-7-Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfallNeu-7-Tage-7-Tage-davor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -757,15 +761,17 @@ colors = {
     'text': 'white'
 }
 
+conditionUltra="conditionUltra"
 conditionDanger="conditionDanger"
 conditionTooHigh="conditionTooHigh"
 conditionSerious="conditionSerious"
 conditionGood="conditionGood"
 conditionSafe="conditionSafe"
 
-conditions = [conditionDanger, conditionTooHigh, conditionSerious, conditionGood, conditionSafe]
+conditions = [conditionUltra, conditionDanger, conditionTooHigh, conditionSerious, conditionGood, conditionSafe]
 
 conditionStyleDict = {
+    conditionUltra : {'backgroundColor': 'blueviolet', 'color': 'white'},
     conditionDanger : {'backgroundColor': 'firebrick', 'color': 'white'},
     conditionTooHigh: {'color': 'tomato'},
     conditionSerious: {'color': 'yellow'},
@@ -793,52 +799,87 @@ def braced(condition):
     return "("+condition+")"
 
 KontaktrisikoClass = {
-    conditionDanger : '{Kontaktrisiko} > 0 && {Kontaktrisiko} < 100',
+    conditionUltra : '{Kontaktrisiko} > 0 && {Kontaktrisiko} < 50',
+    conditionDanger : '{Kontaktrisiko} >= 50 && {Kontaktrisiko} < 100',
     conditionTooHigh: '{Kontaktrisiko} >= 100 && {Kontaktrisiko} < 1000',
     conditionSerious: '{Kontaktrisiko} >= 1000 && {Kontaktrisiko} < 2500',
     conditionGood: '{Kontaktrisiko} >= 2500 && {Kontaktrisiko} < 10000',
-    conditionSafe: '{Kontaktrisiko} > 10000'
+    conditionSafe: '{Kontaktrisiko} >= 10000'
 }
 
-FaellePro100kLetzte7TageClass = {
-    conditionDanger : '{InzidenzFallNeu-7-Tage} > 50',
-    conditionTooHigh: '{InzidenzFallNeu-7-Tage} > 20 && {InzidenzFallNeu-7-Tage} <= 50',
-    conditionSerious: '{InzidenzFallNeu-7-Tage} > 5 && {InzidenzFallNeu-7-Tage} <= 20',
-    conditionGood: '{InzidenzFallNeu-7-Tage} >= 1 && {InzidenzFallNeu-7-Tage} <= 5',
-    conditionSafe: '{InzidenzFallNeu-7-Tage} < 1'
-}
+def makeExpression(name, low=None, high=None):
+    nameVar = "{"+name+"}"
+    if low is None:
+        return "{} >= {}".format(nameVar, high)
+    if high is None:
+        return "{} < {}".format(nameVar, low)
+    return "{} >= {} && {} < {}".format(nameVar, low, nameVar, high)
 
-FaellePro100kPrognoseClass = {
-    conditionDanger : '{InzidenzFallNeu-Prognose-4-Wochen} > 50',
-    conditionTooHigh: '{InzidenzFallNeu-Prognose-4-Wochen} > 20 && {InzidenzFallNeu-Prognose-4-Wochen} <= 50',
-    conditionSerious: '{InzidenzFallNeu-Prognose-4-Wochen} > 5 && {InzidenzFallNeu-Prognose-4-Wochen} <= 20',
-    conditionGood: '{InzidenzFallNeu-Prognose-4-Wochen} >= 1 && {InzidenzFallNeu-Prognose-4-Wochen} <= 5',
-    conditionSafe: '{InzidenzFallNeu-Prognose-4-Wochen} < 1'
-}
 
-FaellePro100kPrognose2Class = {
-    conditionDanger : '{InzidenzFallNeu-Prognose-8-Wochen} > 50',
-    conditionTooHigh: '{InzidenzFallNeu-Prognose-8-Wochen} > 20 && {InzidenzFallNeu-Prognose-8-Wochen} <= 50',
-    conditionSerious: '{InzidenzFallNeu-Prognose-8-Wochen} > 5 && {InzidenzFallNeu-Prognose-8-Wochen} <= 20',
-    conditionGood: '{InzidenzFallNeu-Prognose-8-Wochen} >= 1 && {InzidenzFallNeu-Prognose-8-Wochen} <= 5',
-    conditionSafe: '{InzidenzFallNeu-Prognose-8-Wochen} < 1'
-}
+def makeConditionClass(name, ultra, danger, tooHigh, serious, good):
+    c=  {
+        conditionUltra : makeExpression(name, None, ultra),
+        conditionDanger : makeExpression(name, danger, ultra),
+        conditionTooHigh: makeExpression(name, tooHigh, danger),
+        conditionSerious: makeExpression(name, serious, tooHigh),
+        conditionGood: makeExpression(name, good, serious),
+        conditionSafe: makeExpression(name, good),
+    }
+    print(c)
+    return c
 
-AnzahlFallTrendClass = {
-    conditionDanger : '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 3',
-    conditionTooHigh: '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 1 && {InzidenzFallNeu-7-Tage-Trend-Spezial} <= 3',
-    conditionSerious: '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 0.9 && {InzidenzFallNeu-7-Tage-Trend-Spezial} <= 1',
-    conditionGood: '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 0.3 && {InzidenzFallNeu-7-Tage-Trend-Spezial} <= 0.9',
-    conditionSafe: '{InzidenzFallNeu-7-Tage-Trend-Spezial} < 0.3'
-}
+
+FaellePro100kLetzte7TageClass = makeConditionClass("InzidenzFallNeu-7-Tage",100,50,20,5,1)
+FaellePro100kPrognoseClass = makeConditionClass("InzidenzFallNeu-Prognose-4-Wochen",100,50,20,5,1)
+FaellePro100kPrognose2Class = makeConditionClass("InzidenzFallNeu-Prognose-8-Wochen",100,50,20,5,1)
+
+
+# FaellePro100kLetzte7TageClass = {
+#     conditionUltra : '{InzidenzFallNeu-7-Tage} > 50',
+#     conditionDanger : '{InzidenzFallNeu-7-Tage} > 50 && {InzidenzFallNeu-7-Tage} <= 50',
+#     conditionTooHigh: '{InzidenzFallNeu-7-Tage} > 20 && {InzidenzFallNeu-7-Tage} <= 50',
+#     conditionSerious: '{InzidenzFallNeu-7-Tage} > 5 && {InzidenzFallNeu-7-Tage} <= 20',
+#     conditionGood: '{InzidenzFallNeu-7-Tage} >= 1 && {InzidenzFallNeu-7-Tage} <= 5',
+#     conditionSafe: '{InzidenzFallNeu-7-Tage} < 1'
+# }
+#
+# FaellePro100kPrognoseClass = {
+#     conditionDanger : '{InzidenzFallNeu-Prognose-4-Wochen} > 50',
+#     conditionTooHigh: '{InzidenzFallNeu-Prognose-4-Wochen} > 20 && {InzidenzFallNeu-Prognose-4-Wochen} <= 50',
+#     conditionSerious: '{InzidenzFallNeu-Prognose-4-Wochen} > 5 && {InzidenzFallNeu-Prognose-4-Wochen} <= 20',
+#     conditionGood: '{InzidenzFallNeu-Prognose-4-Wochen} >= 1 && {InzidenzFallNeu-Prognose-4-Wochen} <= 5',
+#     conditionSafe: '{InzidenzFallNeu-Prognose-4-Wochen} < 1'
+# }
+#
+# FaellePro100kPrognose2Class = {
+#     conditionDanger : '{InzidenzFallNeu-Prognose-8-Wochen} > 50',
+#     conditionTooHigh: '{InzidenzFallNeu-Prognose-8-Wochen} > 20 && {InzidenzFallNeu-Prognose-8-Wochen} <= 50',
+#     conditionSerious: '{InzidenzFallNeu-Prognose-8-Wochen} > 5 && {InzidenzFallNeu-Prognose-8-Wochen} <= 20',
+#     conditionGood: '{InzidenzFallNeu-Prognose-8-Wochen} >= 1 && {InzidenzFallNeu-Prognose-8-Wochen} <= 5',
+#     conditionSafe: '{InzidenzFallNeu-Prognose-8-Wochen} < 1'
+# }
+
+# AnzahlFallTrendClass = {
+#     conditionDanger : '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 3',
+#     conditionTooHigh: '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 1 && {InzidenzFallNeu-7-Tage-Trend-Spezial} <= 3',
+#     conditionSerious: '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 0.9 && {InzidenzFallNeu-7-Tage-Trend-Spezial} <= 1',
+#     conditionGood: '{InzidenzFallNeu-7-Tage-Trend-Spezial} > 0.3 && {InzidenzFallNeu-7-Tage-Trend-Spezial} <= 0.9',
+#     conditionSafe: '{InzidenzFallNeu-7-Tage-Trend-Spezial} < 0.3'
+# }
+AnzahlFallTrendClass = makeConditionClass("InzidenzFallNeu-7-Tage-Trend-Spezial",3,2,1,0.9,0.3)
 
 LandkreisClass = {
-    conditionDanger : KontaktrisikoClass[conditionDanger] +" || "+ braced(FaellePro100kLetzte7TageClass[conditionDanger])+" || "+braced(AnzahlFallTrendClass[conditionDanger]),
-    conditionTooHigh: KontaktrisikoClass[conditionTooHigh]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
-    conditionSerious: KontaktrisikoClass[conditionSerious]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
-    conditionGood: KontaktrisikoClass[conditionGood]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
-    conditionSafe: KontaktrisikoClass[conditionSafe]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
+    conditionUltra : KontaktrisikoClass[conditionUltra] +" || "+ braced(FaellePro100kLetzte7TageClass[conditionUltra])+" || "+braced(AnzahlFallTrendClass[conditionUltra]),
+    conditionDanger : "("+KontaktrisikoClass[conditionDanger]+" || "+ braced(FaellePro100kLetzte7TageClass[conditionDanger])+ ") && "+ Not(FaellePro100kLetzte7TageClass[conditionUltra])+" && "+ Not(AnzahlFallTrendClass[conditionUltra]),
+    conditionTooHigh: KontaktrisikoClass[conditionTooHigh]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionUltra])+" && "+ Not(AnzahlFallTrendClass[conditionUltra])+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
+    conditionSerious: KontaktrisikoClass[conditionSerious]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionUltra])+" && "+ Not(AnzahlFallTrendClass[conditionUltra])+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
+    conditionGood: KontaktrisikoClass[conditionGood]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionUltra])+" && "+ Not(AnzahlFallTrendClass[conditionUltra])+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
+    conditionSafe: KontaktrisikoClass[conditionSafe]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionUltra])+" && "+ Not(AnzahlFallTrendClass[conditionUltra])+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
 }
+
+print(LandkreisClass)
+
+#    conditionDanger : KontaktrisikoClass[conditionDanger]+" || "+ braced(FaellePro100kLetzte7TageClass[conditionDanger])+ "&& "+ Not(FaellePro100kLetzte7TageClass[conditionUltra])+" && "+ Not(AnzahlFallTrendClass[conditionUltra]),
 
 xClass = {
     conditionDanger : '',
