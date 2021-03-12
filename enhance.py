@@ -80,6 +80,15 @@ def addIncidenceColumn(table, srcColumn, newColumn):
     newTable = table[:, dt.f[:].extend({newColumn: src / dt.f.Einwohner * 100000})]
     return newTable
 
+def addMultipliedColumn(table, srcColumn, newColumn, factor):
+    src = dt.f[srcColumn]
+    #print("srcColumn",srcColumn)
+    #print(list(zip(table.names, table.stypes)))
+    newTable = table[:, dt.f[:].extend({newColumn: src * factor})]
+    return newTable
+
+
+
 # goal = incidence * trend ^ t
 # trend ^ t = goal/incidence
 # t = log(trend, goal/incidence)
@@ -115,10 +124,20 @@ def addIncidences(table):
 
     return table
 
+def enhanceDatenstandTagMax(table):
+    for row in range(table.nrows):
+        table[row,"DatenstandTag-Max"] = table[:row+1,"DatenstandTag-Max"].max()
+    return table
+
+
 def addMoreMetrics(table):
+    table = enhanceDatenstandTagMax(table)
+    table = addDifferenceColumn(table, "DatenstandTag-Max", "DatenstandTag", "DatenstandTag-Diff")
     table = addIncidenceColumn(table, "AnzahlFallNeu-Meldung-letze-7-Tage-7-Tage", "InzidenzFallNeu-Meldung-letze-7-Tage-7-Tage")
     table = addDifferenceColumn(table, "AnzahlFallNeu-7-Tage", "AnzahlFallNeu-Meldung-letze-7-Tage-7-Tage", "AnzahlFallNeu-7-Tage-Dropped")
     table = addRatioColumn(table, "AnzahlFallNeu-7-Tage-Dropped", "AnzahlFallNeu-7-Tage", "ProzentFallNeu-7-Tage-Dropped", factor=100)
+    table = addMultipliedColumn(table, "MeldeDauerFallNeu-Min", "MeldeDauerFallNeu-Min-Neg", factor=-1)
+
     return table
 
 def add7DayAverages(table):
@@ -164,7 +183,7 @@ def enhance(inputFile, destDir="."):
     #print(table.names)
     #print(table.stypes)
 
-    numericColumns = [name for name in table.names if "Anzahl" in name or "Inzidenz" in name]
+    numericColumns = [name for name in table.names if "Anzahl" in name or "Inzidenz" in name or "DatenstandTag-Max" in name]
     fillEmptyCellsWithZeroes(table, numericColumns)
 
     newTable = addIncidences(table)

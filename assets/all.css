@@ -47,6 +47,9 @@ a:active {
   font-weight: bold;
   color:lightsteelblue;
 }
+.conditionUltra {
+  background-color: blueviolet;
+}
 .conditionDanger {
   background-color: firebrick;
 }

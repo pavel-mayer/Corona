@@ -36,7 +36,7 @@ import dash_table.FormatTemplate as FormatTemplate
 import socket
 import time
 
-versionStr="0.9.18"
+versionStr="1.0.0.0"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
@@ -640,8 +640,8 @@ def makeColumns():
         ('AnzahlFallNeu-7-Tage-Dropped', ['Fälle strikt 7 Tage', 'RKI ignoriert'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('ProzentFallNeu-7-Tage-Dropped', ['Fälle strikt 7 Tage', 'RKI ignoriert %'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
 
-        ('DatenstandTag-Max', ['Meldung', 'Letzte Zählung'], 'numeric', FormatInt, colWidth(70)),
-        ('MeldeDauerFallNeu-Min', ['Meldung', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
+        ('DatenstandTag-Diff', ['Meldung', 'Letzte Zählung'], 'numeric', FormatInt, colWidth(70)),
+        ('MeldeDauerFallNeu-Min-Neg', ['Meldung', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
         ('MeldeDauerFallNeu-Max', ['Meldeverzögerung (Tage)', 'Max.'], 'numeric', FormatFixed1, colWidth(62)),
         ('MeldeDauerFallNeu-Schnitt', ['Meldeverzögerung (Tage)', 'Mittel x̅'], 'numeric', FormatFixed1, colWidth(62)),
         ('MeldeDauerFallNeu-Median', ['Meldeverzögerung (Tage)', 'Median x̃'], 'numeric', FormatInt, colWidth(62)),
@@ -1138,7 +1138,7 @@ h_header = html.Header(
     },
     children=[
         html.H1(className="app-header", children=appTitle, style={'color': colors['text'], 'text-decoration': 'none'}, id="title_header"),
-        html.H2(className="app-header", children="ACHTUNG: Die Zahlen in der Tabelle sind aktuell falsch. Bitte nicht verwenden. Arbeite an der Behebung.", style={'color':'red', 'text-decoration': 'none'}, id="title_alarm"),
+        html.H2(className="app-header", children="Die Zahlen in der Tabelle sind wieder benutzbar.", style={'color':'green', 'text-decoration': 'none'}, id="title_alarm"),
         html.H4(className="app-header-date",
                 children="Datenstand: {} 00:00 Uhr (wird täglich aktualisiert)".format(dataVersionDate),
                 style={'color': colors['text']}),
@@ -1198,59 +1198,79 @@ h_Erlauterung=html.P([
 h_News=html.P([
     html.Span("News:", className=introClass),
     html.P(
-        " Version 0.9.18: Prognosespalten hinzugefügt für Inzidenzen in 4 und 8 Wochen und Tage bis Inzidenz 3 und 7"
+        " Version 1.0.0.0: Die Seite sieht zwar noch fast genauso aus wie vorher, aber die Datenpipeline und alle Berechnungen "
+        " sind komplett von Grundauf neu geschrieben. Es sollten jetzt die neuen täglichen Fälle und"
+        " die Gesamtzahlen identisch mit den offiziell vom RKI veröffentlichten Zahlen sein. Die neue Datenpipeline ist ganz frisch und kann noch Fehler enthalten, wobei die Fallzahlen eingentlich "
+        " alle ziemlich gut aussehen."
         "", className=bodyClass),
     html.P(
-        " Version 0.9.17: Fehler in der Datenaufbereitung gefixt, der zwischen dem 16.12. und 25.12.2020 fehlerhafte Werte verursacht hat. Sorry dafür."
+        "Ansonsten gibt es noch als erstes kleines neues, unübersehbares Feature: Condition Ultra beziehungsweise violett. Sie markiert im Prinzip"
+        " Inzidenzen über 100. Des weiteren gibt es zwei wesentliche Unterschiede in der Berechnung der Zahlen:"
         "", className=bodyClass),
     html.P(
-        " Version 0.9.16: R7-Berechnnung von sqrt(RwK) auf RwK^(4/7) geändert."
+        "1) Der Riskofaktor ist jetzt geringer, weil nur noch die Fälle der letzten Woche und nicht der letzten 2 Wochen als Grundlage für"
+        " die Zahl der Infizierten herangezogen wird."
         "", className=bodyClass),
     html.P(
-        " Version 0.9.15: Weitere Spalten hinzugefügt, um die Anzahl von Fällen anzuzeigen, die bei der offiziellen Berechnung der"
-        " 7-Tage-Inzidenz durch das RKI unter den Tisch fallen, weil sie später als 7 Tage nach der Meldung beim Gesundheitsamt ans RKI gemeldet wurden."
-        " Neu ist auch die Spalte R7, die in ihrer Bedeutung und Dimension in etwa dem berühmten 7-Tage-R-Wert entspricht. Die .csv-Datei enthält jetzt Felder"
-        " zum Datenstand und zur Software-Version, mit der die Tabelle generiert wurde. Der Dunkelzifferfaktor wurde zudem von 6,25 auf 3,5 reduziert."
+        "2) Die Trendberechnung und 7-Tage-Inzidenz berechnen nun alle Fälle mit ein. Die alte Version hatte als 'Kompromiss' "
+        " alle Fälle ignoriert, die länger als 14 Tage zur Meldung bebraucht haben. Bei höherer Zahl an Nachmeldungen kann"
+        " man einfach die in den Spalten unter 'Fälle strikt 7 Tage' heranziehen."
         "", className=bodyClass),
-    html.P(
-        " Version 0.9.14: Weiteren Fehler bei der Berechnung der Faelle/100k bei Bundesländern gefixt. Dank an Andreas für den Hinweis"
-        "", className=bodyClass),
-    html.P(
-        " Version 0.9.13: Fehler bei der Berechnung der Faelle/100k bei Bundesländern gefixt. Dank an Marcus für den Hinweis."
-        "", className=bodyClass),
-    html.P(
-        " Version 0.9.12: Schnelleres Laden der Tabelle durch Dash-Update."
-        "", className=bodyClass),
-    html.P(
-        " Version 0.9.11: Mittelwert, Median und Standardabweichung der Meldeverzögerung hinzufügt, Datendownload als .csv emöglicht."
-        "", className=bodyClass),
-    html.P(
-        " Version 0.9.10: Fehlerhafte Berechnung der Todesfälle korregiert. Vielen Dank an @Stanny96 und alle Anderen, die mich auf Fehler hingewiesen haben."
-        "", className=bodyClass),
-    html.P(" Version 0.9.9: Bundesländer und Deutschland tauchen jetzt als eigene Region in der Liste auf. So lassen sich"
-           " sehr einfach Bundesländer untereinander oder ein Kreis mit dem Landesdurchschitt oder ein Land mit dem Bund vergleichen."
-           "", className=bodyClass),
-    html.P(" Version 0.9.8: Veränderung der Platzierung gegenüber gestern wird angezeigt"
-           "", className=bodyClass),
-    html.P(" Version 0.9.7: Sie Spaltenheader bleiben stehen beim scrollen."
-              "", className=bodyClass),
-    html.P(" Version 0.9.6: Bei den Berechnungen für einzelne Landkreise gab es in der Version eine bedeutende Änderung. Die Definition"
-           " wurde geändert, was die Zählung der Fälle pro Woche betrifft. Als Fall in den letzten 7 Tagen gilt nun,"
-           " wenn der Fall in den letzten 7 Tagen beim RKI eingegangen ist und in den letzten 14 Tagen beim Gesundheitsamt"
-           " gemeldet wurde. Hintergrund ist, dass es bei einzelnen Landkreisen immer wieder zu Nachmeldungen von zig Fällen"
-           " ans RKI kommt, die teilweise Wochen oder Monate zurückliegen. In Einzelfällen führte das zu einem zu hohen Risikoranking"
-           " und einem verfälschten Bild der Entwicklung."
-           "", className=bodyClass),
-    html.P(" Während das RKI nur als Fälle der letzten 7 Tage diejenigen ausweist, die sich auch in den letzten 7 Tagen"
-            " beim beim Gesundheitsamt gemeldet haben, fallen in der RKI-Landkreis-7-Tage-Rechnung alle Fälle unter den Tisch"
-            " die nicht auch in den letzten 7 Tagen eingegangen sind. Dadurch sind die RKI-Zahlen für die letzten 7 Tage"
-            " meist zu niedrig, je nach Meldeverzögerung, während sie hier weniger zu niedrig oder zu hoch sind, weil hier"
-            " verspätet eingegange Fälle der vorletzten 7 Tage den letzten Tagen zugeschlagen werden, wenn sie erst in den"
-            " letzten 7 Tagen eingangen sind. Es wäre interessant zu wissen, warum Wochen zurückliegende Fälle in nennenswerter Zahl, manchmal"
-            " in der Grössenordung von zig bis über hundert Fällen in einem Landkreis alle an einem Tag nachgemeldet werden."
-            " Es gibt seit Version 0.9.15 Spalten, die die vom RKI bei der Inzidenzberechnung ignoeriert werden."
-            " Die lokalen Behörden weisen auf ihren Webseiten ebenfalls oft höhere Inzidenzen als das RKI aus."
-            "", className=bodyClass),
+
+    # html.P(
+    #     " Version 0.9.18: Prognosespalten hinzugefügt für Inzidenzen in 4 und 8 Wochen und Tage bis Inzidenz 3 und 7"
+    #     "", className=bodyClass),
+    # html.P(
+    #     " Version 0.9.17: Fehler in der Datenaufbereitung gefixt, der zwischen dem 16.12. und 25.12.2020 fehlerhafte Werte verursacht hat. Sorry dafür."
+    #     "", className=bodyClass),
+    # html.P(
+    #     " Version 0.9.16: R7-Berechnnung von sqrt(RwK) auf RwK^(4/7) geändert."
+    #     "", className=bodyClass),
+    # html.P(
+    #     " Version 0.9.15: Weitere Spalten hinzugefügt, um die Anzahl von Fällen anzuzeigen, die bei der offiziellen Berechnung der"
+    #     " 7-Tage-Inzidenz durch das RKI unter den Tisch fallen, weil sie später als 7 Tage nach der Meldung beim Gesundheitsamt ans RKI gemeldet wurden."
+    #     " Neu ist auch die Spalte R7, die in ihrer Bedeutung und Dimension in etwa dem berühmten 7-Tage-R-Wert entspricht. Die .csv-Datei enthält jetzt Felder"
+    #     " zum Datenstand und zur Software-Version, mit der die Tabelle generiert wurde. Der Dunkelzifferfaktor wurde zudem von 6,25 auf 3,5 reduziert."
+    #     "", className=bodyClass),
+    # html.P(
+    #     " Version 0.9.14: Weiteren Fehler bei der Berechnung der Faelle/100k bei Bundesländern gefixt. Dank an Andreas für den Hinweis"
+    #     "", className=bodyClass),
+    # html.P(
+    #     " Version 0.9.13: Fehler bei der Berechnung der Faelle/100k bei Bundesländern gefixt. Dank an Marcus für den Hinweis."
+    #     "", className=bodyClass),
+    # html.P(
+    #     " Version 0.9.12: Schnelleres Laden der Tabelle durch Dash-Update."
+    #     "", className=bodyClass),
+    # html.P(
+    #     " Version 0.9.11: Mittelwert, Median und Standardabweichung der Meldeverzögerung hinzufügt, Datendownload als .csv emöglicht."
+    #     "", className=bodyClass),
+    # html.P(
+    #     " Version 0.9.10: Fehlerhafte Berechnung der Todesfälle korregiert. Vielen Dank an @Stanny96 und alle Anderen, die mich auf Fehler hingewiesen haben."
+    #     "", className=bodyClass),
+    # html.P(" Version 0.9.9: Bundesländer und Deutschland tauchen jetzt als eigene Region in der Liste auf. So lassen sich"
+    #        " sehr einfach Bundesländer untereinander oder ein Kreis mit dem Landesdurchschitt oder ein Land mit dem Bund vergleichen."
+    #        "", className=bodyClass),
+    # html.P(" Version 0.9.8: Veränderung der Platzierung gegenüber gestern wird angezeigt"
+    #        "", className=bodyClass),
+    # html.P(" Version 0.9.7: Sie Spaltenheader bleiben stehen beim scrollen."
+    #           "", className=bodyClass),
+    # html.P(" Version 0.9.6: Bei den Berechnungen für einzelne Landkreise gab es in der Version eine bedeutende Änderung. Die Definition"
+    #        " wurde geändert, was die Zählung der Fälle pro Woche betrifft. Als Fall in den letzten 7 Tagen gilt nun,"
+    #        " wenn der Fall in den letzten 7 Tagen beim RKI eingegangen ist und in den letzten 14 Tagen beim Gesundheitsamt"
+    #        " gemeldet wurde. Hintergrund ist, dass es bei einzelnen Landkreisen immer wieder zu Nachmeldungen von zig Fällen"
+    #        " ans RKI kommt, die teilweise Wochen oder Monate zurückliegen. In Einzelfällen führte das zu einem zu hohen Risikoranking"
+    #        " und einem verfälschten Bild der Entwicklung."
+    #        "", className=bodyClass),
+    # html.P(" Während das RKI nur als Fälle der letzten 7 Tage diejenigen ausweist, die sich auch in den letzten 7 Tagen"
+    #         " beim beim Gesundheitsamt gemeldet haben, fallen in der RKI-Landkreis-7-Tage-Rechnung alle Fälle unter den Tisch"
+    #         " die nicht auch in den letzten 7 Tagen eingegangen sind. Dadurch sind die RKI-Zahlen für die letzten 7 Tage"
+    #         " meist zu niedrig, je nach Meldeverzögerung, während sie hier weniger zu niedrig oder zu hoch sind, weil hier"
+    #         " verspätet eingegange Fälle der vorletzten 7 Tage den letzten Tagen zugeschlagen werden, wenn sie erst in den"
+    #         " letzten 7 Tagen eingangen sind. Es wäre interessant zu wissen, warum Wochen zurückliegende Fälle in nennenswerter Zahl, manchmal"
+    #         " in der Grössenordung von zig bis über hundert Fällen in einem Landkreis alle an einem Tag nachgemeldet werden."
+    #         " Es gibt seit Version 0.9.15 Spalten, die die vom RKI bei der Inzidenzberechnung ignoeriert werden."
+    #         " Die lokalen Behörden weisen auf ihren Webseiten ebenfalls oft höhere Inzidenzen als das RKI aus."
+    #         "", className=bodyClass),
 ])
 
 h_About=html.P([
@@ -1379,7 +1399,7 @@ h_Strikt=makeDefinition("Fälle strikt 7 Tage",
 '''
  enthält zum Vergleich die Berechnung, mit der das RKI die 7-Tage-Inzidenz ermittelt (Spalte "absolut"). Dabei fallen alle
  Fälle unter den Tisch, deren Meldedatum beim Gesundheitsamt älter als 7 Tage ist. "RKI ignoriert" enthält die Zahl der Fälle,
- die dabei wären, würde man bis zu 14 Tage Meldeverzug zulassen, so wie es hier allen anderen Berechnungen zugrundeliegt.
+ die dabei wären, würde man alle in den letzten 7 gemeldeten Fälle zählen, so wie es hier allen anderen Berechnungen zugrundeliegt.
  "RKI ignoriert %" ist der Prozentsatz an ignorierten Fällen. Ein hohe Prozentsatz ist ein Indikator dafür, dass die
  Gesundheitsämter vor Ort überlastet sind. Bemerkenswert ist, dass einige Ämter as auch bei hohen Fallzahlen schaffen,
  sämtliche Fälle innerhalb von 7 Tagen zu testen und die Ergebnisse ans RKI zu übermitteln und 0 ignorierte Fälle zu produzieren.
@@ -1407,7 +1427,7 @@ h_MeldeDelay=makeDefinition("Meldeverzögerung",
  ist eine Auswertung der Anzahl der Tage von der Meldung beim Gesundheitsamt bis zum Eingang und Zählung
  beim RKI als Fall in der offiziellen Statistik auf Bundesebene. Hierbei wird angezeigt: Der Mittelwert aller Verzögerungen 
  (Summe/Anzahl), der Median (ca. die Hälfte der Verzögerungen liegt unter dem Wert, Hälfte darüber),
-  die Standardabweichung (durchschnittliche Abweichung vom Mittel) angezeigt sowie die Zahl der Fälle seit dem 29.4.2020,
+  die Standardabweichung (durchschnittliche Abweichung vom Mittel) angezeigt sowie die Zahl der Fälle,
   die in die Berechnung eingegangen sind.
 """)
 
@@ -1415,7 +1435,7 @@ h_MeldeDelay=makeDefinition("Meldeverzögerung",
 h_RisikoList=html.Ul([
     html.Li(["N = Bevölkerung / Dunkelzifferfaktor / ([Anzahl der Fälle in den letzten 2 Wochen] *",h_RwK,")"]),
     html.Li("Als Faktor für die Dunkelziffer wurde 3,5 gewählt, also auf 1 gemeldeten Infizierten werden 2,5 weitere ungemeldete vermutet"),
-    html.Li("Als grobe Annäherung an die Zahl der Ansteckenden wurde die Summe der Fälle der letzten zwei Wochen gewählt"),
+    html.Li("Als grobe Annäherung an die Zahl der Ansteckenden wurde die Summe der Fälle der letzten 7 Tage gewählt"),
     html.Li("Die Zahl der aktuell Ansteckenden wird zudem für die Risikoberechnung hochgerechnet,"
             "indem die Entwicklung von der vorletzten Woche zur letzten Woche prozentual unverändert fortgeschrieben wird "
             "und damit eher dem Stand am heutigen Tag entspricht."),
@@ -1448,6 +1468,11 @@ h_TextFarben=html.Div(["Im Text", h_TextFarbenList])
 
 h_BgFarbenList = html.Ul(
     [
+        html.Li([makeColorSpan("Ultra: ", conditionUltra),
+                 "Viel schlimmer als Super-rot."
+                ],
+                style=LiStyle
+        ),
         html.Li([makeColorSpan("Super-Rot: ", conditionDanger),
                  "Lasset alle Hoffnung fahren. Die Situation ist praktisch ausser Kontrolle."
                  "Wer kürzlich da war und ungeschützte Kontakte hatte, ist mit einer Wahrscheinlichkeit von (Anzahl der Kontakte)/N infiziert."
