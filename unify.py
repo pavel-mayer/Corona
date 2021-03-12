@@ -414,10 +414,12 @@ def main():
         print(daysIncluded)
         pmu.printMemoryUsage("after first query")
 
+    addedData = False
     for fa in args.files:
         files = sorted(glob.glob(fa))
         for f in files:
             if isNewData(f, daysIncluded):
+                addedData = True
                 fstart = time.perf_counter()
                 pmu.printMemoryUsage("after isNewData query")
                 t = tableData(f)
@@ -456,9 +458,13 @@ def main():
                     fullTable.to_jay(checkname)
                     print("Saving done:" + checkname)
                     lastCheckPointTime = time.perf_counter()
-    pmu.printMemoryUsage("before full save")
-    pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
-    pmu.printMemoryUsage("after full save")
+
+    if addedData:
+        pmu.printMemoryUsage("before full save")
+        pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
+        pmu.printMemoryUsage("after full save")
+    else:
+        print("No new data added, not saving 'all-data.ja'")
     #pmu.saveCsvTable(fullTable, "all-data.csv", args.outputDir)
     finish = time.perf_counter()
     secs = finish - start
@@ -467,12 +473,3 @@ def main():
 if __name__ == "__main__":
     # execute only if run as a script
     main()
-
-
-
-'''
-Tue Mar  9 18:15:46 CET 2021
-Memory Usage @ after full save: 28.922 GB
-Tue Mar  9 19:08:01 CET 2021
-
-'''

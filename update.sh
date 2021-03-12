@@ -3,6 +3,14 @@ CORONA=/Users/pavel/Corona
 #cd $CORONA/2020-rki-archive
 #git pull
 cd $CORONA
+
+mkdir -p ard-data
+mkdir -p ard-data
+mkdir -p archive_ard
+mkdir -p archive_v2
+mkdir -p series
+mkdir -p series-enhanced
+
 source /usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc
 gsutil rsync -d -r gs://brdata-public-data/rki-corona-archiv/ ard-data
 
@@ -14,8 +22,8 @@ python $CORONA/unify.py -d $CORONA/archive_v2 $CORONA/archive_ard/NPGEO-RKI-*.cs
 
 cd $CORONA/
 python $CORONA/database.py -d $CORONA/series
-oder:
-python $CORONA/database.py --agegroups -d $CORONA/series
+#or:
+#python $CORONA/database.py --agegroups -d $CORONA/series
 
 cd $CORONA/
 python $CORONA/enhance.py -d $CORONA/series-enhanced series/series-*.csv
