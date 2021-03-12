@@ -5,7 +5,7 @@
 
 # pip install Click==7.0 Flask==1.1.1 itsdangerous==1.1.0 Jinja2==2.10.3 MarkupSafe==1.1.1 uWSGI==2.0.18 Werkzeug==0.16.0 dash=1.11.0
 # pip install Click Flask itsdangerous Jinja2 MarkupSafe uWSGI Werkzeug matplotlib dash pandas datatable feather-format dash=1.11.0
-# pip install: matplotlib dash pandas datatable feather-format
+# pip install: matplotlib dash pandas datatable feather-format psutil
 
 import locale
 
@@ -36,7 +36,7 @@ import dash_table.FormatTemplate as FormatTemplate
 import socket
 import time
 
-versionStr="1.0.0.0"
+versionStr="1.0.0.1"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
@@ -166,12 +166,12 @@ def getTableForDay(fullTable, day):
     sortColumns = ["Kontaktrisiko","InzidenzFallNeu-7-Tage"]
     todayTable = getRankedTable(fullTable, day, sortColumns)
     yesterdayTable = getRankedTable(fullTable, day-1, sortColumns)
-    print(todayTable)
-    print(yesterdayTable)
+    #print(todayTable)
+    #print(yesterdayTable)
     todayTableById = todayTable.sort("IdLandkreis")
     yesterdayTableById = yesterdayTable.sort("IdLandkreis")
-    print(todayTableById.nrows)
-    print(yesterdayTableById.nrows)
+    #print(todayTableById.nrows)
+    #print(yesterdayTableById.nrows)
 
     # check if all entries today and yesterday do match
     for i in range(yesterdayTableById.nrows):
@@ -712,20 +712,22 @@ app = dash.Dash(
 #     dframe = pd.read_feather(cacheFilename)
 #
 # csvData = open(dataFilename,"rb").read().decode('utf-8')
-# csvFullData = open(fullTableFilename,"rb").read().decode('utf-8')
 
-dataURL = '/covid/risks/data.csv'
+fullTableFilename="all-series.csv"
+csvFullData = open(fullTableFilename,"rb").read().decode('utf-8')
+
+#dataURL = '/covid/risks/all_series.csv'
 
 def csvResponse(data):
     r = Response(response=data, status=200, mimetype="text/csv")
     r.headers["Content-Type"] = "text/csv; charset=utf-8"
     return r
 
-@server.route(dataURL)
-def csv_data():
-    return csvResponse(csvData)
+# @server.route(dataURL)
+# def csv_data():
+#     return csvResponse(csvData)
 
-fullDataURL = '/covid/risks/full-data.csv'
+fullDataURL = '/covid/risks/all-series.csv'
 @server.route(fullDataURL)
 def csv_fulldata():
     return csvResponse(csvFullData)
@@ -738,7 +740,7 @@ minWidthStr = colWidthStr(minWidth)
 maxWidthStr = colWidthStr(maxWidth)
 
 # load table
-fullTable = loadData("all-series.csv")
+fullTable = loadData(fullTableFilename)
 
 #maxDay = float(dframe["MeldeDay"].max())
 maxDay = fullTable[:,"DatenstandTag"].max().to_list()[0][0]
@@ -825,7 +827,7 @@ def makeConditionClass(name, ultra, danger, tooHigh, serious, good):
         conditionGood: makeExpression(name, good, serious),
         conditionSafe: makeExpression(name, good),
     }
-    print(c)
+    #print(c)
     return c
 
 
@@ -877,7 +879,7 @@ LandkreisClass = {
     conditionSafe: KontaktrisikoClass[conditionSafe]+" && "+ Not(FaellePro100kLetzte7TageClass[conditionUltra])+" && "+ Not(AnzahlFallTrendClass[conditionUltra])+" && "+ Not(FaellePro100kLetzte7TageClass[conditionDanger])+" && "+ Not(AnzahlFallTrendClass[conditionDanger]),
 }
 
-print(LandkreisClass)
+#print(LandkreisClass)
 
 #    conditionDanger : KontaktrisikoClass[conditionDanger]+" || "+ braced(FaellePro100kLetzte7TageClass[conditionDanger])+ "&& "+ Not(FaellePro100kLetzte7TageClass[conditionUltra])+" && "+ Not(AnzahlFallTrendClass[conditionUltra]),
 
@@ -1296,10 +1298,10 @@ h_About=html.P([
 
 h_Downloads = html.P([
     html.H4(html.Span("Downloads", className=introClass)),
-    html.P([html.A(html.Span("Angereicherte Ursprungsdaten als .csv herunterladen", className=bodyClass),
+    html.P([html.A(html.Span("Der Tabelle zugrundeliegende Daten als .csv herunterladen", className=bodyClass),
                   href=fullDataURL),
-            " (Kombination der RKI/NPGEO-Daten seit 29.4.2020 mit Eingangszeitstempeln und anderen zusätzlichen Feldern versehen)"]),
-    html.P(html.A(html.Span("Tabelle als .csv herunterladen", className=bodyClass), href=dataURL)),
+            " (Es sind viel mehr Spalten und Zeilen enthalten, als angezeigt werden)"]),
+    #html.P(html.A(html.Span("Tabelle als .csv herunterladen", className=bodyClass), href=dataURL)),
 ])
 
 h_Benutzung = html.P([
