@@ -3,6 +3,7 @@ import datatable as dt
 import os
 import glob
 
+from datatable import dt, f, by, ifelse, update
 
 def add7dSumColumn(table, srcColumn, newColumn):
     src = dt.f[srcColumn]
@@ -55,7 +56,7 @@ def addPredictionsColumn(table, incidenceColumn, trendColumn, newColumn, weeks):
 
 def addRiskColumn(table, incidencePrognosisColumn, newColumn, darkFactor):
     incidence = dt.f[incidencePrognosisColumn]
-    newTable = table[:, dt.f[:].extend({newColumn: 100000 / (incidence * darkFactor)})]
+    newTable = table[:, dt.f[:].extend({newColumn: dt.ifelse(incidence <= 0, 99999,100000 / (incidence * darkFactor))})]
     #print(newTable)
     return newTable
 
@@ -121,6 +122,10 @@ def addIncidences(table):
     for c in candidatesColumns:
         newColName = c.replace("Anzahl","Inzidenz")
         table = addIncidenceColumn(table, c, newColName)
+        if "AnzahlTodesfall" in c:
+            newColName = c.replace("AnzahlTodesfall", "Fallsterblichkeit-Prozent")
+            caseColName = c.replace("AnzahlTodesfall", "AnzahlFall")
+            table = addRatioColumn(table, c, caseColName, newColName, factor=100)
 
     return table
 

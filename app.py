@@ -36,7 +36,7 @@ import dash_table.FormatTemplate as FormatTemplate
 import socket
 import time
 
-versionStr="1.0.0.1"
+versionStr="1.0.0.2"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
@@ -650,10 +650,11 @@ def makeColumns():
         ('AnzahlTodesfallNeu-7-Tage', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfallNeu-7-Tage-7-Tage-davor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('Fallsterblichkeit-Prozent', ['Todesfälle', 'CFR in %'], 'numeric', FormatFixed2, colWidth(62)),
         ('InzidenzTodesfallNeu-7-Tage', ['Todesfälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
         ('InzidenzTodesfallNeu-7-Tage-7-Tage-davor', ['Todesfälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
         ('InzidenzTodesfallNeu-7-Tage-Trend-Spezial', ['Todesfälle je 100.000', 'Trend'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
-        ('InzidenzTodesfall', ['Todesfälle je 100.000', 'total'], 'numeric', FormatFixed2, colWidth(60)),
+        ('InzidenzTodesfall', ['Todesfälle je 100.000', 'total'], 'numeric', FormatFixed2, colWidth(62)),
     ]
 
     orderedCols, orderedNames, orderedTypes, orderFormats, orderWidths = zip(*desiredOrder)
@@ -1202,21 +1203,29 @@ h_News=html.P([
     html.P(
         " Version 1.0.0.0: Die Seite sieht zwar noch fast genauso aus wie vorher, aber die Datenpipeline und alle Berechnungen "
         " sind komplett von Grundauf neu geschrieben. Es sollten jetzt die neuen täglichen Fälle und"
-        " die Gesamtzahlen identisch mit den offiziell vom RKI veröffentlichten Zahlen sein. Die neue Datenpipeline ist ganz frisch und kann noch Fehler enthalten, wobei die Fallzahlen eingentlich "
+        " die Gesamtzahlen identisch mit den offiziell vom RKI veröffentlichten Zahlen sein. Die neue Datenpipeline ist ganz frisch und kann noch Fehler enthalten, wobei die Fallzahlen "
         " alle ziemlich gut aussehen."
         "", className=bodyClass),
     html.P(
         "Ansonsten gibt es noch als erstes kleines neues, unübersehbares Feature: Condition Ultra beziehungsweise violett. Sie markiert im Prinzip"
-        " Inzidenzen über 100. Des weiteren gibt es zwei wesentliche Unterschiede in der Berechnung der Zahlen:"
+        " Inzidenzen über 100. Neu ist zudem eine Spalte CFR unter Todesfälle. DIe CFR oder Fallsterblichkeit ist, wie viele von den positiv"
+        " getesteten ingesamt verstorben sind."
+        "", className=bodyClass),
+    html.P(
+        "Des weiteren gibt es zwei wesentliche Unterschiede in der Berechnung der Zahlen:"
         "", className=bodyClass),
     html.P(
         "1) Der Riskofaktor ist jetzt geringer, weil nur noch die Fälle der letzten Woche und nicht der letzten 2 Wochen als Grundlage für"
         " die Zahl der Infizierten herangezogen wird."
         "", className=bodyClass),
+
     html.P(
         "2) Die Trendberechnung und 7-Tage-Inzidenz berechnen nun alle Fälle mit ein. Die alte Version hatte als 'Kompromiss' "
         " alle Fälle ignoriert, die länger als 14 Tage zur Meldung bebraucht haben. Bei höherer Zahl an Nachmeldungen kann"
         " man einfach die in den Spalten unter 'Fälle strikt 7 Tage' heranziehen."
+        "", className=bodyClass),
+    html.P(
+        "3) Die Meldeverzögerung bezieht sich nur noch auf die am aktuellen Tag gemeldeten Fälle und kann sich von Tag zu Tag stark ändern."
         "", className=bodyClass),
 
     # html.P(
@@ -1402,7 +1411,7 @@ h_Strikt=makeDefinition("Fälle strikt 7 Tage",
  enthält zum Vergleich die Berechnung, mit der das RKI die 7-Tage-Inzidenz ermittelt (Spalte "absolut"). Dabei fallen alle
  Fälle unter den Tisch, deren Meldedatum beim Gesundheitsamt älter als 7 Tage ist. "RKI ignoriert" enthält die Zahl der Fälle,
  die dabei wären, würde man alle in den letzten 7 gemeldeten Fälle zählen, so wie es hier allen anderen Berechnungen zugrundeliegt.
- "RKI ignoriert %" ist der Prozentsatz an ignorierten Fällen. Ein hohe Prozentsatz ist ein Indikator dafür, dass die
+ "RKI ignoriert %" ist der Prozentsatz an ignorierten Fällen. Ein hohre Prozentsatz ist ein Indikator dafür, dass die
  Gesundheitsämter vor Ort überlastet sind. Bemerkenswert ist, dass einige Ämter as auch bei hohen Fallzahlen schaffen,
  sämtliche Fälle innerhalb von 7 Tagen zu testen und die Ergebnisse ans RKI zu übermitteln und 0 ignorierte Fälle zu produzieren.
  Die von lokalen Behörden ausgewiesene Inzidenz kann in der Nähe des "strikten" RKI-Werts ("absolut") liegen oder näher an meinem
@@ -1427,10 +1436,11 @@ gemeldet hat, -5 bedeutet, dass seit 5 Tagen keine Meldungen eingegangen sind.
 h_MeldeDelay=makeDefinition("Meldeverzögerung",
 """
  ist eine Auswertung der Anzahl der Tage von der Meldung beim Gesundheitsamt bis zum Eingang und Zählung
- beim RKI als Fall in der offiziellen Statistik auf Bundesebene. Hierbei wird angezeigt: Der Mittelwert aller Verzögerungen 
+ beim RKI als Fall in der offiziellen Statistik auf Bundesebene. Hierbei wird angezeigt: Maximum und Mittelwert aller Verzögerungen 
  (Summe/Anzahl), der Median (ca. die Hälfte der Verzögerungen liegt unter dem Wert, Hälfte darüber),
   die Standardabweichung (durchschnittliche Abweichung vom Mittel) angezeigt sowie die Zahl der Fälle,
-  die in die Berechnung eingegangen sind.
+  die in die Berechnung eingegangen sind. Dabei werden alle heute gemeldeten Fälle sowie alle Negativmeldungen bzw."
+  Stornomeldungen mitgezählt, so dass die Zahl höher sein kann als die Zahl der heute gemeldeten Fälle.
 """)
 
 
