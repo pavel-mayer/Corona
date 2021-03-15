@@ -2,6 +2,7 @@
 import argparse
 import datatable as dt
 import cov_dates as cd
+import numpy as np
 from math import nan
 import dateutil.parser
 import os
@@ -19,182 +20,261 @@ def cstr(tableCell):
 def cint(tableCell):
     return int(tableCell.to_list()[0][0])
 
-def analyzeDay(fullTable, day):
-    dayTable = fullTable[(dt.f.DatenstandTag == day),:]
-    cases = dayTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
-    new_cases = dayTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
-    dead = dayTable[(dt.f.NeuerTodesfall == 0) | (dt.f.NeuerTodesfall == 1), 'AnzahlTodesfall'].sum()[0, 0]
-    new_dead = dayTable[(dt.f.NeuerTodesfall == -1) | (dt.f.NeuerTodesfall == 1), 'AnzahlTodesfall'].sum()[0, 0]
+# def analyzeDay(fullTable, day):
+#     dayTable = fullTable[(dt.f.DatenstandTag == day),:]
+#     cases = dayTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
+#     new_cases = dayTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
+#     dead = dayTable[(dt.f.NeuerTodesfall == 0) | (dt.f.NeuerTodesfall == 1), 'AnzahlTodesfall'].sum()[0, 0]
+#     new_dead = dayTable[(dt.f.NeuerTodesfall == -1) | (dt.f.NeuerTodesfall == 1), 'AnzahlTodesfall'].sum()[0, 0]
+#
+#     recovered = 0
+#     new_recovered = 0
+#     if "NeuGenesen" in dayTable.keys():
+#         recovered = dayTable[(dt.f.NeuGenesen == 0) | (dt.f.NeuGenesen == 1), 'AnzahlGenesen'].sum()[0, 0]
+#         new_recovered = dayTable[(dt.f.NeuGenesen == -1) | (dt.f.NeuGenesen == 1), 'AnzahlGenesen'].sum()[0, 0]
+#     #lastDay=fullTable[:,'MeldeDay'].max()[0,0]
+#     #lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
+#     print("{} Day {}: cases {} (+{}), dead {} (+{}), recovered {} (+{})".format(
+#         cd.dateStrDMFromDay(day), day, int(cases), int(new_cases), int(dead), int(new_dead), int(recovered),int(new_recovered)))
 
-    recovered = 0
-    new_recovered = 0
-    if "NeuGenesen" in dayTable.keys():
-        recovered = dayTable[(dt.f.NeuGenesen == 0) | (dt.f.NeuGenesen == 1), 'AnzahlGenesen'].sum()[0, 0]
-        new_recovered = dayTable[(dt.f.NeuGenesen == -1) | (dt.f.NeuGenesen == 1), 'AnzahlGenesen'].sum()[0, 0]
-    #lastDay=fullTable[:,'MeldeDay'].max()[0,0]
-    #lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
-    print("{} Day {}: cases {} (+{}), dead {} (+{}), recovered {} (+{})".format(
-        cd.dateStrDMFromDay(day), day, int(cases), int(new_cases), int(dead), int(new_dead), int(recovered),int(new_recovered)))
-
-def analyzeDayRange(fullTable, fromDay, toDay):
-    dayTable = fullTable[(dt.f.DatenstandTag >= fromDay) & (dt.f.DatenstandTag < toDay),:]
-
-    cases_to_count = dayTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1),:]
-    cases = cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
-
-    new_cases_to_count = dayTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1),:]
-    new_cases = new_cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
-
-    dead_to_count = dayTable[(dt.f.NeuerTodesfall == 0) | (dt.f.NeuerTodesfall == 1),:]
-    dead = dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(dt.f.DatenstandTag)]
-
-    new_dead_to_count = dayTable[(dt.f.NeuerTodesfall == -1) | (dt.f.NeuerTodesfall == 1),:]
-    new_dead = new_dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(dt.f.DatenstandTag)]
-
-    if "NeuGenesen" in dayTable.keys():
-        recovered_to_count = dayTable[(dt.f.NeuGenesen == 0) | (dt.f.NeuGenesen == 1),:]
-        recovered = recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
-        new_recovered_to_count = dayTable[(dt.f.NeuGenesen == -1) | (dt.f.NeuGenesen == 1),:]
-        new_recovered = new_recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
-
-    #lastDay=fullTable[:,'MeldeDay'].max()[0,0]
-    #lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
-    print("From {}-{} Day {}-{}: cases {} (+{}), dead {} (+{}), recovered {} (+{})".format(
-        cd.dateStrDMFromDay(fromDay), cd.dateStrDMFromDay(toDay), fromDay, toDay,
-        cases.to_list(), new_cases.to_list(), dead.to_list(), new_dead.to_list(), recovered.to_list(), new_recovered.to_list()))
-    return cases, new_cases, dead, new_dead, recovered, new_recovered
+# def analyzeDayRange(fullTable, fromDay, toDay):
+#     dayTable = fullTable[(dt.f.DatenstandTag >= fromDay) & (dt.f.DatenstandTag < toDay),:]
+#
+#     cases_to_count = dayTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1),:]
+#     cases = cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
+#
+#     new_cases_to_count = dayTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1),:]
+#     new_cases = new_cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
+#
+#     dead_to_count = dayTable[(dt.f.NeuerTodesfall == 0) | (dt.f.NeuerTodesfall == 1),:]
+#     dead = dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(dt.f.DatenstandTag)]
+#
+#     new_dead_to_count = dayTable[(dt.f.NeuerTodesfall == -1) | (dt.f.NeuerTodesfall == 1),:]
+#     new_dead = new_dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(dt.f.DatenstandTag)]
+#
+#     if "NeuGenesen" in dayTable.keys():
+#         recovered_to_count = dayTable[(dt.f.NeuGenesen == 0) | (dt.f.NeuGenesen == 1),:]
+#         recovered = recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
+#         new_recovered_to_count = dayTable[(dt.f.NeuGenesen == -1) | (dt.f.NeuGenesen == 1),:]
+#         new_recovered = new_recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
+#
+#     #lastDay=fullTable[:,'MeldeDay'].max()[0,0]
+#     #lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
+#     print("From {}-{} Day {}-{}: cases {} (+{}), dead {} (+{}), recovered {} (+{})".format(
+#         cd.dateStrDMFromDay(fromDay), cd.dateStrDMFromDay(toDay), fromDay, toDay,
+#         cases.to_list(), new_cases.to_list(), dead.to_list(), new_dead.to_list(), recovered.to_list(), new_recovered.to_list()))
+#     return cases, new_cases, dead, new_dead, recovered, new_recovered
 
 
-#def analyzeDayRangeBy(fullTable, fromDay, toDay, forIdLandkreis):
-def analyzeDaily(fullTable, filter, postfix):
+def addRunningSumColumn(table, srcColumn, newColumn):
+    src = dt.f[srcColumn]
+    src_na = dt.math.isna(src)
+    table[src_na, src] = 0
+    values = table[:, src].to_list()[0]
+    #print("values",values)
+    cumsums = np.cumsum(values)
+    #print("cumsums",cumsums)
+    sumsTable = table[:, dt.f[:].extend({newColumn: 0})]
+    sumsTable[:, newColumn] = cumsums
+    return sumsTable
 
+
+def analyzeDaily(fullTable, filter, prefix, postfix, byDateColName):
+
+    print("analyzeDaily prefix='{}' postfix='{}' byDateColName='{}'".format(prefix, postfix, byDateColName))
+    #print("analyzeDaily filter='{}' '".format(filter))
+    byDate = dt.f[byDateColName]
     #print("----- analyzeDaily:"+postfix)
     #dayTable = fullTable[(dt.f.DatenstandTag >= fromDay) & (dt.f.DatenstandTag < toDay) & (dt.f.IdLandkreis == forIdLandkreis),:]
+
     dayTable = fullTable[filter,:]
 
     cases_to_count = dayTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1),:]
-    cases = cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
-    cases.names = ["DatenstandTag", "AnzahlFall"+postfix]
-    cases.key = "DatenstandTag"
+    cases = cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(byDate)]
+    cases.names = [byDateColName, prefix+"AnzahlFall"+postfix]
+    cases.key = byDateColName
     print("cases rows = {}, cases_to_count = {}".format(cases.nrows, cases_to_count.nrows))
     #print(cases)
+    byDayTable = cases
 
-    new_cases_to_count = dayTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1),:]
-    new_cases = new_cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
-    new_cases.names = ["DatenstandTag", "AnzahlFallNeu"+postfix]
-    new_cases.key = "DatenstandTag"
-    print("new_cases rows = {}, new_cases_to_count = {}".format(new_cases.nrows, new_cases_to_count.nrows))
-    #new_cases_to_count.to_csv("new_cases_to_count.csv")
-
-    new_cases_to_count_delay = new_cases_to_count[(dt.f.AnzahlFall > 0),:] # measure delay only for positive cases
-    new_cases_to_count_delay.materialize()
-    new_cases_delay = new_cases_to_count_delay[:, [dt.min(dt.f.MeldeDelay),dt.max(dt.f.MeldeDelay),
-                      dt.mean(dt.f.MeldeDelay),dt.median(dt.f.MeldeDelay),
-                      dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall),
-                      dt.max(dt.f.DatenstandTag)],dt.by(dt.f.DatenstandTag)]
-    new_cases_delay.names = ["DatenstandTag",
-                             "MeldeDauerFallNeu-Min" + postfix,"MeldeDauerFallNeu-Max" + postfix,
-                             "MeldeDauerFallNeu-Schnitt" + postfix, "MeldeDauerFallNeu-Median" + postfix,
-                             "MeldeDauerFallNeu-StdAbw" + postfix, "MeldeDauerFallNeu-Fallbasis" + postfix,
-                             "DatenstandTag-Max" + postfix]
-    new_cases_delay.key = "DatenstandTag"
-    print("new_cases_delay rows = {}, new_cases_to_count_delay = {}".format(new_cases_delay.nrows, new_cases_to_count_delay.nrows))
-    #new_cases_delay = new_cases_to_count_delay[:, [dt.mean(dt.f.DatenstandTag-dt.f.MeldeTag)],dt.by(dt.f.DatenstandTag)]
-
-    #     delays = delayRecs[:, [dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay), dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall)], dt.by(dt.f.Landkreis)]
-
-    # new_cases_stddev = new_cases_to_count_delay[:, [dt.mean(dt.f.DatenstandTag - dt.f.MeldeTag)],
-    #                   dt.by(dt.f.DatenstandTag)]
-    # new_cases_delay.names = ["DatenstandTag", "AnzahlFallNeu-MeldeDauer" + postfix]
-    # new_cases_delay.key = "DatenstandTag"
-    # print("new_cases_delay rows = {}, new_cases_to_count_delay = {}".format(new_cases_delay.nrows,
-    #                                                                         new_cases_to_count_delay.nrows))
-
-    new_cases_to_count_strict = new_cases_to_count[(dt.f.DatenstandTag - dt.f.MeldeTag < 7) | (dt.f.AnzahlFall < 0) ,:]
-    new_cases_strict = new_cases_to_count_strict[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
-    new_cases_strict.names = ["DatenstandTag", "AnzahlFallNeu-Meldung-letze-7-Tage"+postfix]
-    new_cases_strict.key = "DatenstandTag"
-    print("new_cases_strict rows = {}, new_cases_to_count_strict = {}".format(new_cases_strict.nrows, new_cases_to_count_strict.nrows))
-    #new_cases_to_count_strict.to_csv("new_cases_to_count_strict.csv")
-
-    new_cases_to_count_strict_14 = new_cases_to_count[(dt.f.DatenstandTag - dt.f.MeldeTag < 14) | (dt.f.AnzahlFall < 0) ,:]
-    new_cases_strict_14 = new_cases_to_count_strict_14[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
-    new_cases_strict_14.names = ["DatenstandTag", "AnzahlFallNeu-Meldung-letze-14-Tage"+postfix]
-    new_cases_strict_14.key = "DatenstandTag"
-    print("new_cases_strict_14 rows = {}, new_cases_to_count_strict_14 = {}".format(new_cases_strict_14.nrows, new_cases_to_count_strict_14.nrows))
+    if byDateColName == "DatenstandTag":
+        new_cases_to_count = dayTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1),:]
+        new_cases = new_cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(byDate)]
+        new_cases.names = [byDateColName, prefix+"AnzahlFallNeu"+postfix]
+        new_cases.key = byDateColName
+        print("new_cases rows = {}, new_cases_to_count = {}".format(new_cases.nrows, new_cases_to_count.nrows))
+        #new_cases_to_count.to_csv("new_cases_to_count.csv")
+        byDayTable = byDayTable[:,:,dt.join(new_cases)]
+    else:
+        # add days by MeldeTag
+        byDayTable.names = {prefix+"AnzahlFall"+postfix: prefix+"AnzahlFallNeu"+postfix}
+        byDayTable = addRunningSumColumn(byDayTable, prefix+"AnzahlFallNeu"+postfix, prefix+"AnzahlFall"+postfix)
 
     dead_to_count = dayTable[(dt.f.NeuerTodesfall == 0) | (dt.f.NeuerTodesfall == 1),:]
-    dead = dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(dt.f.DatenstandTag)]
-    dead.names = ["DatenstandTag", "AnzahlTodesfall"+postfix]
-    dead.key = "DatenstandTag"
+    dead = dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(byDate)]
+    dead.names = [byDateColName, prefix+"AnzahlTodesfall"+postfix]
+    dead.key = byDateColName
     #print("dead rows = {}".format(dead.nrows))
+    byDayTable = byDayTable[:,:,dt.join(dead)]
 
-    new_dead_to_count = dayTable[(dt.f.NeuerTodesfall == -1) | (dt.f.NeuerTodesfall == 1),:]
-    new_dead = new_dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(dt.f.DatenstandTag)]
-    new_dead.names = ["DatenstandTag", "AnzahlTodesfallNeu"+postfix]
-    new_dead.key = "DatenstandTag"
-    #print("new_dead rows = {}".format(new_dead.nrows))
+    if byDateColName == "DatenstandTag":
+        new_dead_to_count = dayTable[(dt.f.NeuerTodesfall == -1) | (dt.f.NeuerTodesfall == 1),:]
+        new_dead = new_dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(byDate)]
+        new_dead.names = [byDateColName, prefix+"AnzahlTodesfallNeu"+postfix]
+        new_dead.key = byDateColName
+        #print("new_dead rows = {}".format(new_dead.nrows))
+        byDayTable = byDayTable[:,:,dt.join(new_dead)]
+    else:
+        # add days by MeldeTag
+        byDayTable.names = {prefix+"AnzahlTodesfall"+postfix: prefix+"AnzahlTodesfallNeu"+postfix}
+        byDayTable = addRunningSumColumn(byDayTable, prefix+"AnzahlTodesfallNeu"+postfix, prefix+"AnzahlTodesfall"+postfix)
 
-    recovered_to_count = dayTable[(dt.f.NeuGenesen == 0) | (dt.f.NeuGenesen == 1),:]
-    recovered = recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
-    recovered.names = ["DatenstandTag", "AnzahlGenesen"+postfix]
-    recovered.key = "DatenstandTag"
-    #print("recovered rows = {}".format(recovered.nrows))
+    byDayTable.key = byDateColName
 
-    new_recovered_to_count = dayTable[(dt.f.NeuGenesen == -1) | (dt.f.NeuGenesen == 1),:]
-    new_recovered = new_recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
-    new_recovered.names = ["DatenstandTag", "AnzahlGenesenNeu"+postfix]
-    new_recovered.key = "DatenstandTag"
-    #print("new_recovered rows = {}".format(new_recovered.nrows))
+    if postfix == "" and prefix == "" and byDateColName == "DatenstandTag":
+        new_cases_to_count_delay = new_cases_to_count[(dt.f.AnzahlFall > 0), :]  # measure delay only for positive cases
+        new_cases_to_count_delay.materialize()
+        new_cases_delay = new_cases_to_count_delay[:, [dt.min(dt.f.MeldeDelay), dt.max(dt.f.MeldeDelay),
+                                                       dt.mean(dt.f.MeldeDelay), dt.median(dt.f.MeldeDelay),
+                                                       dt.sd(dt.f.MeldeDelay), dt.sum(dt.f.AnzahlFall),
+                                                       dt.max(dt.f.DatenstandTag)], dt.by(byDate)]
+        new_cases_delay.names = ["DatenstandTag",
+                                 "PublikationsdauerFallNeu_Min" + postfix, "PublikationsdauerFallNeu_Max" + postfix,
+                                 "PublikationsdauerFallNeu_Schnitt" + postfix, "PublikationsdauerFallNeu_Median" + postfix,
+                                 "PublikationsdauerFallNeu_StdAbw" + postfix, "PublikationsdauerFallNeu_Fallbasis" + postfix,
+                                 "DatenstandTag_Max" + postfix]
+        new_cases_delay.key = "DatenstandTag"
+        print("new_cases_delay rows = {}, new_cases_to_count_delay = {}".format(new_cases_delay.nrows,
+                                                                                new_cases_to_count_delay.nrows))
+        # new_cases_delay = new_cases_to_count_delay[:, [dt.mean(dt.f.DatenstandTag-dt.f.MeldeTag)],dt.by(dt.f.DatenstandTag)]
 
-    byDayTable = cases[:,:,dt.join(new_cases)]\
-                     [:,:,dt.join(dead)][:,:,dt.join(new_dead)][:,:,dt.join(recovered)][:,:,dt.join(new_recovered)]\
-        [:,:,dt.join(new_cases_strict)][:,:,dt.join(new_cases_strict_14)][:,:,dt.join(new_cases_delay)]
-    byDayTable.key = "DatenstandTag"
+        # new_cases_to_count_strict = new_cases_to_count[(dt.f.DatenstandTag - dt.f.MeldeTag < 7) | (dt.f.AnzahlFall < 0),
+        #                             :]
+        # new_cases_strict = new_cases_to_count_strict[:, [dt.sum(dt.f.AnzahlFall)], dt.by(byDate)]
+        # new_cases_strict.names = ["DatenstandTag", "AnzahlFallNeu-Meldung-letze-7-Tage" + postfix]
+        # new_cases_strict.key = "DatenstandTag"
+        # print("new_cases_strict rows = {}, new_cases_to_count_strict = {}".format(new_cases_strict.nrows,
+        #                                                                           new_cases_to_count_strict.nrows))
+        # # new_cases_to_count_strict.to_csv("new_cases_to_count_strict.csv")
+        #
+        # new_cases_to_count_strict_14 = new_cases_to_count[
+        #                                (dt.f.DatenstandTag - dt.f.MeldeTag < 14) | (dt.f.AnzahlFall < 0), :]
+        # new_cases_strict_14 = new_cases_to_count_strict_14[:, [dt.sum(dt.f.AnzahlFall)], dt.by(byDate)]
+        # new_cases_strict_14.names = ["DatenstandTag", "AnzahlFallNeu-Meldung-letze-14-Tage" + postfix]
+        # new_cases_strict_14.key = "DatenstandTag"
+        # print("new_cases_strict_14 rows = {}, new_cases_to_count_strict_14 = {}".format(new_cases_strict_14.nrows,
+        #                                                                                 new_cases_to_count_strict_14.nrows))
+
+        recovered_to_count = dayTable[(dt.f.NeuGenesen == 0) | (dt.f.NeuGenesen == 1),:]
+        recovered = recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(byDate)]
+        recovered.names = ["DatenstandTag", "AnzahlGenesen"+postfix]
+        recovered.key = "DatenstandTag"
+        #print("recovered rows = {}".format(recovered.nrows))
+
+        new_recovered_to_count = dayTable[(dt.f.NeuGenesen == -1) | (dt.f.NeuGenesen == 1),:]
+        new_recovered = new_recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(byDate)]
+        new_recovered.names = ["DatenstandTag", "AnzahlGenesenNeu"+postfix]
+        new_recovered.key = "DatenstandTag"
+        #print("new_recovered rows = {}".format(new_recovered.nrows))
+
+        byDayTable = byDayTable[:, :, dt.join(recovered)][:, :, dt.join(new_recovered)][:, :,dt.join(new_cases_delay)]
+        #byDayTable = byDayTable[:,:,dt.join(recovered)][:,:,dt.join(new_recovered)]\
+        #    [:,:,dt.join(new_cases_strict)][:,:,dt.join(new_cases_strict_14)][:,:,dt.join(new_cases_delay)]
+
+    byDayTable.key = byDateColName
     #print("byDayTable rows = {}".format(byDayTable.nrows))
-    print(byDayTable)
-
+    #print(byDayTable)
     return byDayTable
 
+def filterByDayAndLandkreis(fromDay, toDay, forIdLandkreis, byDateColName):
+    byDate = dt.f[byDateColName]
+    return (byDate >= fromDay) & (byDate < toDay) & (dt.f.IdLandkreis == forIdLandkreis)
 
-def analyzeDailyAltersgruppen(fullTable, byDayTable, filter, Altersgruppen, Geschlechter, postfix):
+def filterByDayAndCriteria(fromDay, toDay, criteria, byDateColName):
+    byDate = dt.f[byDateColName]
+    return (byDate >= fromDay) & (byDate < toDay) & criteria
+
+def filterByDay(fromDay, toDay, byDateColName):
+    byDate = dt.f[byDateColName]
+    return (byDate >= fromDay) & (byDate < toDay)
+
+def analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue, filter, postfix):
+    # print("fromDay, toDay",fromDay, toDay)
+    # print("byCriteria, criteriaValue",byCriteria, criteriaValue)
+    # print("filter:", filter)
+
+    fullfilter = filter & filterByDayAndCriteria(fromDay, toDay, (byCriteria == criteriaValue),"DatenstandTag")
+    #print("fullfilter:", fullfilter)
+    dayTable = analyzeDaily(fullTable, fullfilter, "", postfix, "DatenstandTag")
+
+    maxDatenstandTag = fullTable[:, dt.f.DatenstandTag].max().to_list()[0][0]
+    print("maxDatenstandTag",maxDatenstandTag)
+
+    latestTable = fullTable[dt.f.DatenstandTag == maxDatenstandTag, :]
+    #latestTable.materialize()
+    #print("latestTable",latestTable)
+
+    #print(latestTable)
+    minMeldeTag = latestTable[:, dt.f.MeldeTag].min().to_list()[0][0]
+    maxMeldeTag = latestTable[:, dt.f.MeldeTag].max().to_list()[0][0]
+    print("minMeldeTag,maxMeldeTag",minMeldeTag,maxMeldeTag)
+
+    fullfilter = filter & filterByDayAndCriteria(minMeldeTag, maxMeldeTag+1, (byCriteria == criteriaValue), "MeldeTag")
+    #print("fullfilter2:", fullfilter)
+
+    meldeTable = analyzeDaily(latestTable,fullfilter,"MeldeTag_", postfix, "MeldeTag")
+    #meldeTable.to_csv("Meldung.csv")
+    meldeTable.names = {"MeldeTag":"DatenstandTag"}
+    meldeTable.key = "DatenstandTag"
+    dayTable.key = "DatenstandTag"
+
+    meldeDays = set(meldeTable[:,"DatenstandTag"].to_list()[0])
+    dataDays = set(dayTable[:,"DatenstandTag"].to_list()[0])
+    allDays = sorted(list(meldeDays.union(dataDays)))
+    allDaysTable = dt.Frame(allDays)
+    allDaysTable.names = ["DatenstandTag"]
+    allDaysTable.key = "DatenstandTag"
+
+    #dayTable = dayTable[:, :, dt.join(meldeTable)]
+    allDaysTable = allDaysTable[:, :, dt.join(meldeTable)][:, :, dt.join(dayTable)]
+    allDaysTable.key = "DatenstandTag"
+    return allDaysTable
+
+
+def analyzeDailyAltersgruppen(fullTable, byDayTable, fromDay, toDay, byCriteria, criteriaValue, filter, Altersgruppen, Geschlechter, postfix):
     #byDayTable = analyzeDaily(fullTable, filter, postfix)
     #print("----- analyzeDailyAltersgruppen:"+postfix)
 
     for ag in Altersgruppen:
         print("Analyzing Altergruppe "+ ag)
-        byDayTableAG = analyzeDaily(fullTable, filter & (dt.f.Altersgruppe == ag), postfix+"-AG-"+ag)
+
+        fullfilter = filter & (dt.f.Altersgruppe == ag)
+        byDayTableAG = analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue, fullfilter, postfix+"_AG_"+ag)
         byDayTable = byDayTable[:,:,dt.join(byDayTableAG)]
         byDayTable.key = "DatenstandTag"
     return byDayTable
 
-def analyzeDailyAltersgruppenGeschlechter(fullTable, filter, Altersgruppen, Geschlechter):
-    byDayTable = analyzeDaily(fullTable, filter, "")
-    byDayTable = analyzeDailyAltersgruppen(fullTable, byDayTable, filter, Altersgruppen, Geschlechter,"")
+def analyzeDailyAltersgruppenGeschlechter(fullTable, fromDay, toDay, byCriteria, criteriaValue, Altersgruppen, Geschlechter):
+    byDayTable = analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue, True, "")
+    byDayTable = analyzeDailyAltersgruppen(fullTable, byDayTable, fromDay, toDay, byCriteria, criteriaValue, True, Altersgruppen, Geschlechter,"")
     #byDayTable = byDayTable[:, :, dt.join(byDayTableAG)]
-    return byDayTable
-    print("byDayTable 1", byDayTable.names)
+    #return byDayTable
+    #print("byDayTable 1", byDayTable.names)
     for g in Geschlechter:
         print("Analyzing Geschlechter "+ g)
-        byDayTableG = analyzeDaily(fullTable, filter & (dt.f.Geschlecht == g), "-G-"+g)
+        byDayTableG = analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue, (dt.f.Geschlecht == g), "_G_"+g)
         print("byDayTableG", byDayTableG.names)
         byDayTable = byDayTable[:,:,dt.join(byDayTableG)]
         print("byDayTable 2", byDayTable.names)
-        byDayTable = analyzeDailyAltersgruppen(fullTable, byDayTable, filter & (dt.f.Geschlecht == g), Altersgruppen, Geschlechter, "-G-"+g)
+        byDayTable = analyzeDailyAltersgruppen(fullTable, byDayTable,
+                                               fromDay, toDay, byCriteria, criteriaValue, (dt.f.Geschlecht == g),
+                                               Altersgruppen, Geschlechter, "_G_"+g)
         #print("byDayTableAG", byDayTableAG.names)
         #byDayTable = byDayTable[:,:,dt.join(byDayTableAG)]
         print("byDayTable 3", byDayTable.names)
 
     return byDayTable
 
-def filterByDayAndLandkreis(fromDay, toDay, forIdLandkreis):
-    return (dt.f.DatenstandTag >= fromDay) & (dt.f.DatenstandTag < toDay) & (dt.f.IdLandkreis == forIdLandkreis)
-
-def filterByDayAndCriteria(fromDay, toDay, criteria):
-    return (dt.f.DatenstandTag >= fromDay) & (dt.f.DatenstandTag < toDay) & criteria
-
-def filterByDay(fromDay, toDay):
-    return (dt.f.DatenstandTag >= fromDay) & (dt.f.DatenstandTag < toDay)
 
 def timeSeries(fullTable, fromDay, toDay, byCriteria, nameColumn, Altersgruppen, Geschlechter):
     regions = fullTable[:, [dt.first(nameColumn)], dt.by(byCriteria)]
@@ -202,14 +282,15 @@ def timeSeries(fullTable, fromDay, toDay, byCriteria, nameColumn, Altersgruppen,
     print("Creating time series for regions:")
     print(regions)
     dailysByCriteria = {}
+    dailysMeldeDatumByCriteria = {}
     start = time.perf_counter()
     for i, lk in enumerate(regions[:, byCriteria].to_list()[0]):
         print("Processing Region '{}'".format(regions[i,nameColumn][0,0]))
         start_region = time.perf_counter()
 
         pmu.printMemoryUsage("pre analyzeDailyAltersgruppenGeschlechter")
-        dailysByCriteria[lk] = analyzeDailyAltersgruppenGeschlechter(fullTable,
-            filterByDayAndCriteria(fromDay, toDay, (byCriteria == lk)), Altersgruppen, Geschlechter)
+        dailysByCriteria[lk] = analyzeDailyAltersgruppenGeschlechter(fullTable, fromDay, toDay, byCriteria, lk, Altersgruppen, Geschlechter)
+
         finish = time.perf_counter()
         duration = finish - start
         print("Region took {:.2f} seconds, elapsed {:.2f} minutes, time to completion: {:.2f} minutes".format(finish-start_region, duration/60, duration/(i+1) * (regions.nrows - i)/60))
@@ -231,15 +312,15 @@ def makeIncidenceColumns(regionTable, censusTable, Altersgruppen, Geschlechter):
 
     for ag in Altersgruppen:
         if ag != "unbekannt":
-            srccolname = "AnzahlFallNeu-AG-" + ag
-            newcolname = "InzidenzFallNeu-" + ag
+            srccolname = "AnzahlFallNeu_AG_" + ag
+            newcolname = "InzidenzFallNeu_" + ag
             censuscolname = ag + "-total"
             AnzahlFallNeu_X = dt.f[srccolname]
             ag_size = censusTable[0,censuscolname]
             #print("srccolname:{} newcolname:{} AnzahlFallNeu_X:{} ag_size:{}".format(srccolname, newcolname, AnzahlFallNeu_X, ag_size))
-            regionTable = regionTable[:, dt.f[:].extend({"Einwohner-"+ag: ag_size})]
+            regionTable = regionTable[:, dt.f[:].extend({"Einwohner_"+ag: ag_size})]
             regionTable = regionTable[:, dt.f[:].extend({newcolname: (100000.0 * AnzahlFallNeu_X) / ag_size})]
-    print(regionTable)
+    #print(regionTable)
     return regionTable
 
 def add7DayAverages(table):
@@ -319,6 +400,8 @@ def analyze(fullTable, args):
     print("firstDumpDay", firstDumpDay)
     print("lastDumpDay",lastDumpDay)
 
+    print(list(zip(fullTable.names, fullTable.stypes)))
+
     #fromDay = lastDumpDay-27
     fromDay = firstDumpDay
     toDay = lastDumpDay+1
@@ -333,7 +416,9 @@ def analyze(fullTable, args):
 
     print("Altersgruppen", Altersgruppen)
 
-    Geschlechter = dt.unique(fullTable[:,"Geschlecht"]).to_list()[0]
+    Geschlechter = []
+    if args.gender:
+        Geschlechter = dt.unique(fullTable[:,"Geschlecht"]).to_list()[0]
     print("Geschlechter", Geschlechter)
 
     census = dt.fread("CensusByRKIAgeGroups.csv")
@@ -347,7 +432,8 @@ def analyze(fullTable, args):
 
     print("Processing 'Deutschland'")
     pmu.printMemoryUsage("begin Deutschland")
-    deutschland = analyzeDailyAltersgruppenGeschlechter(fullTable, filterByDay(fromDay, toDay), Altersgruppen, Geschlechter)
+
+    deutschland = analyzeDailyAltersgruppenGeschlechter(fullTable, fromDay, toDay, True, True, Altersgruppen, Geschlechter)
     deutschland = insertDates(deutschland)
     deutschland = insertRegionInfo(deutschland, 0, "Deutschland", "BR", 0, "Deutschland", flaechen[0])
 
@@ -421,6 +507,7 @@ def main():
                         default="archive_v2/all-data.jay")
     parser.add_argument('-d', '--output-dir', dest='outputDir', default="series")
     parser.add_argument("--agegroups", help="also create columns for all seperate age groups", action="store_true")
+    parser.add_argument("--gender", help="also create columns for all seperate gender groups", action="store_true")
 
     args = parser.parse_args()
     #print(args)

@@ -88,7 +88,11 @@ def addMultipliedColumn(table, srcColumn, newColumn, factor):
     newTable = table[:, dt.f[:].extend({newColumn: src * factor})]
     return newTable
 
-
+def addShiftedColumn(table, srcColumn, newColumn, shift_rows):
+    src = dt.f[srcColumn]
+    newTable = table[:, dt.f[:].extend({newColumn: dt.shift(src, n=shift_rows)})]
+    #print(newTable)
+    return newTable
 
 # goal = incidence * trend ^ t
 # trend ^ t = goal/incidence
@@ -114,6 +118,13 @@ def test():
     table = add7dSumColumn(table, "period", "sumPeriod")
     add7dAvrgColumn(table, "period", "avPeriod")
 
+def addMeldeTagShift(table):
+    candidatesColumns = [name for name in table.names if ("MeldeTag_Anzahl" in name)]
+    for c in candidatesColumns:
+        table = addShiftedColumn(table, c, c+"_Gestern",1)
+    return table
+
+
 def addIncidences(table):
     table = addIncidenceColumn(table, "AnzahlTodesfallNeu", "InzidenzTodesfallNeu")
 
@@ -123,7 +134,7 @@ def addIncidences(table):
         newColName = c.replace("Anzahl","Inzidenz")
         table = addIncidenceColumn(table, c, newColName)
         if "AnzahlTodesfall" in c:
-            newColName = c.replace("AnzahlTodesfall", "Fallsterblichkeit-Prozent")
+            newColName = c.replace("AnzahlTodesfall", "Fallsterblichkeit_Prozent")
             caseColName = c.replace("AnzahlTodesfall", "AnzahlFall")
             table = addRatioColumn(table, c, caseColName, newColName, factor=100)
 
@@ -131,17 +142,20 @@ def addIncidences(table):
 
 def enhanceDatenstandTagMax(table):
     for row in range(table.nrows):
-        table[row,"DatenstandTag-Max"] = table[:row+1,"DatenstandTag-Max"].max()
+        table[row,"DatenstandTag_Max"] = table[:row+1,"DatenstandTag_Max"].max()
     return table
 
 
 def addMoreMetrics(table):
+    print(table.names)
     table = enhanceDatenstandTagMax(table)
-    table = addDifferenceColumn(table, "DatenstandTag-Max", "DatenstandTag", "DatenstandTag-Diff")
-    table = addIncidenceColumn(table, "AnzahlFallNeu-Meldung-letze-7-Tage-7-Tage", "InzidenzFallNeu-Meldung-letze-7-Tage-7-Tage")
-    table = addDifferenceColumn(table, "AnzahlFallNeu-7-Tage", "AnzahlFallNeu-Meldung-letze-7-Tage-7-Tage", "AnzahlFallNeu-7-Tage-Dropped")
-    table = addRatioColumn(table, "AnzahlFallNeu-7-Tage-Dropped", "AnzahlFallNeu-7-Tage", "ProzentFallNeu-7-Tage-Dropped", factor=100)
-    table = addMultipliedColumn(table, "MeldeDauerFallNeu-Min", "MeldeDauerFallNeu-Min-Neg", factor=-1)
+    table = addDifferenceColumn(table, "DatenstandTag_Max", "DatenstandTag", "DatenstandTag_Diff")
+
+    table = addIncidenceColumn(table, "MeldeTag_AnzahlFallNeu_Gestern_7TageSumme", "MeldeTag_InzidenzFallNeu_Gestern_7TageSumme")
+    table = addDifferenceColumn(table, "AnzahlFallNeu_7TageSumme", "MeldeTag_AnzahlFallNeu_Gestern_7TageSumme", "AnzahlFallNeu_7TageSumme_Dropped")
+    table = addRatioColumn(table, "AnzahlFallNeu_7TageSumme_Dropped", "AnzahlFallNeu_7TageSumme", "ProzentFallNeu_7TageSumme_Dropped", factor=100)
+
+    table = addMultipliedColumn(table, "PublikationsdauerFallNeu_Min", "PublikationsdauerFallNeu_Min_Neg", factor=-1)
 
     return table
 
@@ -150,23 +164,23 @@ def add7DayAverages(table):
     candidatesColumns = [name for name in  table.names if "Neu" in name]
     #print(candidatesColumns)
     for c in candidatesColumns:
-        table = add7dSumColumn(table, c, c+"-7-Tage")
-        table = add7dTrendColumn(table, c+"-7-Tage", c+"-7-Tage-Trend")
+        table = add7dSumColumn(table, c, c+"_7TageSumme")
+        table = add7dTrendColumn(table, c+"_7TageSumme", c+"_7TageSumme_Trend")
         if c in ["AnzahlFallNeu","InzidenzFallNeu","AnzahlTodesfallNeu","InzidenzTodesfallNeu"]:
-            table = add7dBeforeColumn(table, c + "-7-Tage", c + "-7-Tage-7-Tage-davor")
+            table = add7dBeforeColumn(table, c + "_7TageSumme", c + "_7TageSumme_7_Tage_davor")
         if c in ["InzidenzFallNeu", "InzidenzTodesfallNeu"]:
-            table = add7dWTrendColumn(table, c+"-7-Tage", c+"-7-Tage-Trend-Spezial")
+            table = add7dWTrendColumn(table, c+"_7TageSumme", c+"_7TageSumme_Trend_Spezial")
             if c in ["InzidenzFallNeu"]:
-                table = add7dRColumn(table, c + "-7-Tage-Trend", c + "-7-Tage-R")
-                table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-1-Wochen", 1)
-                table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-2-Wochen", 2)
-                table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-4-Wochen", 4)
-                table = addPredictionsColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Prognose-8-Wochen", 8)
+                table = add7dRColumn(table, c + "_7TageSumme_Trend", c + "_7TageSumme_R")
+                table = addPredictionsColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial", c + "_Prognose_1_Wochen", 1)
+                table = addPredictionsColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial", c + "_Prognose_2_Wochen", 2)
+                table = addPredictionsColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial", c + "_Prognose_4_Wochen", 4)
+                table = addPredictionsColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial", c + "_Prognose_8_Wochen", 8)
 
-                table = addGoalColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Tage-bis-50", 50)
-                table = addGoalColumn(table, c + "-7-Tage", c + "-7-Tage-Trend-Spezial", c + "-Tage-bis-100", 100)
+                table = addGoalColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial", c + "_Tage_bis_50", 50)
+                table = addGoalColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial", c + "_Tage_bis_100", 100)
 
-                table = addRiskColumn(table,"InzidenzFallNeu-Prognose-1-Wochen", "Kontaktrisiko", 3.5)
+                table = addRiskColumn(table,"InzidenzFallNeu_Prognose_1_Wochen", "Kontaktrisiko", 3.5)
     return table
 
 def enhance(inputFile, destDir="."):
@@ -188,10 +202,11 @@ def enhance(inputFile, destDir="."):
     #print(table.names)
     #print(table.stypes)
 
-    numericColumns = [name for name in table.names if "Anzahl" in name or "Inzidenz" in name or "DatenstandTag-Max" in name]
+    numericColumns = [name for name in table.names if "Anzahl" in name or "Inzidenz" in name or "DatenstandTag_Max" in name]
     fillEmptyCellsWithZeroes(table, numericColumns)
 
-    newTable = addIncidences(table)
+    newTable = addMeldeTagShift(table)
+    newTable = addIncidences(newTable)
     newTable = add7DayAverages(newTable)
     newTable = addMoreMetrics(newTable)
 
@@ -204,7 +219,7 @@ def enhance(inputFile, destDir="."):
 def main():
     #test()
     #exit(0)
-    parser = argparse.ArgumentParser(description='Enahnce by adding columns with 7-day-averages, changes, predictions and risk')
+    parser = argparse.ArgumentParser(description='Enhance by adding columns with 7-day-averages, changes, predictions and risk')
     parser.add_argument('files', metavar='fileName', type=str, nargs='+',
                         help='.csv-File produced by database.py')
     parser.add_argument('-d', '--output-dir', dest='outputDir', default=".")
