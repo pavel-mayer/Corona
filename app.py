@@ -36,7 +36,7 @@ import dash_table.FormatTemplate as FormatTemplate
 import socket
 import time
 
-versionStr="1.0.0.2"
+versionStr="1.0.1.0"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
@@ -259,7 +259,7 @@ def makeColumns():
         ('InzidenzFallNeu_Tage_bis_50', ['Publizierte Fälle je 100.000', 'Tage bis 50'], 'numeric', FormatInt, colWidth(60)),
         ('InzidenzFallNeu_Tage_bis_100', ['Publizierte Fälle je 100.000', 'Tage bis 100'], 'numeric', FormatInt, colWidth(60)),
 
-        ('MeldeTag_AnzahlFallNeu_Gestern_7TageSumme', ['Fälle nach Meldedatum (RKI-Zählung)', 'absolut'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('MeldeTag_AnzahlFallNeu_Gestern_7TageSumme', ['Fälle nach Meldedatum (RKI-Zählung)', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('MeldeTag_InzidenzFallNeu_Gestern_7TageSumme', ['Fälle nach Meldedatum (RKI-Zählung)', '7 Tage Inzidenz'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
         ('AnzahlFallNeu_7TageSumme_Dropped', ['Fälle nach Meldedatum (RKI-Zählung)', 'Diff. zu publ. Fällen'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('ProzentFallNeu_7TageSumme_Dropped', ['Fälle nach Meldedatum (RKI-Zählung)', '% zu publ. Fällen'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
@@ -790,6 +790,11 @@ h_Erlauterung=html.P([
 h_News=html.P([
     html.Span("News:", className=introClass),
     html.P(
+        " Version 1.0.1.0: Jetzt passen wirklich alle Zahlen. Es gibt jetzt eine klarere und neutralere Unterscheidung zwischen "
+        " den publizierten Fallzahlen und den Fallzahlen nach Meldedatum, die das RKi zur Berechnung der 'offiziellen'"
+        " 7-Tage-Inzidenz heranzieht."
+        "", className=bodyClass),
+    html.P(
         " Version 1.0.0.0: Die Seite sieht zwar noch fast genauso aus wie vorher, aber die Datenpipeline und alle Berechnungen "
         " sind komplett von Grundauf neu geschrieben. Es sollten jetzt die neuen täglichen Fälle und"
         " die Gesamtzahlen identisch mit den offiziell vom RKI veröffentlichten Zahlen sein. Die neue Datenpipeline ist ganz frisch und kann noch Fehler enthalten, wobei die Fallzahlen "
@@ -947,7 +952,7 @@ h_RwK = html.Span(["R", html.Sub("w"),"K"])
 
 h_RwDef = makeDefinition(h_RwK,
 '''
- ist ein wöchentlicher Reproduktionsfaktor. Er ist das Verhältnis aller Fälle der letzten 7 Tage gegenüber den 7
+ ist ein wöchentlicher Reproduktionsfaktor. Er ist das Verhältnis aller publizierten Fälle der letzten 7 Tage gegenüber den 7
  Tagen davor. Diese Zahl "schlägt" stärker aus als der "normale" Reproduktionsfaktor, aber über 1.0 heißt
  auch hier Ausbreitung und unter 1.0 Rückgang. Ein Wert von 2 bedeutet, dass in der letzten Woche ungefähr doppelt so viele
  so viele Fälle gemeldet wurden wie in der vorletzten Woche, ein Wert von 0,5 bedeutet ungefähr nur halb so viele neue Fälle.
@@ -978,14 +983,14 @@ gewinnt der, wo bisher pro 100.000 die wenigsten Fälle gemeldet wurden.
 N berechnet sich wie folgt:  
 """)
 
-h_Prognose=makeDefinition("Fälle je 100.000, in X Wochen",
+h_Prognose=makeDefinition("Publizierte Fälle je 100.000, in X Wochen",
 """
 Zeigt die 7-Tage-Inzidenz in X Wochen an, falls sich der aktuelle Trend fortsetzt, also RwK gleich bleibt.
  Das ist in der Realität in der Regel nicht so, und bei kleinen Zahlen und und auf Landkreis-Ebene ergeben
  sich gelegentlich absurd hohe Zahlen, aber so ist nun mal die Mathematik, wenn man den aktuellen Trend fortschreibt. 
 """)
 
-h_TageBis=makeDefinition("Fälle je 100.000, Tage bis X",
+h_TageBis=makeDefinition("Publizierte Fälle je 100.000, Tage bis X",
 """
 Zeigt an, wie viele Tage es dauert, bis eine Inzidenz von X erreicht ist, falls sich der aktuelle Trend fortsetzt, also RwK gleich bleibt.
  Ist die Zahl ist negativ, bedeutet dass erst mal, dass bei aktuellem Trend X niemals erreicht wird.
@@ -995,16 +1000,19 @@ Zeigt an, wie viele Tage es dauert, bis eine Inzidenz von X erreicht ist, falls 
  seit X über- oder unterschritten wurde, hätte die ganze Zeit über derselbe Trend geherrscht wie aktuell.  
 """)
 
-h_Strikt=makeDefinition("Fälle strikt 7 Tage",
+h_Strikt=makeDefinition("Publizierte nach Meldedatum (RKI-Zählung)",
 '''
- enthält zum Vergleich die Berechnung, mit der das RKI die 7-Tage-Inzidenz ermittelt (Spalte "absolut"). Dabei fallen alle
- Fälle unter den Tisch, deren Meldedatum beim Gesundheitsamt älter als 7 Tage ist. "RKI ignoriert" enthält die Zahl der Fälle,
- die dabei wären, würde man alle in den letzten 7 gemeldeten Fälle zählen, so wie es hier allen anderen Berechnungen zugrundeliegt.
- "RKI ignoriert %" ist der Prozentsatz an ignorierten Fällen. Ein hohre Prozentsatz ist ein Indikator dafür, dass die
- Gesundheitsämter vor Ort überlastet sind. Bemerkenswert ist, dass einige Ämter as auch bei hohen Fallzahlen schaffen,
- sämtliche Fälle innerhalb von 7 Tagen zu testen und die Ergebnisse ans RKI zu übermitteln und 0 ignorierte Fälle zu produzieren.
+ enthält zum Vergleich die Berechnung, mit der das RKI die 7-Tage-Inzidenz ermittelt (Spalte "7-Tage-Inzidenz"). Dabei fallen
+ einerseits alle Fälle unter den Tisch, deren Meldedatum beim Gesundheitsamt älter als 7 Tage ist, andereseits gibt es
+ manchmal "Aufholeffekte", so dass die Zahl nach Meldedatum manchmal höher sein kann."Differenz zu publizierten Fällen"
+ enthält, wie der Titel sagt, die Differenz zwischen den in den letzteb Tagen publizierten Fällen und der Zahl der Fälle,
+ die in den letzten 7 Tagen beim Gesundheitsamt gemeldet *und* ans RKI übermittelt wurden.
+ "% zu publizierten Fällen" in der Anteil der Differenz an den publizierten Fällen.
+ Ein hoher Prozentsatz kann ein Indikator dafür sein, dass die Gesundheitsämter vor Ort überlastet sind, oder dass
+ ein größeres Cluster die Zahlen hochgetrieben hat.
  Die von lokalen Behörden ausgewiesene Inzidenz kann in der Nähe des "strikten" RKI-Werts ("absolut") liegen oder näher an meinem
- Wert ("Fälle letzte 7 Tage"), je nachdem, wie vor Ort gerechnet wird.
+ Wert ("Fälle letzte 7 Tage"), je nachdem, wie vor Ort gerechnet wird. Oft sind die lokal veröffentlichten Daten
+ auch den hier zugrundeliegenden Daten einen Tag voraus, weil sie erst um Mitternacht vom RKI gezählt werden.
 ''')
 
 
