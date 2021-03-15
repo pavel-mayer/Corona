@@ -231,6 +231,7 @@ def analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue
     meldeDays = set(meldeTable[:,"DatenstandTag"].to_list()[0])
     dataDays = set(dayTable[:,"DatenstandTag"].to_list()[0])
     allDays = sorted(list(meldeDays.union(dataDays)))
+
     allDaysTable = dt.Frame(allDays)
     allDaysTable.names = ["DatenstandTag"]
     allDaysTable.key = "DatenstandTag"
@@ -277,7 +278,8 @@ def analyzeDailyAltersgruppenGeschlechter(fullTable, fromDay, toDay, byCriteria,
 
 
 def timeSeries(fullTable, fromDay, toDay, byCriteria, nameColumn, Altersgruppen, Geschlechter):
-    regions = fullTable[:, [dt.first(nameColumn)], dt.by(byCriteria)]
+    good_regions = fullTable[byCriteria >= 0, :]
+    regions = good_regions[:, [dt.first(nameColumn)], dt.by(byCriteria)]
     #regions = regions[:5,:]
     print("Creating time series for regions:")
     print(regions)
