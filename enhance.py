@@ -119,9 +119,13 @@ def test():
     add7dAvrgColumn(table, "period", "avPeriod")
 
 def addMeldeTagShift(table):
-    candidatesColumns = [name for name in table.names if ("MeldeTag_Anzahl" in name)]
+    candidatesColumns = [name for name in table.names if ("MeldeTag_Anzahl" in name) ]
     for c in candidatesColumns:
         table = addShiftedColumn(table, c, c+"_Gestern",1)
+
+    candidatesColumns = [name for name in table.names if ("MeldeTag_Vor7Tagen_Anzahl" in name)]
+    for c in candidatesColumns:
+        table = addShiftedColumn(table, c, c + "_Vor8Tagen", 8)
     return table
 
 
@@ -155,6 +159,13 @@ def addMoreMetrics(table):
     table = addDifferenceColumn(table, "AnzahlFallNeu_7TageSumme", "MeldeTag_AnzahlFallNeu_Gestern_7TageSumme", "AnzahlFallNeu_7TageSumme_Dropped")
     table = addRatioColumn(table, "AnzahlFallNeu_7TageSumme_Dropped", "AnzahlFallNeu_7TageSumme", "ProzentFallNeu_7TageSumme_Dropped", factor=100)
 
+    table = addIncidenceColumn(table, "MeldeTag_Vor7Tagen_AnzahlFallNeu_Vor8Tagen_7TageSumme", "MeldeTag_Vor7Tagen_InzidenzFallNeu_Vor8Tagen_7TageSumme")
+    table = addRatioColumn(table, "MeldeTag_InzidenzFallNeu_Gestern_7TageSumme", "MeldeTag_Vor7Tagen_InzidenzFallNeu_Vor8Tagen_7TageSumme",
+                           "MeldeTag_InzidenzFallNeu_Trend")
+    table = add7dRColumn(table, "MeldeTag_InzidenzFallNeu_Trend", "MeldeTag_InzidenzFallNeu_R")
+    table = addPredictionsColumn(table, "MeldeTag_InzidenzFallNeu_Gestern_7TageSumme", "MeldeTag_InzidenzFallNeu_Trend",
+                                 "MeldeTag_InzidenzFallNeu_Prognose_4_Wochen",4)
+
     table = addMultipliedColumn(table, "PublikationsdauerFallNeu_Min", "PublikationsdauerFallNeu_Min_Neg", factor=-1)
 
     return table
@@ -164,8 +175,10 @@ def add7DayAverages(table):
     candidatesColumns = [name for name in  table.names if "Neu" in name]
     #print(candidatesColumns)
     for c in candidatesColumns:
-        table = add7dSumColumn(table, c, c+"_7TageSumme")
-        table = add7dTrendColumn(table, c+"_7TageSumme", c+"_7TageSumme_Trend")
+        if not ("Publikationsdauer" in c):
+            table = add7dSumColumn(table, c, c+"_7TageSumme")
+        if not ("MeldeTag" in c or "Publikationsdauer" in c):
+            table = add7dTrendColumn(table, c+"_7TageSumme", c+"_7TageSumme_Trend")
         if c in ["AnzahlFallNeu","InzidenzFallNeu","AnzahlTodesfallNeu","InzidenzTodesfallNeu"]:
             table = add7dBeforeColumn(table, c + "_7TageSumme", c + "_7TageSumme_7_Tage_davor")
         if c in ["InzidenzFallNeu", "InzidenzTodesfallNeu"]:

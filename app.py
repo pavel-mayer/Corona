@@ -36,7 +36,7 @@ import dash_table.FormatTemplate as FormatTemplate
 import socket
 import time
 
-versionStr="1.0.1.0"
+versionStr="1.0.2.0"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
@@ -260,7 +260,12 @@ def makeColumns():
         ('InzidenzFallNeu_Tage_bis_100', ['Publizierte Fälle je 100.000', 'Tage bis 100'], 'numeric', FormatInt, colWidth(60)),
 
         ('MeldeTag_AnzahlFallNeu_Gestern_7TageSumme', ['Fälle nach Meldedatum (RKI-Zählung)', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
+        ('MeldeTag_Vor7Tagen_AnzahlFallNeu_Vor8Tagen_7TageSumme', ['Fälle nach Meldedatum (RKI-Zählung)', 'vor 7 Tagen'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('MeldeTag_InzidenzFallNeu_Gestern_7TageSumme', ['Fälle nach Meldedatum (RKI-Zählung)', '7 Tage Inzidenz'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+        ('MeldeTag_InzidenzFallNeu_Trend', ['Fälle nach Meldedatum (RKI-Zählung)', '7-Tage Faktor'], 'numeric', FormatFixed2, colWidth(70)),
+        ('MeldeTag_InzidenzFallNeu_R', ['Fälle nach Meldedatum (RKI-Zählung)', '7 Tage R-Wert'], 'numeric', FormatFixed2, colWidth(70)),
+        ('MeldeTag_InzidenzFallNeu_Prognose_4_Wochen', ['Fälle nach Meldedatum (RKI-Zählung)', 'Inzidenz in 4 Wochen'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
+
         ('AnzahlFallNeu_7TageSumme_Dropped', ['Fälle nach Meldedatum (RKI-Zählung)', 'Diff. zu publ. Fällen'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('ProzentFallNeu_7TageSumme_Dropped', ['Fälle nach Meldedatum (RKI-Zählung)', '% zu publ. Fällen'], 'numeric', FormatFixed1, colWidth(defaultColWidth)),
 
@@ -462,9 +467,11 @@ FaellePro100kLetzte7TageClass = makeConditionClass("InzidenzFallNeu_7TageSumme",
 FaellePro100kPrognoseClass = makeConditionClass("InzidenzFallNeu_Prognose_4_Wochen",100,50,20,5,1)
 FaellePro100kPrognose2Class = makeConditionClass("InzidenzFallNeu_Prognose_8_Wochen",100,50,20,5,1)
 InzidenzRKIClass = makeConditionClass("MeldeTag_InzidenzFallNeu_Gestern_7TageSumme",100,50,20,5,1)
+InzidenzRKIPrognoseClass = makeConditionClass("MeldeTag_InzidenzFallNeu_Prognose_4_Wochen",100,50,20,5,1)
 
 
 AnzahlFallTrendClass = makeConditionClass("InzidenzFallNeu_7TageSumme_Trend_Spezial",3,2,1,0.9,0.3)
+AnzahlFallTrendRKIClass = makeConditionClass("MeldeTag_InzidenzFallNeu_Trend",3,2,1,0.9,0.3)
 
 LandkreisClass = {
     conditionUltra : KontaktrisikoClass[conditionUltra] +" || "+ braced(FaellePro100kLetzte7TageClass[conditionUltra])+" || "+braced(AnzahlFallTrendClass[conditionUltra]),
@@ -620,11 +627,13 @@ def make_style_data_conditional():
     result = result + width_style_conditional
     result = result + conditionalStyles(FaellePro100kLetzte7TageClass, 'InzidenzFallNeu_7TageSumme')
     result = result + conditionalStyles(AnzahlFallTrendClass, 'InzidenzFallNeu_7TageSumme_Trend_Spezial')
+    result = result + conditionalStyles(AnzahlFallTrendRKIClass, 'MeldeTag_InzidenzFallNeu_Trend')
     result = result + conditionalStyles(KontaktrisikoClass, 'Kontaktrisiko')
     result = result + conditionalStyles(LandkreisClass, 'Landkreis')
     result = result + conditionalStyles(FaellePro100kPrognoseClass, 'InzidenzFallNeu_Prognose_4_Wochen')
     result = result + conditionalStyles(FaellePro100kPrognose2Class, 'InzidenzFallNeu_Prognose_8_Wochen')
     result = result + conditionalStyles(InzidenzRKIClass, 'MeldeTag_InzidenzFallNeu_Gestern_7TageSumme')
+    result = result + conditionalStyles(InzidenzRKIPrognoseClass, 'MeldeTag_InzidenzFallNeu_Prognose_4_Wochen')
 
     return result
 
@@ -730,7 +739,7 @@ h_header = html.Header(
     },
     children=[
         html.H1(className="app-header", children=appTitle, style={'color': colors['text'], 'text-decoration': 'none'}, id="title_header"),
-        html.H2(className="app-header", children="Die Zahlen in der Tabelle sind wieder benutzbar.", style={'color':'green', 'text-decoration': 'none'}, id="title_alarm"),
+        #html.H2(className="app-header", children="Die Zahlen in der Tabelle sind wieder benutzbar.", style={'color':'green', 'text-decoration': 'none'}, id="title_alarm"),
         html.H4(className="app-header-date",
                 children="Datenstand: {} 00:00 Uhr (wird täglich aktualisiert)".format(dataVersionDate),
                 style={'color': colors['text']}),
@@ -789,6 +798,15 @@ h_Erlauterung=html.P([
 
 h_News=html.P([
     html.Span("News:", className=introClass),
+    html.P(
+        " Version 1.0.2.0: Es gibt jetzt auch für die Fallzahlen nach Meldedatum eine Trend-, R-Wert- und 4-Wochen-Prognose."
+        " Damit lässen sich jetzt die Zahlen nach Veröffentlichungsdatum und nach Meldedatum noch besser vergleichen."
+        " Die Trendberechnung nach Meldedatum ist umständlicher, als man denkt. Um sie korrekt zu machen, kann man nicht "
+        " einfach Zeitabschnitte des aktuellen Datenstands vergleichen, sondern braucht zusätzlich die Zahlenreihe eines"
+        " 7 Tage älteren Dumps, der für die jüngeren Tage genauso unvollständig ist, wie der aktuelle Dump für das gestrige"
+        " Meldedatum. Da ich aber alle vergangengen Dumps seit April 2020 im direkten Zugriff habe, war das machbar."
+        " Viel Spaß beim Vergleichen."
+        "", className=bodyClass),
     html.P(
         " Version 1.0.1.0: Jetzt passen wirklich alle Zahlen. Es gibt jetzt eine klarere und neutralere Unterscheidung zwischen "
         " den publizierten Fallzahlen und den Fallzahlen nach Meldedatum, die das RKi zur Berechnung der 'offiziellen'"

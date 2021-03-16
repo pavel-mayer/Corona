@@ -146,24 +146,6 @@ def analyzeDaily(fullTable, filter, prefix, postfix, byDateColName):
         new_cases_delay.key = "DatenstandTag"
         print("new_cases_delay rows = {}, new_cases_to_count_delay = {}".format(new_cases_delay.nrows,
                                                                                 new_cases_to_count_delay.nrows))
-        # new_cases_delay = new_cases_to_count_delay[:, [dt.mean(dt.f.DatenstandTag-dt.f.MeldeTag)],dt.by(dt.f.DatenstandTag)]
-
-        # new_cases_to_count_strict = new_cases_to_count[(dt.f.DatenstandTag - dt.f.MeldeTag < 7) | (dt.f.AnzahlFall < 0),
-        #                             :]
-        # new_cases_strict = new_cases_to_count_strict[:, [dt.sum(dt.f.AnzahlFall)], dt.by(byDate)]
-        # new_cases_strict.names = ["DatenstandTag", "AnzahlFallNeu-Meldung-letze-7-Tage" + postfix]
-        # new_cases_strict.key = "DatenstandTag"
-        # print("new_cases_strict rows = {}, new_cases_to_count_strict = {}".format(new_cases_strict.nrows,
-        #                                                                           new_cases_to_count_strict.nrows))
-        # # new_cases_to_count_strict.to_csv("new_cases_to_count_strict.csv")
-        #
-        # new_cases_to_count_strict_14 = new_cases_to_count[
-        #                                (dt.f.DatenstandTag - dt.f.MeldeTag < 14) | (dt.f.AnzahlFall < 0), :]
-        # new_cases_strict_14 = new_cases_to_count_strict_14[:, [dt.sum(dt.f.AnzahlFall)], dt.by(byDate)]
-        # new_cases_strict_14.names = ["DatenstandTag", "AnzahlFallNeu-Meldung-letze-14-Tage" + postfix]
-        # new_cases_strict_14.key = "DatenstandTag"
-        # print("new_cases_strict_14 rows = {}, new_cases_to_count_strict_14 = {}".format(new_cases_strict_14.nrows,
-        #                                                                                 new_cases_to_count_strict_14.nrows))
 
         recovered_to_count = dayTable[(dt.f.NeuGenesen == 0) | (dt.f.NeuGenesen == 1),:]
         recovered = recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(byDate)]
@@ -211,6 +193,7 @@ def analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue
     print("maxDatenstandTag",maxDatenstandTag)
 
     latestTable = fullTable[dt.f.DatenstandTag == maxDatenstandTag, :]
+    olderTable = fullTable[dt.f.DatenstandTag == maxDatenstandTag-7, :]
     #latestTable.materialize()
     #print("latestTable",latestTable)
 
@@ -223,21 +206,26 @@ def analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue
     #print("fullfilter2:", fullfilter)
 
     meldeTable = analyzeDaily(latestTable,fullfilter,"MeldeTag_", postfix, "MeldeTag")
-    #meldeTable.to_csv("Meldung.csv")
     meldeTable.names = {"MeldeTag":"DatenstandTag"}
     meldeTable.key = "DatenstandTag"
+
+    meldeTable7TageAlt = analyzeDaily(olderTable,fullfilter,"MeldeTag_Vor7Tagen_", postfix, "MeldeTag")
+    meldeTable7TageAlt.names = {"MeldeTag": "DatenstandTag"}
+    meldeTable7TageAlt.key = "DatenstandTag"
+
     dayTable.key = "DatenstandTag"
 
     meldeDays = set(meldeTable[:,"DatenstandTag"].to_list()[0])
+    meldeDays7old = set(meldeTable7TageAlt[:,"DatenstandTag"].to_list()[0])
     dataDays = set(dayTable[:,"DatenstandTag"].to_list()[0])
-    allDays = sorted(list(meldeDays.union(dataDays)))
+    allDays = sorted(list(meldeDays.union(dataDays).union(meldeDays7old)))
 
     allDaysTable = dt.Frame(allDays)
     allDaysTable.names = ["DatenstandTag"]
     allDaysTable.key = "DatenstandTag"
 
     #dayTable = dayTable[:, :, dt.join(meldeTable)]
-    allDaysTable = allDaysTable[:, :, dt.join(meldeTable)][:, :, dt.join(dayTable)]
+    allDaysTable = allDaysTable[:, :, dt.join(meldeTable)][:, :, dt.join(meldeTable7TageAlt)][:, :, dt.join(dayTable)]
     allDaysTable.key = "DatenstandTag"
     return allDaysTable
 
