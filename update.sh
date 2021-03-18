@@ -9,7 +9,6 @@ cd $CORONA
 #pip install -r requirements.txt
 
 mkdir -p ard-data
-mkdir -p ard-data
 mkdir -p archive_ard
 mkdir -p archive_v2
 mkdir -p series

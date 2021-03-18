@@ -37,12 +37,39 @@ def convert(compressedJSONFile, destDir=".", force = False):
     day = cd.dayFromDate(date)
     newFile =  destDir+"/NPGEO-RKI-{}.csv".format(cd.dateStrYMDFromDay(day))
 
-    if force or not os.path.isfile(newFile):
+    # check if previous file exist and make sure the current file is not broken
+    previousFile =  destDir+"/NPGEO-RKI-{}.csv".format(cd.dateStrYMDFromDay(day-1))
+
+    yesterDayRows = -1
+    if os.path.isfile(previousFile):
+        yesterdayFrame = dt.fread(previousFile)
+        yesterDayRows = yesterdayFrame.nrows
+
+    allowedShrinkageDays = [33,68]
+
+    redo = False
+    if not force and os.path.isfile(newFile):
+        existingFrame = dt.fread(newFile)
+        existingRows = existingFrame.nrows
+        if existingRows <= yesterDayRows:
+            if not day in allowedShrinkageDays:
+                print("Existing .csv file for day {} contains not more rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
+                redo = True
+            else:
+                print("On day {} the number of rows was reduced from {} to compared to yesterday ({})".format(day,existingRows,yesterDayRows))
+
+        else:
+            print("Existing .csv file contains {} rows, {} more than yesterday".format(existingRows,existingRows-yesterDayRows))
+
+    if force or redo or not os.path.isfile(newFile):
         print("Loading " + compressedJSONFile)
         #with bz2.open(compressedJSONFile, "rb") as f:
         with lzma.open(compressedJSONFile, "rb") as f:
             content = ndjson.load(f)
             frame = dt.Frame(content)
+            if frame.nrows <= yesterDayRows and not day in allowedShrinkageDays:
+                print("Rejecting '{}' because it contains less rows than yesterdays file".format(compressedJSONFile))
+                return
             print("Saving " + newFile)
             frame.to_csv(newFile)
     else:
@@ -54,8 +81,11 @@ def main():
                         help='Convert ARD-RKI-dumps to .csv')
     parser.add_argument('-d', '--output-dir', dest='outputDir', default=".")
     args = parser.parse_args()
-    print(args)
-    for f in args.files:
+    #print(args)
+
+    dt.options.progress.enabled = False
+
+    for f in sorted(args.files):
         convert(f, args.outputDir)
 
 if __name__ == "__main__":
