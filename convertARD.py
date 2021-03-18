@@ -44,21 +44,35 @@ def convert(compressedJSONFile, destDir=".", force = False):
     if os.path.isfile(previousFile):
         yesterdayFrame = dt.fread(previousFile)
         yesterDayRows = yesterdayFrame.nrows
+    else:
+        print("No file for previous day {}".format(day-1))
 
     allowedShrinkageDays = [33,68]
+    allowedSameDays = [33]
+    allowedJumpDays = [46,66]
 
     redo = False
-    if not force and os.path.isfile(newFile):
+    if not force and os.path.isfile(newFile) and yesterDayRows >= 0:
         existingFrame = dt.fread(newFile)
         existingRows = existingFrame.nrows
-        if existingRows <= yesterDayRows:
+        if existingRows < yesterDayRows:
             if not day in allowedShrinkageDays:
-                print("Existing .csv file for day {} contains not more rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
+                print("Existing .csv file for day {} contains less rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
                 redo = True
             else:
                 print("On day {} the number of rows was reduced from {} to compared to yesterday ({})".format(day,existingRows,yesterDayRows))
-
         else:
+            if existingRows == yesterDayRows:
+                if not day in allowedSameDays:
+                    print("Existing .csv file for day {} contains same number of rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
+                    redo = True
+                else:
+                    print( "Existing .csv file for day {} contains same number of rows ({}) than previous day file ({}) but we can't do anything about it".format(
+                            day, existingRows, yesterDayRows))
+            elif (existingRows > yesterDayRows * 1.1) and (existingRows - yesterDayRows > 5000) and not day in allowedJumpDays:
+                print("Existing .csv file for day {} contains much more rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
+                redo = True
+
             print("Existing .csv file contains {} rows, {} more than yesterday".format(existingRows,existingRows-yesterDayRows))
 
     if force or redo or not os.path.isfile(newFile):
