@@ -134,6 +134,14 @@ def checkLandkreisData(data, row, Census, Flaeche):
         data["Landkreis"][row] = Landkreis
         data["IdLandkreis"][row] = IdLandkreis
 
+    if Landkreis == "LK Saarpfalz-Kreis":
+        print("#Info: Bad record in row:",row)
+        print("#Info: Changing bad '{}' Kreis with Id {} to ‘LK Saar-Pfalz-Kreis‘ id 5334".format(Landkreis, IdLandkreis))
+        Landkreis = "LK Saar-Pfalz-Kreis"
+        data["Landkreis"][row] = Landkreis
+
+    ## TODO: Normalize all Landkreis Names
+
     #print(record)
     #print(record["IdLandkreis"])
     #censusLK = Census[dt.f.IdLandkreis == IdLandkreis,:]
@@ -455,7 +463,11 @@ def main():
                 if time.perf_counter() - lastCheckPointTime > float(args.checkpoint) * 60:
                     #checkname = args.outputDir+"/"+"all-data.check.jay"
                     #print("Saving checkpoint: " + checkname)
-                    pmu.saveJayTable(fullTable,"all-data.check.jay",args.outputDir)
+                    #pmu.saveJayTable(fullTable,"all-data.check.jay",args.outputDir)
+                    pmu.saveCsvTable(fullTable,"all-data.check.csv",args.outputDir)
+                    fullTable = None
+                    fullTable = dt.fread(args.outputDir+"/all-data.check.csv")
+                    #fullTable = dt.fread(args.outputDir+"/all-data.check.jay")
                     #fullTable.to_jay(checkname)
                     #print("Saving done:" + checkname)
                     lastCheckPointTime = time.perf_counter()

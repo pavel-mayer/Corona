@@ -100,7 +100,7 @@ def main():
                 table = dt.fread(f)
                 #print(table.names)
                 #print(table.stypes)
-                print(list(zip(table.names, table.stypes)))
+                #print(list(zip(table.names, table.stypes)))
                 if result is None:
                     result = table
                 else:

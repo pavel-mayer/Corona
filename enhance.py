@@ -151,7 +151,7 @@ def enhanceDatenstandTagMax(table):
 
 
 def addMoreMetrics(table):
-    print(table.names)
+    #print(table.names)
     table = enhanceDatenstandTagMax(table)
     table = addDifferenceColumn(table, "DatenstandTag_Max", "DatenstandTag", "DatenstandTag_Diff")
 

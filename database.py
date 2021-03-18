@@ -328,6 +328,8 @@ def makeIncidenceColumn(regionTable, censusTable, g, ag):
         g_ag_size = censusTable[0, censuscolname]
         print("srccolname:{} newcolname:{} AnzahlFallNeu_X:{} g_ag_size:{}".format(srccolname, newcolname, AnzahlFallNeu_X, g_ag_size))
         regionTable = regionTable[:, dt.f[:].extend({fullColName("Einwohner",g,ag): g_ag_size})]
+        if censuscolname == "Insgesamt-total":
+            regionTable = regionTable[:, dt.f[:].extend({"Dichte": censusTable[0,"Insgesamt-total"] / dt.f.Flaeche})]
         regionTable = regionTable[:, dt.f[:].extend({newcolname: (100000.0 * AnzahlFallNeu_X) / g_ag_size})]
     return regionTable
 
@@ -462,10 +464,10 @@ def updateOldTable(table, withTable):
 
     # update MeldeDatum columns
     meldeTagCols = [col for col in table.names if "MeldeTag_" in col]
-    print("meldeTagCols", meldeTagCols)
+    #print("meldeTagCols", meldeTagCols)
     # update only rows that are contained in withTable
     meldeRowMask = [day in withTableDates for day in tableDates]
-    print(meldeRowMask)
+    #print(meldeRowMask)
 
     table[meldeRowMask,meldeTagCols] = withTable[:,meldeTagCols]
     return table
@@ -585,6 +587,9 @@ def analyze(fullTable, args, oldTables):
         print(i)
         lk_name = landKreise[i, dt.f.Landkreis].to_list()[0][0]
         lk_id = landKreise[i, dt.f.IdLandkreis].to_list()[0][0]
+        if lk_name == "LK Saarpfalz-Kreis":
+            lk_name = "LK Saar-Pfalz-Kreis"
+
         if lk_id > 0:
             censusLK = census[dt.f.IdLandkreis == lk_id, :]
             bl_name = censusLK[0,dt.f.Bundesland].to_list()[0][0]

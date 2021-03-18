@@ -60,7 +60,7 @@ def convert(compressedJSONFile, destDir=".", force = False):
                 print("Existing .csv file for day {} contains less rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
                 redo = True
             else:
-                print("On day {} the number of rows was reduced from {} to compared to yesterday ({})".format(day,existingRows,yesterDayRows))
+                print("On day {} the number of rows was reduced from {} to compared to yesterday's file ({})".format(day,existingRows,yesterDayRows))
         else:
             if existingRows == yesterDayRows:
                 if not day in allowedSameDays:
