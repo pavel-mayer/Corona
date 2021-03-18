@@ -298,7 +298,8 @@ def timeSeries(fullTable, fromDay, toDay, byCriteria, nameColumn, Altersgruppen,
 
         finish = time.perf_counter()
         duration = finish - start
-        print("Region took {:.2f} seconds, elapsed {:.2f} minutes, time to completion: {:.2f} minutes".format(finish-start_region, duration/60, duration/(i+1) * (regions.nrows - i)/60))
+        print("Region took {:.2f} seconds, elapsed {:.2f} minutes, time to completion: {:.2f} minutes or {:.2f} hours".format(
+            finish-start_region, duration/60, duration/(i+1) * (regions.nrows - i)/60, duration/(i+1) * (regions.nrows - i)/60/60))
 
         pmu.printMemoryUsage("post analyzeDailyAltersgruppenGeschlechter")
         print("Done {} of {}, key = {} name = {}".format(i+1, regions.nrows, lk, regions[i,nameColumn][0,0]))
@@ -606,6 +607,8 @@ def analyze(fullTable, args, oldTables):
     return fullTable
 
 def main():
+    dt.options.progress.enabled = False
+
     parser = argparse.ArgumentParser(description='Fast queries on all data')
     parser.add_argument('file', metavar='fileName', type=str, nargs='?',
                         help='.Full unified NPGEO COVID19 Germany data as .csv or .jay file',
