@@ -36,24 +36,27 @@ def retrieveAllRecords():
     chunksize = 5000
     records = []
     newRecords = None
+    retry = 0
     while ready == 0:
         chunk = retrieveRecords(offset, chunksize)
         print("Retrieved chunk from {}, chunk items: {}".format(offset, len(chunk)))
-        offset = offset + chunksize
         try:
             newRecords= chunk['features']
         except KeyError:
             print("feature not found in newRecord:")
             #pmu.pretty(newRecords)
             return None
-        records = records + newRecords
         print("Records = {}".format(len(newRecords)))
         if 'exceededTransferLimit' in chunk:
+            records = records + newRecords
             exceededTransferLimit = chunk['exceededTransferLimit']
             ready = not exceededTransferLimit
+            offset = offset + chunksize
         else:
-            print("exceededTransferLimit flag missing")
-            ready = True
+            print("exceededTransferLimit flag missing, retry #q{}".format(retry))
+            retry = retry = retry + 1
+            if retry > 10:
+                return None
     print("Done")
     return records
 

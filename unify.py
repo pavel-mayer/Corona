@@ -453,10 +453,11 @@ def main():
                 print("fullTable rows = {}".format(fullTable.nrows))
                 print("-> File time {:.1f} secs or {:.1f} mins or {:.1f} hours".format(secs, secs/60, secs/60/60))
                 if time.perf_counter() - lastCheckPointTime > float(args.checkpoint) * 60:
-                    checkname = args.outputDir+"/"+"all-data.check.jay"
-                    print("Saving checkpoint: " + checkname)
-                    fullTable.to_jay(checkname)
-                    print("Saving done:" + checkname)
+                    #checkname = args.outputDir+"/"+"all-data.check.jay"
+                    #print("Saving checkpoint: " + checkname)
+                    pmu.saveJayTable(fullTable,"all-data.check.jay",args.outputDir)
+                    #fullTable.to_jay(checkname)
+                    #print("Saving done:" + checkname)
                     lastCheckPointTime = time.perf_counter()
 
     if addedData:
