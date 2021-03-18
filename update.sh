@@ -1,8 +1,12 @@
 #/bin/bash
-CORONA=/Users/pavel/Corona
+CORONA=$HOME/Corona
 #cd $CORONA/2020-rki-archive
 #git pull
 cd $CORONA
+
+#pip install pipreqs
+#pipreqs
+#pip install -r requirements.txt
 
 mkdir -p ard-data
 mkdir -p ard-data
@@ -22,8 +26,12 @@ python $CORONA/unify.py -d $CORONA/archive_v2 $CORONA/archive_ard/NPGEO-RKI-*.cs
 
 cd $CORONA/
 python $CORONA/database.py -d $CORONA/series
-#or:
-#python $CORONA/database.py --agegroups -d $CORONA/series
+
+#or with age groups and gender, first run takes 10-20 hours:
+#python $CORONA/database.py --agegroups --gender -d $CORONA/series
+
+#or incremental update, creates updated series in -d <dir>, runs 50-100 times faster:
+#python $CORONA/database.py --agegroups --gender -i $CORONA/series -d $CORONA/series-updated
 
 cd $CORONA/
 python $CORONA/enhance.py -d $CORONA/series-enhanced series/series-*.csv

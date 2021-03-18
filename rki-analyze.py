@@ -400,6 +400,7 @@ if UPDATE or FORCE_UPDATE:
         if not os.path.isfile(fn) or FORCE_UPDATE:
             pmu.saveCsv(fn, allRecords)
 
+exit(0)
 
 def findOldRecords(currentRecords, likeRecord):
     results = []
