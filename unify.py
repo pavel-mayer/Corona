@@ -399,13 +399,18 @@ def main():
                         action="store_true")
     parser.add_argument("--inMemory", help="run faster but with higher memory footprint",
                         action="store_true")
-    parser.add_argument("--checkpoint", help="write checkpoint after amount of minutes elapsed", default = 5)
+    parser.add_argument("--checkpoint", help="write checkpoint after amount of minutes elapsed", default = 10)
+    parser.add_argument("--nthreads", help="number of concurrent threads used by python dataframes, 0 = as many as cores, 1 single-thread, -3 = 3 threads less than cores", default = 0)
 
     args = parser.parse_args()
     print(args)
     print("args.inMemory",args.inMemory)
     print("args.materializeNew",args.materializeNew)
     print("args.noMaterialize",args.noMaterialize)
+
+    if args.nthreads != 0:
+        dt.options.nthreads = args.nthreads
+    print("dt.options.nthreads", dt.options.nthreads)
 
     fullTable = None
     jayPath = args.outputDir+"/all-data.jay"
@@ -466,8 +471,8 @@ def main():
                     #pmu.saveJayTable(fullTable,"all-data.check.jay",args.outputDir)
                     pmu.saveCsvTable(fullTable,"all-data.check.csv",args.outputDir)
                     fullTable = None
-                    fullTable = dt.fread(args.outputDir+"/all-data.check.csv")
-                    #fullTable = dt.fread(args.outputDir+"/all-data.check.jay")
+                    #fullTable = dt.fread(args.outputDir+"/all-data.check.csv")
+                    fullTable = dt.fread(args.outputDir+"/all-data.check.jay")
                     #fullTable.to_jay(checkname)
                     #print("Saving done:" + checkname)
                     lastCheckPointTime = time.perf_counter()
