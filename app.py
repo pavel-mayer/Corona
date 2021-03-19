@@ -26,6 +26,10 @@ import dash_table
 from dash_table.Format import Format, Scheme, Sign, Symbol
 import dash_core_components as dcc
 import dash_html_components as html
+from dash.dependencies import Input, Output
+
+import plotly.graph_objects as go
+import plotly.express as px
 
 import pandas as pd
 import numpy as np
@@ -40,6 +44,8 @@ versionStr="1.0.2.0"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
+WITH_GRPAH = False
+
 print("Running on host '{}', debug={}".format(socket.gethostname(), debugFlag))
 
 def pretty(jsonmap):
@@ -163,15 +169,15 @@ def clip(table, colName, maxValue):
 
 def getTableForDay(fullTable, day):
     #sortColumns = ["Risk","LetzteMeldung","InzidenzFallNeu_7_Tage"]
-    sortColumns = ["Kontaktrisiko","InzidenzFallNeu_7TageSumme"]
+    sortColumns = ["Kontaktrisiko","PublikationsdauerFallNeu_Min_Neg","InzidenzFallNeu_7TageSumme"]
     todayTable = getRankedTable(fullTable, day, sortColumns)
     yesterdayTable = getRankedTable(fullTable, day-1, sortColumns)
-    #print(todayTable)
-    #print(yesterdayTable)
+    print(todayTable)
+    print(yesterdayTable)
     todayTableById = todayTable.sort("IdLandkreis")
     yesterdayTableById = yesterdayTable.sort("IdLandkreis")
-    #print(todayTableById.nrows)
-    #print(yesterdayTableById.nrows)
+    print(todayTableById.nrows)
+    print(yesterdayTableById.nrows)
 
     # check if all entries today and yesterday do match
     for i in range(yesterdayTableById.nrows):
@@ -179,13 +185,13 @@ def getTableForDay(fullTable, day):
         l_name = todayTableById[i, dt.f.Landkreis].to_list()[0][0]
         l_new_id = yesterdayTableById[i, dt.f.IdLandkreis].to_list()[0][0]
         l_new_name = yesterdayTableById[i, dt.f.Landkreis].to_list()[0][0]
-        #print("{}: ? {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
+        print("{}: ? {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
         if l_id != l_new_id:
             print("missing id {} ({}) in today, was {} ({}) yesterday".format(l_id, l_name, l_new_id, l_new_name))
-            #print("{}: BAD: {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
+            print("{}: BAD: {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
             exit(1)
-        #else:
-        #    print("{}: ok : {} {} == {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
+        else:
+            print("{}: ok : {} {} == {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
 
     todayTableById=todayTableById[:,dt.f[:].extend({"RangChange": 0})]
     rangChange = np.subtract(yesterdayTableById[:,"Rang"],todayTableById[:,"Rang"])
@@ -222,6 +228,9 @@ def getTableForDay(fullTable, day):
 
     return todayTableById
 
+def getTimeSeries(fullTable, regionID, columnNames):
+    result = fullTable[dt.f.IdLandkreis == regionID, columnNames]
+    return result
 
 defaultColWidth=70
 #charWidth=7
@@ -271,11 +280,11 @@ def makeColumns():
 
         ('DatenstandTag_Diff', ['Meldung', 'Letzte Zählung'], 'numeric', FormatInt, colWidth(70)),
         ('PublikationsdauerFallNeu_Min_Neg', ['Meldung', 'Letzte Meldung'], 'numeric', FormatInt, colWidth(70)),
-        ('PublikationsdauerFallNeu_Max', ['Meldeverzögerung (Tage)', 'Max.'], 'numeric', FormatFixed1, colWidth(62)),
-        ('PublikationsdauerFallNeu_Schnitt', ['Meldeverzögerung (Tage)', 'Mittel x̅'], 'numeric', FormatFixed1, colWidth(62)),
-        ('PublikationsdauerFallNeu_Median', ['Meldeverzögerung (Tage)', 'Median x̃'], 'numeric', FormatInt, colWidth(62)),
-        ('PublikationsdauerFallNeu_StdAbw', ['Meldeverzögerung (Tage)', 'Stdabw. σx'], 'numeric', FormatFixed1, colWidth(62)),
-        ('PublikationsdauerFallNeu_Fallbasis', ['Meldeverzögerung (Tage)', 'Anzahl Fälle'], 'numeric', FormatInt, colWidth(62)),
+        ('PublikationsdauerFallNeu_Max', ['Publikationsverzögerung (Tage)', 'Max.'], 'numeric', FormatFixed1, colWidth(62)),
+        ('PublikationsdauerFallNeu_Schnitt', ['Publikationsverzögerung (Tage)', 'Mittel x̅'], 'numeric', FormatFixed1, colWidth(62)),
+        ('PublikationsdauerFallNeu_Median', ['Publikationsverzögerung (Tage)', 'Median x̃'], 'numeric', FormatInt, colWidth(62)),
+        ('PublikationsdauerFallNeu_StdAbw', ['Publikationsverzögerung (Tage)', 'Stdabw. σx'], 'numeric', FormatFixed1, colWidth(62)),
+        ('PublikationsdauerFallNeu_Fallbasis', ['Publikationsverzögerung (Tage)', 'Anzahl Fälle'], 'numeric', FormatInt, colWidth(62)),
         ('AnzahlTodesfallNeu_7TageSumme', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfallNeu_7TageSumme_7_Tage_davor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth)),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth)),
@@ -290,7 +299,9 @@ def makeColumns():
     #orderedIndices = np.array(orderedIndices)+1
     #print(orderedIndices)
 
-    columns = [{'name': L1, 'id': L2, 'type':L3, 'format':L4} for (L1,L2,L3,L4) in zip(orderedNames,orderedCols,orderedTypes,orderFormats)]
+
+
+    columns = [{'name': L1, 'id': L2, 'type':L3, 'format':L4, "deletable": WITH_GRPAH, "selectable": WITH_GRPAH} for (L1,L2,L3,L4) in zip(orderedNames,orderedCols,orderedTypes,orderFormats)]
     widths = {}
     totalWidth = 0
     minWidth = 0
@@ -308,7 +319,7 @@ def makeColumns():
             maxWidth = thisColWidth
 
     #print("columns=",columns)
-    return columns, widths, totalWidth+1, minWidth, maxWidth
+    return columns, widths, totalWidth+1, minWidth, maxWidth, orderedCols
 
 
 server = flask.Flask(__name__)
@@ -365,7 +376,7 @@ def csv_fulldata():
 
 ###########################################################################################
 # Start of table initialization
-columns, colWidths, totalWidth, minWidth, maxWidth = makeColumns()
+columns, colWidths, totalWidth, minWidth, maxWidth, usedColumns = makeColumns()
 totalWidthStr = colWidthStr(totalWidth)
 minWidthStr = colWidthStr(minWidth)
 maxWidthStr = colWidthStr(maxWidth)
@@ -652,6 +663,9 @@ h_table = dash_table.DataTable(
     data=data,
     sort_action='native',
     filter_action='native',
+#    column_selectable="multi",
+#    row_selectable="multi",
+
     #filter_query='{Bundesland} = Berlin',
     page_size= 500,
     style_table = {
@@ -939,11 +953,11 @@ h_Benutzung = html.P([
            "Mit Audrücken wie <10 oder >=50 können Datensätzte ausgefiltert werden, die bestimmte Werte in der Spalte "
            "über- oder unterschreiten. Einfach Wert eingeben und <Return> drücken. Eingabe löschen, um Filter zu entfernen."
            , className=bodyClass),
-    html.P("Um nur die Bundesländer uns Deutschland zu sehen, 'B' im Feld Region/Art eingeben, '=B', um nur die Bundesländer"
-            " zu sehen, 'R', um nur Deutschland zu sehen. Weitere Werte sind 'LK' für "
+    html.P("Um nur die Bundesländer und Deutschland zu sehen, 'B' im Feld Region/Art eingeben, 'BL', um nur die Bundesländer"
+            " zu sehen, 'BR', um nur Deutschland zu sehen. Weitere Werte sind 'LK' für "
            " für Landkreis, SK für Stadtkreis und LSK für Land/Stadtregionen. Um nur Sachsen zu sehen, '=Sachsen' bei Region/Land nehmen,"
            , className=bodyClass),
-     html.H4(html.A(html.Span("Ans Seitenende springen ⬇", className=introClass), href="#bottom")),
+    html.H4(html.A(html.Span("Ans Seitenende springen ⬇", className=introClass), href="#bottom")),
     html.P(html.H4(html.A(html.Span("Zu Absatz 'Benutzung' springen ⬆", className=introClass), href="#Benutzung")),
            style={'padding': '0px',
                   'backgroundColor': colors['background']}, id="tabletop"),
@@ -1185,11 +1199,76 @@ betterExplanation = html.Div([
     }
 )
 
+print(usedColumns)
+print(list(usedColumns))
+visualizeColumns = ["Datum"] + list(usedColumns)
+visualizeColumns = [col for col in visualizeColumns if not "Rang" in col]
+print(visualizeColumns)
+
+chartDataFrame = getTimeSeries(fullTable,0,visualizeColumns).to_pandas()
+#chartDataFrame = fullTable[:, visualizeColumns].to_pandas()
+
+print(chartDataFrame)
+
+# @app.callback(
+#     Output("time-series-chart", "figure"),
+#     Input('table', 'selected_columns'),
+#     Input('table', 'selected_rows'),
+# )
+# def display_time_series(selected_columns,selected_rows):
+#     print("---------------------->")
+#     print(selected_columns)
+#     print(selected_rows)
+#     fig = go.Figure()
+#     if not (selected_columns is None or selected_rows is None):
+#         print(table[selected_rows, visualizeColumns])
+#         print(table[selected_rows, "Landkreis"])
+#         print(table[selected_rows, "IdLandkreis"])
+#
+#         names = table[selected_rows, "Landkreis"].to_list()[0]
+#         IDs = table[selected_rows, "IdLandkreis"].to_list()[0]
+#         print(names)
+#         print(IDs)
+#
+#
+#         for i, id in enumerate(IDs):
+#             print("id2=",id)
+#             print("i: {} : col: {}".format(i, id))
+#
+#             lkTable = getTimeSeries(fullTable,id, ["Datum"]+selected_columns)
+#             print(IDs)
+#             print(lkTable)
+#
+#             dates = lkTable[:,"Datum"].to_list()[0]
+#             print("dates",dates)
+#             ##tables[id] = lkTable
+#             for col in selected_columns:
+#                 print("col",col)
+#                 values = lkTable[:, col].to_list()[0]
+#                 name = names[i]+":"+col
+#                 print("adding scatter trace {} name {} col {}".format(i, name, col))
+#                 print(dates)
+#                 print(values)
+#                 fig.add_trace(go.Scatter(x=dates, y=values, name=name))
+#
+#         #print(fullTable[selected_rows, visualizeColumns])
+#         #chartDataFrame = fullTable[selected_rows, visualizeColumns].to_pandas()
+#         #fig = px.line(chartDataFrame, x='Datum', y=selected_columns)
+#         #fig.show()
+#     return fig
+
+h_graph = dcc.Graph(
+        id='time-series-chart',
+        figure=px.line(chartDataFrame, x='Datum', y="AnzahlFallNeu_7TageSumme"),
+    )
+
+
 app.title = appTitle
 
 app.layout = html.Div([
     h_header,
     betterExplanation,
+#    h_graph,
     h_table,
 
     #html.P(html.H3(
@@ -1200,7 +1279,7 @@ app.layout = html.Div([
            'backgroundColor': colors['background']}, id="bottom"),
 
 ])
-debugFlag = False
+debugFlag = True
 if __name__ == '__main__':
     if socket.gethostname() == 'westphal.uberspace.de':
         app.run_server(host='0.0.0.0', port=1024,debug=debugFlag)
