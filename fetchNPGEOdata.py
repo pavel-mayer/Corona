@@ -2,24 +2,59 @@ import os
 import datatable as dt
 import cov_dates as cd
 import json
-import urllib.request
 import time
 import argparse
 
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
+import socket
 import pm_util as pmu
 
-UPDATE = True # fetch new data for the day if it not already exist
-FORCE_UPDATE = False # fetch new data for the day even if it already exists
-REFRESH= False or UPDATE # recreate enriched, consolidated dump
+# timeout in seconds
+socket.setdefaulttimeout(10)
 
 def retrieveRecords(offset, length):
     url = "https://services7.arcgis.com/mOBPykOjAyBO2ZKk/arcgis/rest/services/RKI_COVID19/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json&resultOffset={}&resultRecordCount={}".format(offset, length)
-    with urllib.request.urlopen(url) as response:
-        response = urllib.request.urlopen(url)
+    with urlopen(url) as response:
+        response = urlopen(url)
         data = json.loads(response.read())
         #print(data)
         # records = data['fields']
         return data
+
+#return a repsonse object; errors are also response instances
+def requestURL(url):
+    req = Request(url)
+    try:
+        response = urlopen(req)
+    except HTTPError as e:
+        print('The server couldn\'t fulfill the request.')
+        print('Error code: ', e.code)
+        return e
+    except URLError as e:
+        print('We failed to reach a server.')
+        print('Reason: ', e.reason)
+        return e
+    else:
+        return response
+
+
+def retrieveRecords2(offset, length):
+    apiurl = "https://services7.arcgis.com/mOBPykOjAyBO2ZKk/arcgis/rest/services/RKI_COVID19/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json&resultOffset={}&resultRecordCount={}".format(offset, length)
+
+    response = requestURL(apiurl)
+
+    if hasattr(response,'reason') and response.reason != "OK":
+        print("response.reason", response.reason)
+        return None
+    else:
+        if hasattr(response, 'code'):
+            if response.code == 200:
+                #print("response.code", response.code)
+                data = json.loads(response.read())
+                return data
+    return None
+
 
 def getRecordVersionOnServer():
     print("Retrieving version date from server")
@@ -29,34 +64,63 @@ def getRecordVersionOnServer():
     print("Version on server is: "+datenStand)
     return datenStand
 
-def retrieveAllRecords():
+def retrieveAllRecords(args):
     ready = 0
     offset = 0
     #offset = 340000
     chunksize = 5000
     records = []
+    if args.resume:
+        records = pmu.loadJson("lastReceived.json")
+
     newRecords = None
+    lastReceived = None
     retry = 0
     while ready == 0:
-        chunk = retrieveRecords(offset, chunksize)
+        chunk = retrieveRecords2(offset, chunksize)
+        error = False
         print("Retrieved chunk from {}, chunk items: {}".format(offset, len(chunk)))
         try:
-            newRecords= chunk['features']
+            newRecords = chunk['features']
         except KeyError:
-            print("feature not found in newRecord:")
-            #pmu.pretty(newRecords)
-            return None
-        print("Records = {}".format(len(newRecords)))
-        if 'exceededTransferLimit' in chunk:
-            records = records + newRecords
-            exceededTransferLimit = chunk['exceededTransferLimit']
-            ready = not exceededTransferLimit
-            offset = offset + chunksize
-        else:
-            print("exceededTransferLimit flag missing, retry #q{}".format(retry))
-            retry = retry = retry + 1
-            if retry > 10:
+            print("feature not found in newRecord, retry #{}".format(retry))
+            time.sleep(retry*3)
+            retry = retry + 1
+            print("Starting retry #{}".format(retry))
+            error = True
+            if retry > args.maxRetries:
+                pmu.saveJson("lastReceived.json", newRecords)
+                pmu.saveJson("allReceived-noFeature.json", records)
+                #pmu.pretty(newRecords)
                 return None
+
+        if newRecords != None:
+            print("Records = {}".format(len(newRecords)))
+        else:
+            print("No Records")
+        if not error:
+            if 'exceededTransferLimit' in chunk:
+                records = records + newRecords
+                exceededTransferLimit = chunk['exceededTransferLimit']
+                ready = not exceededTransferLimit
+                offset = offset + chunksize
+                retry = 0
+            else:
+                if retry > 0 and lastReceived == newRecords and len(newRecords)>0:
+                    print("exceededTransferLimit flag still missing, but we got the same data twice, so it should be ok")
+                    records = records + newRecords
+                    break
+
+                print("exceededTransferLimit flag missing, retry #{}".format(retry))
+                #pmu.pretty(newRecords)
+                time.sleep(retry*3)
+                retry = retry + 1
+                print("Starting retry #{}".format(retry))
+                if retry > args.maxRetries:
+                    pmu.saveJson("lastReceived.json", newRecords)
+                    pmu.saveJson("allReceived-noLimitFlag.json", records)
+                    return None
+                lastReceived = newRecords
     print("Done")
     return records
 
@@ -69,16 +133,59 @@ def archiveFilename(day,dir):
 def csvFilename(day,kind,dir):
     return "{}/NPGEO-RKI-{}-{}.csv".format(dir, cd.dateStrYMDFromDay(day),kind)
 
+
+def retrieveLatestCsvDate(args):
+    metaDataUrl = 'https://www.arcgis.com/sharing/rest/content/items/f10774f1c63e40168479a1feb6c7ca74?f=json'
+
+    response = requestURL(metaDataUrl)
+    if hasattr(response,'reason') and response.reason != "OK":
+        print("response.reason", response.reason)
+        return None
+    else:
+        if hasattr(response, 'code'):
+            if response.code == 200:
+                print("response.code", response.code)
+                metaData = json.loads(response.read())
+                pmu.pretty(metaData)
+                lastModDateStr = metaData["modified"]
+                lastModeDate = cd.datetimeFromStampStr(lastModDateStr)
+                print(lastModDateStr, lastModeDate)
+                return lastModeDate
+    return None
+
+
+def downloadCsv(args, toFile):
+    dataUrl = 'https://www.arcgis.com/sharing/rest/content/items/f10774f1c63e40168479a1feb6c7ca74/data'
+    response = requestURL(dataUrl)
+    if hasattr(response, 'reason') and response.reason != "OK":
+        print("response.reason", response.reason)
+    else:
+        if hasattr(response, 'code'):
+            if response.code == 200:
+                # print("response.code", response.code)
+                with open(toFile, mode='wb') as localfile:
+                    localfile.write(response.read())
+                    return True
+    return False
+
 def main():
     parser = argparse.ArgumentParser(description='Download RKI/NPGEO data and save as json-dump and .csv')
     parser.add_argument('-j', '--json-dump-dir', dest='dumpDir', default="dumps")
     parser.add_argument('-c', '--csv-dir', dest='csvDir', default="archive_csv")
     parser.add_argument("-f","--force", dest='force', help="download even if data for day already exist", action="store_true")
+    parser.add_argument("-R","--resume", dest='resume', help="download even if data for day already exist (API download only). Barely tested)", action="store_true")
+    parser.add_argument('-r','--retry', dest='maxRetries',type=int, default=10, help='Number of retries before giving up on a single request; each retry waits 3 second longer')
+    parser.add_argument("-F","--fetchcsv", dest='fetchcsv', help="fall back to directly download as .csv file, not using the api", action="store_true")
     args = parser.parse_args()
     print(args)
 
-    datenStand = getRecordVersionOnServer()
-    datenStandDay = cd.dayFromDatenstand(datenStand)
+    if args.fetchcsv:
+        datenStand = retrieveLatestCsvDate(args)
+        datenStandDay = cd.dayFromDate(datenStand)
+    else:
+        datenStand = getRecordVersionOnServer()
+        datenStandDay = cd.dayFromDatenstand(datenStand)
+
     afn = archiveFilename(datenStandDay, args.dumpDir)
     cfn = csvFilename(datenStandDay, "fullDaily", args.csvDir)
 
@@ -90,23 +197,28 @@ def main():
             print("Forcing Download because '--force' is set")
 
     if (not os.path.isfile(afn) and not os.path.isfile(cfn)) or args.force:
-        allRecords = retrieveAllRecords()
-        if allRecords is not None:
-            dfn = "dumps/dump-rki-" + time.strftime("%Y%m%d-%H%M%S") + "-Stand-" + cd.dateStrYMDFromDay(
-                datenStandDay) + ".json"
-            pmu.saveJson(dfn, allRecords)
+        dfn = "dumps/dump-rki-" + time.strftime("%Y%m%d-%H%M%S") + "-Stand-" + cd.dateStrYMDFromDay(
+            datenStandDay) + ".json"
 
-            afn = archiveFilename(datenStandDay,args.dumpDir )
-            if not os.path.isfile(afn) or  args.force:
-                pmu.saveJson(afn, allRecords)
-
-            fn = csvFilename(datenStandDay, "fullDaily", args.csvDir)
-            if not os.path.isfile(fn) or args.force:
-                pmu.saveCsv(fn, allRecords)
-            exit(0)
+        if not args.fetchcsv:
+            allRecords = retrieveAllRecords(args)
+            if allRecords is not None:
+                pmu.saveJson(dfn, allRecords)
+                if not os.path.isfile(afn) or  args.force:
+                    pmu.saveJson(afn, allRecords)
+                if not os.path.isfile(cfn) or args.force:
+                    pmu.saveCsv(cfn, allRecords)
+                exit(0)
+            else:
+                print("failed to retrieve data")
+                exit(1)
         else:
-            print("failed to retrieve data")
-            exit(1)
+            # download the .csv
+            if downloadCsv(args, cfn):
+                print("Successfully downloaded .csv")
+                dataDict = pmu.loadCsv(cfn)
+                pmu.saveJson(afn, dataDict)
+
     exit(9)
 
 
