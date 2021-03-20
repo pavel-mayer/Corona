@@ -566,7 +566,7 @@ def analyze(fullTable, args, oldTables):
 
         if bl_id > 0:
             bundeslaender_numbers[bl_id] = insertDates(bundeslaender_numbers[bl_id])
-            bundeslaender_numbers[bl_id] = insertRegionInfo(bundeslaender_numbers[bl_id], bl_id, bl_name, "BR", bl_id, bl_name, flaechen[0])
+            bundeslaender_numbers[bl_id] = insertRegionInfo(bundeslaender_numbers[bl_id], bl_id, bl_name, "BL", bl_id, bl_name, flaechen[0])
             censusBL = census[dt.f.IdLandkreis == bl_id, :]
             print(censusBL)
             bundeslaender_numbers[bl_id] = makeIncidenceColumns(bundeslaender_numbers[bl_id], censusBL, Altersgruppen, Geschlechter)

@@ -291,7 +291,7 @@ def makeColumns():
         ('Fallsterblichkeit_Prozent', ['Todesfälle', 'CFR in %'], 'numeric', FormatFixed2, colWidth(62)),
         ('InzidenzTodesfallNeu_7TageSumme', ['Todesfälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
         ('InzidenzTodesfallNeu_7TageSumme_7_Tage_davor', ['Todesfälle je 100.000', 'vorl. 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
-        ('InzidenzTodesfallNeu_7TageSumme_Trend_Spezial', ['Todesfälle je 100.000', 'Trend'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
+        ('InzidenzTodesfallNeu_7TageSumme_Trend', ['Todesfälle je 100.000', 'Trend'], 'numeric', FormatFixed2, colWidth(defaultColWidth)),
         ('InzidenzTodesfall', ['Todesfälle je 100.000', 'total'], 'numeric', FormatFixed2, colWidth(62)),
     ]
 
