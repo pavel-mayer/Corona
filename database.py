@@ -188,7 +188,7 @@ def analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue
     # print("filter:", filter)
 
     fullfilter = filter & filterByDayAndCriteria(fromDay, toDay, (byCriteria == criteriaValue),"DatenstandTag")
-    #print("fullfilter:", fullfilter)
+    print("fullfilter:", fullfilter)
     dayTable = analyzeDaily(fullTable, fullfilter, "", postfix, "DatenstandTag")
 
     maxDatenstandTag = fullTable[:, dt.f.DatenstandTag].max().to_list()[0][0]
