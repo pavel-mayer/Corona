@@ -468,8 +468,8 @@ def main():
                 if time.perf_counter() - lastCheckPointTime > float(args.checkpoint) * 60:
                     #checkname = args.outputDir+"/"+"all-data.check.jay"
                     #print("Saving checkpoint: " + checkname)
-                    #pmu.saveJayTable(fullTable,"all-data.check.jay",args.outputDir)
-                    pmu.saveCsvTable(fullTable,"all-data.check.csv",args.outputDir)
+                    pmu.saveJayTable(fullTable,"all-data.check.jay",args.outputDir)
+                    #pmu.saveCsvTable(fullTable,"all-data.check.csv",args.outputDir)
                     fullTable = None
                     #fullTable = dt.fread(args.outputDir+"/all-data.check.csv")
                     fullTable = dt.fread(args.outputDir+"/all-data.check.jay")
