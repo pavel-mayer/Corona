@@ -399,8 +399,8 @@ def main():
                         action="store_true")
     parser.add_argument("--inMemory", help="run faster but with higher memory footprint",
                         action="store_true")
-    parser.add_argument("--checkpoint", help="write checkpoint after amount of minutes elapsed", default = 10)
-    parser.add_argument("--nthreads", help="number of concurrent threads used by python dataframes, 0 = as many as cores, 1 single-thread, -3 = 3 threads less than cores", default = 0)
+    parser.add_argument("--checkpoint",  type=int, help="write checkpoint after amount of minutes elapsed", default = 10)
+    parser.add_argument("--nthreads", type=int, help="number of concurrent threads used by python dataframes, 0 = as many as cores, 1 single-thread, -3 = 3 threads less than cores", default = 0)
 
     args = parser.parse_args()
     print(args)
