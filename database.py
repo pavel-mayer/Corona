@@ -3,14 +3,9 @@ import argparse
 import datatable as dt
 import cov_dates as cd
 import numpy as np
-from math import nan
-import dateutil.parser
-import os
 import pm_util as pmu
-from dateutil.parser import parse
 import time
 import glob
-
 
 
 def cval(tableCell):
@@ -21,52 +16,6 @@ def cstr(tableCell):
 
 def cint(tableCell):
     return int(tableCell.to_list()[0][0])
-
-# def analyzeDay(fullTable, day):
-#     dayTable = fullTable[(dt.f.DatenstandTag == day),:]
-#     cases = dayTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
-#     new_cases = dayTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
-#     dead = dayTable[(dt.f.NeuerTodesfall == 0) | (dt.f.NeuerTodesfall == 1), 'AnzahlTodesfall'].sum()[0, 0]
-#     new_dead = dayTable[(dt.f.NeuerTodesfall == -1) | (dt.f.NeuerTodesfall == 1), 'AnzahlTodesfall'].sum()[0, 0]
-#
-#     recovered = 0
-#     new_recovered = 0
-#     if "NeuGenesen" in dayTable.keys():
-#         recovered = dayTable[(dt.f.NeuGenesen == 0) | (dt.f.NeuGenesen == 1), 'AnzahlGenesen'].sum()[0, 0]
-#         new_recovered = dayTable[(dt.f.NeuGenesen == -1) | (dt.f.NeuGenesen == 1), 'AnzahlGenesen'].sum()[0, 0]
-#     #lastDay=fullTable[:,'MeldeDay'].max()[0,0]
-#     #lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
-#     print("{} Day {}: cases {} (+{}), dead {} (+{}), recovered {} (+{})".format(
-#         cd.dateStrDMFromDay(day), day, int(cases), int(new_cases), int(dead), int(new_dead), int(recovered),int(new_recovered)))
-
-# def analyzeDayRange(fullTable, fromDay, toDay):
-#     dayTable = fullTable[(dt.f.DatenstandTag >= fromDay) & (dt.f.DatenstandTag < toDay),:]
-#
-#     cases_to_count = dayTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1),:]
-#     cases = cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
-#
-#     new_cases_to_count = dayTable[(dt.f.NeuerFall == -1) | (dt.f.NeuerFall == 1),:]
-#     new_cases = new_cases_to_count[:, [dt.sum(dt.f.AnzahlFall)],dt.by(dt.f.DatenstandTag)]
-#
-#     dead_to_count = dayTable[(dt.f.NeuerTodesfall == 0) | (dt.f.NeuerTodesfall == 1),:]
-#     dead = dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(dt.f.DatenstandTag)]
-#
-#     new_dead_to_count = dayTable[(dt.f.NeuerTodesfall == -1) | (dt.f.NeuerTodesfall == 1),:]
-#     new_dead = new_dead_to_count[:, [dt.sum(dt.f.AnzahlTodesfall)],dt.by(dt.f.DatenstandTag)]
-#
-#     if "NeuGenesen" in dayTable.keys():
-#         recovered_to_count = dayTable[(dt.f.NeuGenesen == 0) | (dt.f.NeuGenesen == 1),:]
-#         recovered = recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
-#         new_recovered_to_count = dayTable[(dt.f.NeuGenesen == -1) | (dt.f.NeuGenesen == 1),:]
-#         new_recovered = new_recovered_to_count[:, [dt.sum(dt.f.AnzahlGenesen)],dt.by(dt.f.DatenstandTag)]
-#
-#     #lastDay=fullTable[:,'MeldeDay'].max()[0,0]
-#     #lastnewCaseOnDay=fullTable[:,'newCaseOnDay'].max()[0,0]
-#     print("From {}-{} Day {}-{}: cases {} (+{}), dead {} (+{}), recovered {} (+{})".format(
-#         cd.dateStrDMFromDay(fromDay), cd.dateStrDMFromDay(toDay), fromDay, toDay,
-#         cases.to_list(), new_cases.to_list(), dead.to_list(), new_dead.to_list(), recovered.to_list(), new_recovered.to_list()))
-#     return cases, new_cases, dead, new_dead, recovered, new_recovered
-
 
 def addRunningSumColumn(table, srcColumn, newColumn):
     src = dt.f[srcColumn]
@@ -79,7 +28,6 @@ def addRunningSumColumn(table, srcColumn, newColumn):
     sumsTable = table[:, dt.f[:].extend({newColumn: 0})]
     sumsTable[:, newColumn] = cumsums
     return sumsTable
-
 
 def analyzeDaily(fullTable, filter, prefix, postfix, byDateColName):
 
@@ -188,11 +136,11 @@ def analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue
     # print("filter:", filter)
 
     fullfilter = filter & filterByDayAndCriteria(fromDay, toDay, (byCriteria == criteriaValue),"DatenstandTag")
-    print("fullfilter:", fullfilter)
+    #print("fullfilter:", fullfilter)
     dayTable = analyzeDaily(fullTable, fullfilter, "", postfix, "DatenstandTag")
 
     maxDatenstandTag = fullTable[:, dt.f.DatenstandTag].max().to_list()[0][0]
-    print("maxDatenstandTag",maxDatenstandTag)
+    #print("maxDatenstandTag",maxDatenstandTag)
 
     latestTable = fullTable[dt.f.DatenstandTag == maxDatenstandTag, :]
     olderTable = fullTable[dt.f.DatenstandTag == maxDatenstandTag-7, :]
@@ -235,6 +183,7 @@ def agColName(ag):
     ag_col_postfix = ag.replace("-", "_").replace("+", "Plus")
     return ag_col_postfix
 
+#return new column name based on gender and age group
 def fullColName(baseColName,g,ag):
     if g != "":
         baseColName = baseColName + "_G_"+g
@@ -267,15 +216,15 @@ def analyzeDailyAltersgruppenGeschlechter(fullTable, fromDay, toDay, byCriteria,
         if g != "unbekannt":
             print("Analyzing Geschlechter "+ g)
             byDayTableG = analyzeDailyAndMeldeTag(fullTable, fromDay, toDay, byCriteria, criteriaValue, (dt.f.Geschlecht == g), "_G_"+g)
-            print("byDayTableG", byDayTableG.names)
+            #print("byDayTableG", byDayTableG.names)
             byDayTable = byDayTable[:,:,dt.join(byDayTableG)]
-            print("byDayTable 2", byDayTable.names)
+            #print("byDayTable 2", byDayTable.names)
             byDayTable = analyzeDailyAltersgruppen(fullTable, byDayTable,
                                                    fromDay, toDay, byCriteria, criteriaValue, (dt.f.Geschlecht == g),
                                                    Altersgruppen, Geschlechter, "_G_"+g)
             #print("byDayTableAG", byDayTableAG.names)
             #byDayTable = byDayTable[:,:,dt.join(byDayTableAG)]
-            print("byDayTable 3", byDayTable.names)
+           # print("byDayTable 3", byDayTable.names)
 
     return byDayTable
 
@@ -307,11 +256,34 @@ def timeSeries(fullTable, fromDay, toDay, byCriteria, nameColumn, Altersgruppen,
         #    break
     return regions, dailysByCriteria
 
-def makeIncidenceColumn(regionTable, censusTable, g, ag):
-    if ag != "unbekannt" and g != "unbekannt":
+# def makeIncidenceColumn(regionTable, censusTable, g, ag):
+#     if ag != "unbekannt" and g != "unbekannt":
+#
+#         srccolname = fullColName("AnzahlFallNeu", g, ag)
+#         newcolname = fullColName("InzidenzFallNeu", g, ag)
+#
+#         if ag == "":
+#             censusPrefix = "Insgesamt"
+#         else:
+#             censusPrefix = ag
+#
+#         if g == "":
+#             censusPostfix = "-total"
+#         else:
+#             censusPostfix = "-" + g
+#
+#         censuscolname = censusPrefix + censusPostfix
+#         AnzahlFallNeu_X = dt.f[srccolname]
+#         g_ag_size = censusTable[0, censuscolname]
+#         print("srccolname:{} newcolname:{} AnzahlFallNeu_X:{} g_ag_size:{}".format(srccolname, newcolname, AnzahlFallNeu_X, g_ag_size))
+#         regionTable = regionTable[:, dt.f[:].extend({fullColName("Einwohner",g,ag): g_ag_size})]
+#         if censuscolname == "Insgesamt-total":
+#             regionTable = regionTable[:, dt.f[:].extend({"Dichte": censusTable[0,"Insgesamt-total"] / dt.f.Flaeche})]
+#         regionTable = regionTable[:, dt.f[:].extend({newcolname: (100000.0 * AnzahlFallNeu_X) / g_ag_size})]
+#     return regionTable
 
-        srccolname = fullColName("AnzahlFallNeu", g, ag)
-        newcolname = fullColName("InzidenzFallNeu", g, ag)
+def makeEinwohnerColumn(regionTable, censusTable, g, ag, afterColumnIndex):
+    if ag != "unbekannt" and g != "unbekannt":
 
         if ag == "":
             censusPrefix = "Insgesamt"
@@ -324,21 +296,37 @@ def makeIncidenceColumn(regionTable, censusTable, g, ag):
             censusPostfix = "-" + g
 
         censuscolname = censusPrefix + censusPostfix
-        AnzahlFallNeu_X = dt.f[srccolname]
         g_ag_size = censusTable[0, censuscolname]
-        print("srccolname:{} newcolname:{} AnzahlFallNeu_X:{} g_ag_size:{}".format(srccolname, newcolname, AnzahlFallNeu_X, g_ag_size))
-        regionTable = regionTable[:, dt.f[:].extend({fullColName("Einwohner",g,ag): g_ag_size})]
-        if censuscolname == "Insgesamt-total":
-            regionTable = regionTable[:, dt.f[:].extend({"Dichte": censusTable[0,"Insgesamt-total"] / dt.f.Flaeche})]
-        regionTable = regionTable[:, dt.f[:].extend({newcolname: (100000.0 * AnzahlFallNeu_X) / g_ag_size})]
+        regionTable = regionTable[:, dt.f[:afterColumnIndex].extend({fullColName("Einwohner",g,ag): g_ag_size})]
     return regionTable
 
-def makeIncidenceColumns(regionTable, censusTable, Altersgruppen, Geschlechter):
+# def makeEinwohnerColumns(regionTable, censusTable, Altersgruppen, Geschlechter):
+#     for g in [""] + Geschlechter:
+#         for ag in [""] + Altersgruppen:
+#             if ag != "unbekannt":
+#                 regionTable = makeEinwohnerColumn(regionTable, censusTable,g,ag)
+#     return regionTable
+
+def insertEinwohnerColumns(regionTable, censusTable, Altersgruppen, Geschlechter, afterColumnName):
+    afterFirstColumnIndex = [i for i, n in enumerate(regionTable.names) if n == afterColumnName][0] + 1
+    afterColumnIndex = afterFirstColumnIndex
+    print("afterColumnIndex", afterColumnIndex)
+    resultTable = regionTable
     for g in [""] + Geschlechter:
         for ag in [""] + Altersgruppen:
             if ag != "unbekannt":
-                regionTable = makeIncidenceColumn(regionTable, censusTable,g,ag)
-    return regionTable
+                resultTable = makeEinwohnerColumn(resultTable, censusTable,g,ag, afterColumnIndex)
+                afterColumnIndex = afterColumnIndex + 1
+
+    resultTable.cbind(regionTable[:, afterFirstColumnIndex:])
+    return resultTable
+
+# def makeIncidenceColumns(regionTable, censusTable, Altersgruppen, Geschlechter):
+#     for g in [""] + Geschlechter:
+#         for ag in [""] + Altersgruppen:
+#             if ag != "unbekannt":
+#                 regionTable = makeIncidenceColumn(regionTable, censusTable,g,ag)
+#     return regionTable
 
 
 # def makeIncidenceColumns(regionTable, censusTable, Altersgruppen, Geschlechter):
@@ -431,19 +419,48 @@ def landKreisTyp(lk_id, lk_name):
         return "LSK"
 
 
+def moveCols(table, cols, afterColumnName):
+    afterFirstColumnIndex = [i for i, n in enumerate(table.names) if n == afterColumnName][0] + 1
+    print("move cols {} afterColumnIndex {}".format(cols, afterFirstColumnIndex))
+    resultTable = table[:, dt.f[:afterFirstColumnIndex].extend(table[:, cols])]
+    del table[:, cols]
+    resultTable.cbind(table[:, afterFirstColumnIndex:])
+    return resultTable
+
 def updateOldTable(table, withTable):
+    #print("table.names     len={}, names={}".format(len(table.names), table.names))
+    #print()
+    #print("withTable.names len={}, names={}".format(len(withTable.names), withTable.names))
+
+    incidenceCols = [col for col in table.names if "Inzidenz" in col]
+    if len(incidenceCols)>0:
+        del table[:, incidenceCols]
+        del table[:, "Dichte"]
+        EinwohnerCols = [col for col in table.names if "Einwohner" in col]
+        table = moveCols(table, EinwohnerCols, "Flaeche" )
+
+    #print()
+    #print("table.names     len={}, names={}".format(len(table.names), table.names))
+
     if table.names != withTable.names:
-        print("table.names", table.names)
-        print("withTable.names", withTable.names)
+        print("BAD: table# {} !=: {} withTable#".format(len(table.names),len(withTable.names)))
+
+        for i, n in enumerate(table.names):
+            if n == withTable.names[i]:
+                print("OK: {}: {}".format(i,n))
+            else:
+                print("BAD: {} : {} != {}".format(i,n, withTable.names[i]))
+        #print("table.names", table.names)
+        #print("withTable.names", withTable.names)
         print("#ERROR: Can't update, table name mismatch ")
         exit(1)
 
     # update  with new rows
     rowsAvailable = withTable[~dt.math.isna(dt.f.AnzahlFall),:]
-    print("rowsAvailable",rowsAvailable)
-    table.to_csv("oldTable.csv")
-    withTable.to_csv("withTable.csv")
-    rowsAvailable.to_csv("rowsAvailable.csv")
+    #print("rowsAvailable",rowsAvailable)
+    #table.to_csv("oldTable.csv")
+    #withTable.to_csv("withTable.csv")
+    #rowsAvailable.to_csv("rowsAvailable.csv")
 
     rowsAvailableList = rowsAvailable[:,dt.f.DatenstandTag].to_list()[0]
     rowsOldList = table[:,dt.f.DatenstandTag].to_list()[0]
@@ -543,12 +560,13 @@ def analyze(fullTable, args, oldTables):
     deutschland = analyzeDailyAltersgruppenGeschlechter(fullTable, fromDay, toDay, True, True, Altersgruppen, Geschlechter)
     deutschland = insertDates(deutschland)
     deutschland = insertRegionInfo(deutschland, 0, "Deutschland", "BR", 0, "Deutschland", flaechen[0])
+    deutschland = insertEinwohnerColumns(deutschland, censusDeutschland, Altersgruppen, Geschlechter, "Flaeche")
 
     print(deutschland)
     pmu.printMemoryUsage("pre makeIncidenceColumns")
 
-    deutschland = makeIncidenceColumns(deutschland, censusDeutschland, Altersgruppen, Geschlechter)
-    print(deutschland)
+    #deutschland = makeIncidenceColumns(deutschland, censusDeutschland, Altersgruppen, Geschlechter)
+    #print(deutschland)
     if len(oldTables) > 0: deutschland = updateOldTable(oldTables[0], deutschland)
     pmu.printMemoryUsage("pre save")
     pmu.saveCsvTable(deutschland, "series-{}-{}.csv".format(0, "Deutschland"), args.outputDir)
@@ -568,10 +586,10 @@ def analyze(fullTable, args, oldTables):
             bundeslaender_numbers[bl_id] = insertDates(bundeslaender_numbers[bl_id])
             bundeslaender_numbers[bl_id] = insertRegionInfo(bundeslaender_numbers[bl_id], bl_id, bl_name, "BL", bl_id, bl_name, flaechen[0])
             censusBL = census[dt.f.IdLandkreis == bl_id, :]
-            print(censusBL)
-            bundeslaender_numbers[bl_id] = makeIncidenceColumns(bundeslaender_numbers[bl_id], censusBL, Altersgruppen, Geschlechter)
+            bundeslaender_numbers[bl_id] = insertEinwohnerColumns(bundeslaender_numbers[bl_id], censusBL, Altersgruppen, Geschlechter, "Flaeche")
             if len(oldTables) > 0:
                 bundeslaender_numbers[bl_id] = updateOldTable(oldTables[bl_id], bundeslaender_numbers[bl_id])
+            print(censusBL)
 
         pmu.printMemoryUsage("pre save {}".format(bl_name))
         pmu.saveCsvTable(bundeslaender_numbers[bl_id], "series-{}-{}.csv".format(bl_id, bl_name), args.outputDir)
@@ -600,8 +618,8 @@ def analyze(fullTable, args, oldTables):
             landkreise_numbers[lk_id] = insertRegionInfo(landkreise_numbers[lk_id], lk_id, lk_name, lk_typ, bl_id,
                                                              bl_name, flaechen[lk_id])
             #print(censusLK)
-            landkreise_numbers[lk_id] = makeIncidenceColumns(landkreise_numbers[lk_id], censusLK, Altersgruppen,
-                                                                Geschlechter)
+            landkreise_numbers[lk_id] = insertEinwohnerColumns(landkreise_numbers[lk_id], censusLK, Altersgruppen,
+                                                                Geschlechter, "Flaeche")
             if len(oldTables) > 0:
                 landkreise_numbers[lk_id] = updateOldTable(oldTables[lk_id], landkreise_numbers[lk_id])
 

@@ -4,6 +4,7 @@ import cov_dates as cd
 import json
 import time
 import argparse
+import sys
 
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
@@ -35,6 +36,17 @@ def requestURL(url):
         print('We failed to reach a server.')
         print('Reason: ', e.reason)
         return e
+    except socket.timeout as e:
+        print('Socket timeout')
+        print('Exception: ', e)
+        return None
+    except socket.error as e:
+        print('Socket error')
+        print('Exception: ', e)
+        return None
+    except:
+        e = sys.exc_info()[0]
+        print('Exception: ', e)
     else:
         return response
 
@@ -44,6 +56,9 @@ def retrieveRecords2(offset, length):
 
     response = requestURL(apiurl)
 
+    if response is None:
+        return None
+
     if hasattr(response,'reason') and response.reason != "OK":
         print("response.reason", response.reason)
         return None
@@ -51,8 +66,13 @@ def retrieveRecords2(offset, length):
         if hasattr(response, 'code'):
             if response.code == 200:
                 #print("response.code", response.code)
-                data = json.loads(response.read())
-                return data
+                try:
+                    data = json.loads(response.read())
+                except:
+                    e = sys.exc_info()[0]
+                    print('Exception: ', e)
+                else:
+                    return data
     return None
 
 
@@ -79,48 +99,54 @@ def retrieveAllRecords(args):
     while ready == 0:
         chunk = retrieveRecords2(offset, chunksize)
         error = False
-        print("Retrieved chunk from {}, chunk items: {}".format(offset, len(chunk)))
-        try:
-            newRecords = chunk['features']
-        except KeyError:
-            print("feature not found in newRecord, retry #{}".format(retry))
-            time.sleep(retry*3)
+        if chunk is None:
+            print("Retrieve returned without chunk")
+            time.sleep(retry * 3)
             retry = retry + 1
             print("Starting retry #{}".format(retry))
-            error = True
-            if retry > args.maxRetries:
-                pmu.saveJson("lastReceived.json", newRecords)
-                pmu.saveJson("allReceived-noFeature.json", records)
-                #pmu.pretty(newRecords)
-                return None
-
-        if newRecords != None:
-            print("Records = {}".format(len(newRecords)))
         else:
-            print("No Records")
-        if not error:
-            if 'exceededTransferLimit' in chunk:
-                records = records + newRecords
-                exceededTransferLimit = chunk['exceededTransferLimit']
-                ready = not exceededTransferLimit
-                offset = offset + chunksize
-                retry = 0
-            else:
-                if retry > 0 and lastReceived == newRecords and len(newRecords)>0:
-                    print("exceededTransferLimit flag still missing, but we got the same data twice, so it should be ok")
-                    records = records + newRecords
-                    break
-
-                print("exceededTransferLimit flag missing, retry #{}".format(retry))
-                #pmu.pretty(newRecords)
+            print("Retrieved chunk from {}, chunk items: {}".format(offset, len(chunk)))
+            try:
+                newRecords = chunk['features']
+            except KeyError:
+                print("feature not found in newRecord, retry #{}".format(retry))
                 time.sleep(retry*3)
                 retry = retry + 1
                 print("Starting retry #{}".format(retry))
+                error = True
                 if retry > args.maxRetries:
                     pmu.saveJson("lastReceived.json", newRecords)
-                    pmu.saveJson("allReceived-noLimitFlag.json", records)
+                    pmu.saveJson("allReceived-noFeature.json", records)
+                    #pmu.pretty(newRecords)
                     return None
-                lastReceived = newRecords
+
+            if newRecords != None:
+                print("Records = {}".format(len(newRecords)))
+            else:
+                print("No Records")
+            if not error:
+                if 'exceededTransferLimit' in chunk:
+                    records = records + newRecords
+                    exceededTransferLimit = chunk['exceededTransferLimit']
+                    ready = not exceededTransferLimit
+                    offset = offset + chunksize
+                    retry = 0
+                else:
+                    if retry > 0 and lastReceived == newRecords and len(newRecords)>0:
+                        print("exceededTransferLimit flag still missing, but we got the same data twice, so it should be ok")
+                        records = records + newRecords
+                        break
+
+                    print("exceededTransferLimit flag missing, retry #{}".format(retry))
+                    #pmu.pretty(newRecords)
+                    time.sleep(retry*3)
+                    retry = retry + 1
+                    print("Starting retry #{}".format(retry))
+                    if retry > args.maxRetries:
+                        pmu.saveJson("lastReceived.json", newRecords)
+                        pmu.saveJson("allReceived-noLimitFlag.json", records)
+                        return None
+                    lastReceived = newRecords
     print("Done")
     return records
 
