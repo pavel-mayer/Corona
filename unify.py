@@ -393,36 +393,43 @@ def main():
     parser.add_argument('-d', '--output-dir', dest='outputDir', default=".")
     #parser.add_argument("--flushmemfull", help="flush full table to disk for lower memory footprint",
     #                    action="store_true")
-    parser.add_argument("--materializeNew", help="materialize new table to disk for lower memory footprint",
+    parser.add_argument("--force", help="build new database anyway",
                         action="store_true")
-    parser.add_argument("--noMaterialize", help="run with higher memory footprint, or much higher memory footprint with --in-memory",
-                        action="store_true")
-    parser.add_argument("--inMemory", help="run faster but with higher memory footprint",
-                        action="store_true")
+    # parser.add_argument("--noMaterialize", help="run with higher memory footprint, or much higher memory footprint with --in-memory",
+    #                     action="store_true")
+    # parser.add_argument("--inMemory", help="run faster but with higher memory footprint",
+    #                     action="store_true")
     parser.add_argument("--checkpoint",  type=int, help="write checkpoint after amount of minutes elapsed", default = 10)
     parser.add_argument("--nthreads", type=int, help="number of concurrent threads used by python dataframes, 0 = as many as cores, 1 single-thread, -3 = 3 threads less than cores", default = 0)
 
     args = parser.parse_args()
     print(args)
-    print("args.inMemory",args.inMemory)
-    print("args.materializeNew",args.materializeNew)
-    print("args.noMaterialize",args.noMaterialize)
+    # print("args.inMemory",args.inMemory)
+    # print("args.materializeNew",args.materializeNew)
+    # print("args.noMaterialize",args.noMaterialize)
 
     if args.nthreads != 0:
         dt.options.nthreads = args.nthreads
     print("dt.options.nthreads", dt.options.nthreads)
 
     fullTable = None
-    jayPath = args.outputDir+"/all-data.jay"
+    jayFile = "all-data.jay"
+    jayPath = os.path.join(args.outputDir,jayFile)
     print(jayPath)
     pmu.printMemoryUsage("after start")
 
+    partitioned = False
     daysIncluded = []
-    if os.path.isfile(jayPath):
+    if len(pmu.getJayTablePartitions(jayPath)) > 0:
+        fullTable = pmu.loadJayTablePartioned(jayPath)
+        partitioned = True
+    elif os.path.isfile(jayPath):
         print("Loading " + jayPath)
         fullTable = dt.fread(jayPath)
+
+    if fullTable is not None:
         pmu.printMemoryUsage("after load")
-        daysIncluded = sorted(fullTable[:, [dt.first(dt.f.DatenstandTag)],dt.by(dt.f.DatenstandTag)].to_list()[0])
+        daysIncluded = sorted(fullTable[:, [dt.first(dt.f.DatenstandTag)], dt.by(dt.f.DatenstandTag)].to_list()[0])
         print("Days in full table:")
         print(daysIncluded)
         pmu.printMemoryUsage("after first query")
@@ -448,14 +455,6 @@ def main():
                 else:
                     #print("full fields", fullTable.names)
                     checkColumns(fullTable.names, newTable.names)
-                    pmu.printMemoryUsage("after checkColumns")
-                    if not args.noMaterialize:
-                        fullTable.materialize(to_memory=args.inMemory)
-                        pmu.printMemoryUsage("after materialize fullTable")
-                    if args.materializeNew:
-                        newTable.materialize(to_memory=args.inMemory)
-                        pmu.printMemoryUsage("after materialize newTable")
-
                     pmu.printMemoryUsage("before fulltable rbind")
                     fullTable.rbind(newTable)  # memory gets used here
                     pmu.printMemoryUsage("after rbind")
@@ -466,20 +465,17 @@ def main():
                 print("fullTable rows = {}".format(fullTable.nrows))
                 print("-> File time {:.1f} secs or {:.1f} mins or {:.1f} hours".format(secs, secs/60, secs/60/60))
                 if time.perf_counter() - lastCheckPointTime > float(args.checkpoint) * 60:
-                    #checkname = args.outputDir+"/"+"all-data.check.jay"
-                    #print("Saving checkpoint: " + checkname)
-                    pmu.saveJayTable(fullTable,"all-data.check.jay",args.outputDir)
-                    #pmu.saveCsvTable(fullTable,"all-data.check.csv",args.outputDir)
+                    print("Saving checkpoint @ {}".format(datetime.now()))
+                    pmu.saveJayTablePartioned(fullTable, jayFile, args.outputDir, 10000000, True)
                     fullTable = None
-                    #fullTable = dt.fread(args.outputDir+"/all-data.check.csv")
-                    fullTable = dt.fread(args.outputDir+"/all-data.check.jay")
-                    #fullTable.to_jay(checkname)
-                    #print("Saving done:" + checkname)
+                    fullTable = pmu.loadJayTablePartioned(jayPath)
                     lastCheckPointTime = time.perf_counter()
+                    print("Checkpoint done @ {}".format(datetime.now()))
 
-    if addedData:
+    if addedData or not partitioned or True:
         pmu.printMemoryUsage("before full save")
-        pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
+        #pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
+        pmu.saveJayTablePartioned(fullTable, "all-data.jay", args.outputDir, 10000000, True)
         pmu.printMemoryUsage("after full save")
     else:
         print("No new data added, not saving 'all-data.ja'")

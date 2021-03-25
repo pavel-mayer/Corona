@@ -4,6 +4,8 @@ import datatable as dt
 import sys
 import os
 import psutil
+import glob
+import gc
 
 csv.field_size_limit(sys.maxsize)
 
@@ -75,6 +77,61 @@ def saveJayTable(table, fileName, destDir="."):
     table.to_jay(newFile)
     print("Saving done "+newFile)
 
+def printMemoryUsage(where):
+    process = psutil.Process(os.getpid())
+    print("Memory Usage @ {}: {:.3f} GB".format(where, process.memory_info().rss/1024/1024/1024))  # in bytes
+
+def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000, onlyWhenChanged=False):
+    partitions = int(table.nrows / partitionSize) + 1
+    print("partitions",partitions)
+    for r in range(partitions):
+        printMemoryUsage("saveJayTablePartioned {}".format(r))
+        partitionFileName = "partition-{:04d}-{}".format(r, fileName)
+        start = r*partitionSize
+        end = min(start+partitionSize, table.nrows)
+        newFile = os.path.join(destDir,partitionFileName)
+        partition = table[start:end,:]
+        if os.path.isfile(newFile):
+            if onlyWhenChanged:
+                printMemoryUsage("saveJayTablePartioned - reading existing {}".format(r))
+                oldTable = dt.fread(newFile)
+                if oldTable == partition:
+                    printMemoryUsage("saveJayTablePartioned - same as old, not saving {}".format(r))
+                    continue
+            else:
+                bakFile = newFile + ".bak"
+                if os.path.isfile(bakFile):
+                    os.remove(bakFile)
+                os.rename(newFile, bakFile)
+
+        print("Saving " + newFile)
+        partition.to_jay(newFile)
+    print("Saved all partitions of " + fileName)
+
+def getJayTablePartitions(pathName):
+    path = os.path.normpath(pathName)
+    dir, fileName = os.path.split(path)
+    globstr = dir+"/partition-????-"+fileName
+    files = sorted(glob.glob(globstr))
+    return files
+
+def loadJayTablePartioned(fileName):
+    files = getJayTablePartitions(fileName)
+    fullTable = None
+    for f in files:
+        printMemoryUsage("before loading partition from '{}'".format(f))
+        newTable = dt.fread(f)
+        if fullTable is None:
+            fullTable = newTable
+        else:
+            fullTable.rbind(newTable)
+        printMemoryUsage("after loading partition from '{}'".format(f))
+        newTable = None
+        #printMemoryUsage("after clearing partition from '{}'".format(f))
+
+    print("Read {} rows from {} partitions".format(fullTable.nrows, len(files)))
+    return fullTable
+
 def is_int(o):
     try:
         i=int(o)
@@ -82,6 +139,3 @@ def is_int(o):
     except ValueError:
         return False
 
-def printMemoryUsage(where):
-    process = psutil.Process(os.getpid())
-    print("Memory Usage @ {}: {:.3f} GB".format(where, process.memory_info().rss/1024/1024/1024))  # in bytes

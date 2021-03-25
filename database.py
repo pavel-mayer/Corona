@@ -5,6 +5,7 @@ import cov_dates as cd
 import numpy as np
 import pm_util as pmu
 import time
+import os
 import glob
 
 
@@ -643,9 +644,15 @@ def main():
 
     args = parser.parse_args()
     #print(args)
+    partitioned = False
     pmu.printMemoryUsage("after start")
-    print("Loading " + args.file)
-    fullTable = dt.fread(args.file)
+    if len(pmu.getJayTablePartitions(args.file)) > 0:
+        fullTable = pmu.loadJayTablePartioned(args.file)
+        partitioned = True
+    elif os.path.isfile(args.file):
+        print("Loading " + args.file)
+        fullTable = dt.fread(args.file)
+
     print("Loading done loading table from ‘{}‘, rows: {} cols: {}".format(args.file, fullTable.nrows, fullTable.ncols))
     pmu.printMemoryUsage("after load")
 
