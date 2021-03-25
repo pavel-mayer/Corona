@@ -667,11 +667,6 @@ def main():
                 print("lkID {}".format(lkID))
                 oldTables[lkID] = table
 
-    if False:
-        print("Materializing fullTable")
-        fullTable.materialize(to_memory=True)
-        pmu.printMemoryUsage("after materialize")
-
     analyze(fullTable, args, oldTables)
 
 if __name__ == "__main__":

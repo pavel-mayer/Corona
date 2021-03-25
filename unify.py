@@ -124,19 +124,19 @@ def checkLandkreisData(data, row, Census, Flaeche):
         # change old Landkreis ID for Göttingen to new Id
         IdLandkreis = 3159
         data["IdLandkreis"][row] = 3159
-        print("#Info: Changed bad Göttingen Landkreis Id from 3152 to 3159")
+        #print("#Info: Changed bad Göttingen Landkreis Id from 3152 to 3159")
     if Landkreis == "LK Aachen" or IdLandkreis == 5354:
         # change bad Landkreis for Aachen to Stadtregion
-        print("#Info: Bad record in row:",row)
-        print("#Info: Changing bad '{}' Kreis with Id {} to ‘StadtRegion Aachen‘ id 5334".format(Landkreis, IdLandkreis))
+        #print("#Info: Bad record in row:",row)
+        #print("#Info: Changing bad '{}' Kreis with Id {} to ‘StadtRegion Aachen‘ id 5334".format(Landkreis, IdLandkreis))
         Landkreis = "StadtRegion Aachen"
         IdLandkreis = 5334
         data["Landkreis"][row] = Landkreis
         data["IdLandkreis"][row] = IdLandkreis
 
     if Landkreis == "LK Saarpfalz-Kreis":
-        print("#Info: Bad record in row:",row)
-        print("#Info: Changing bad '{}' Kreis with Id {} to ‘LK Saar-Pfalz-Kreis‘ id 5334".format(Landkreis, IdLandkreis))
+        #print("#Info: Bad record in row:",row)
+        #print("#Info: Changing bad '{}' Kreis with Id {} to ‘LK Saar-Pfalz-Kreis‘ id 5334".format(Landkreis, IdLandkreis))
         Landkreis = "LK Saar-Pfalz-Kreis"
         data["Landkreis"][row] = Landkreis
 
@@ -391,8 +391,8 @@ def main():
     parser.add_argument('files', metavar='fileName', type=str, nargs='+',
                         help='.NPGEO COVID19 Germany data as .csv file')
     parser.add_argument('-d', '--output-dir', dest='outputDir', default=".")
-    #parser.add_argument("--flushmemfull", help="flush full table to disk for lower memory footprint",
-    #                    action="store_true")
+    parser.add_argument("--flushread", help="flush full table an re-read after checkpoint lower memory footprint",
+                        action="store_true")
     parser.add_argument("--force", help="build new database anyway",
                         action="store_true")
     # parser.add_argument("--noMaterialize", help="run with higher memory footprint, or much higher memory footprint with --in-memory",
@@ -467,12 +467,14 @@ def main():
                 if time.perf_counter() - lastCheckPointTime > float(args.checkpoint) * 60:
                     print("Saving checkpoint @ {}".format(datetime.now()))
                     pmu.saveJayTablePartioned(fullTable, jayFile, args.outputDir, 10000000, True)
-                    fullTable = None
-                    fullTable = pmu.loadJayTablePartioned(jayPath)
+                    if args.flushread:
+                        print("Re-reading checkpoint @ {}".format(datetime.now()))
+                        fullTable = None
+                        fullTable = pmu.loadJayTablePartioned(jayPath)
                     lastCheckPointTime = time.perf_counter()
                     print("Checkpoint done @ {}".format(datetime.now()))
 
-    if addedData or not partitioned or True:
+    if addedData or not partitioned:
         pmu.printMemoryUsage("before full save")
         #pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
         pmu.saveJayTablePartioned(fullTable, "all-data.jay", args.outputDir, 10000000, True)

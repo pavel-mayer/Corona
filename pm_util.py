@@ -5,7 +5,7 @@ import sys
 import os
 import psutil
 import glob
-import gc
+import numpy as np
 
 csv.field_size_limit(sys.maxsize)
 
@@ -95,9 +95,16 @@ def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000
             if onlyWhenChanged:
                 printMemoryUsage("saveJayTablePartioned - reading existing {}".format(r))
                 oldTable = dt.fread(newFile)
-                if oldTable == partition:
-                    printMemoryUsage("saveJayTablePartioned - same as old, not saving {}".format(r))
-                    continue
+                if oldTable.nrows == partition.nrows:
+                    if oldTable.names == partition.names:
+                        oldCases = oldTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
+                        partitionCases = partition[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
+                        if oldCases == partitionCases:
+                            printMemoryUsage("saveJayTablePartioned - same as old, not saving {}".format(r))
+                            continue
+
+                printMemoryUsage("saveJayTablePartioned - old table differs, will save {}".format(r))
+
             else:
                 bakFile = newFile + ".bak"
                 if os.path.isfile(bakFile):
