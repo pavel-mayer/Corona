@@ -94,14 +94,19 @@ def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000
         if os.path.isfile(newFile):
             if onlyWhenChanged:
                 printMemoryUsage("saveJayTablePartioned - reading existing {}".format(r))
-                oldTable = dt.fread(newFile)
-                if oldTable.nrows == partition.nrows:
-                    if oldTable.names == partition.names:
-                        oldCases = oldTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
-                        partitionCases = partition[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
-                        if oldCases == partitionCases:
-                            printMemoryUsage("saveJayTablePartioned - same as old, not saving {}".format(r))
-                            continue
+                try:
+                    oldTable = dt.fread(newFile)
+                except:
+                    e = sys.exc_info()[0]
+                    print("Could not read file {}, error= {}".format(newFile, e))
+                else:
+                    if oldTable.nrows == partition.nrows:
+                        if oldTable.names == partition.names:
+                            oldCases = oldTable[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
+                            partitionCases = partition[(dt.f.NeuerFall == 0) | (dt.f.NeuerFall == 1), 'AnzahlFall'].sum()[0, 0]
+                            if oldCases == partitionCases:
+                                printMemoryUsage("saveJayTablePartioned - same as old, not saving {}".format(r))
+                                continue
 
                 printMemoryUsage("saveJayTablePartioned - old table differs, will save {}".format(r))
 
