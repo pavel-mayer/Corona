@@ -422,6 +422,9 @@ def main():
     daysIncluded = []
     if len(pmu.getJayTablePartitions(jayPath)) > 0:
         fullTable = pmu.loadJayTablePartioned(jayPath)
+        if fullTable == None:
+            print("The file {} is not a valid jay file, please remove it and retry")
+            exit(1)
         partitioned = True
     elif os.path.isfile(jayPath):
         print("Loading " + jayPath)

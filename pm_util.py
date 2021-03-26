@@ -127,14 +127,20 @@ def loadJayTablePartioned(fileName):
     fullTable = None
     for f in files:
         printMemoryUsage("before loading partition from '{}'".format(f))
-        newTable = dt.fread(f)
-        if fullTable is None:
-            fullTable = newTable
+        try:
+            newTable = dt.fread(f)
+        except:
+            e = sys.exc_info()[0]
+            print("Could not read file {}, error= {}".format(f,e))
+            return fullTable
         else:
-            fullTable.rbind(newTable)
-        printMemoryUsage("after loading partition from '{}'".format(f))
-        newTable = None
-        #printMemoryUsage("after clearing partition from '{}'".format(f))
+            if fullTable is None:
+                fullTable = newTable
+            else:
+                fullTable.rbind(newTable)
+            printMemoryUsage("after loading partition from '{}'".format(f))
+            newTable = None
+            #printMemoryUsage("after clearing partition from '{}'".format(f))
 
     print("Read {} rows from {} partitions".format(fullTable.nrows, len(files)))
     return fullTable
