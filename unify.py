@@ -396,10 +396,12 @@ def main():
                         action="store_true")
     parser.add_argument("--force", help="build new database anyway",
                         action="store_true")
+    parser.add_argument("--destructivesave", help="release memory gradually while saving and reload after saving",
+                    action="store_true")
     parser.add_argument("-v","--verbose", help="make more noise",
                         action="store_true")
     parser.add_argument("--partitionsize",  type=int, help="number of records per partition", default = 10000000)
-    parser.add_argument("--memorylimit",  type=int, help="number of records per partition")
+    parser.add_argument("--memorylimit",  type=int, help="maximum memory limit for a database file")
     parser.add_argument("--checkpoint",  type=int, help="write checkpoint after amount of minutes elapsed", default = 10)
     parser.add_argument("--nthreads", type=int, help="number of concurrent threads used by python dataframes, 0 = as many as cores, 1 single-thread, -3 = 3 threads less than cores", default = 0)
 

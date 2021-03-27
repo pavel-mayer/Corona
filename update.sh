@@ -18,6 +18,7 @@ mkdir -p dumps
 mkdir -p series-agegroups-gender
 mkdir -p series-updated-agegroups-gender
 mkdir -p series-enhanced-agegroups-gender
+mkdir -p tmp
 
 source /usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc
 gsutil rsync -d -r gs://brdata-public-data/rki-corona-archiv/ ard-data
