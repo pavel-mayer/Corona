@@ -30,50 +30,51 @@ def datetimeFromARDFilename(ds):
         return datetimeFromARDFilenameXZ(ds)
     return datetimeFromARDFilenameBZ2(ds)
 
-def convert(compressedJSONFile, destDir=".", force = False):
+def convert(compressedJSONFile, destDir=".", force = False, skipchecks=False):
     path = os.path.normpath(compressedJSONFile)
     fileName = path.split(os.sep)[-1]
     date = datetimeFromARDFilename(fileName)
     day = cd.dayFromDate(date)
     newFile =  destDir+"/NPGEO-RKI-{}.csv".format(cd.dateStrYMDFromDay(day))
 
-    # check if previous file exist and make sure the current file is not broken
-    previousFile =  destDir+"/NPGEO-RKI-{}.csv".format(cd.dateStrYMDFromDay(day-1))
-
-    yesterDayRows = -1
-    if os.path.isfile(previousFile):
-        yesterdayFrame = dt.fread(previousFile)
-        yesterDayRows = yesterdayFrame.nrows
-    else:
-        print("No file for previous day {}".format(day-1))
-
-    allowedShrinkageDays = [33,68]
-    allowedSameDays = [33]
-    allowedJumpDays = [46,66]
-
     redo = False
-    if not force and os.path.isfile(newFile) and yesterDayRows >= 0:
-        existingFrame = dt.fread(newFile)
-        existingRows = existingFrame.nrows
-        if existingRows < yesterDayRows:
-            if not day in allowedShrinkageDays:
-                print("Existing .csv file for day {} contains less rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
-                redo = True
-            else:
-                print("On day {} the number of rows was reduced from {} to compared to yesterday's file ({})".format(day,existingRows,yesterDayRows))
+    if not skipchecks:
+        # check if previous file exist and make sure the current file is not broken
+        previousFile =  destDir+"/NPGEO-RKI-{}.csv".format(cd.dateStrYMDFromDay(day-1))
+
+        yesterDayRows = -1
+        if os.path.isfile(previousFile):
+            yesterdayFrame = dt.fread(previousFile)
+            yesterDayRows = yesterdayFrame.nrows
         else:
-            if existingRows == yesterDayRows:
-                if not day in allowedSameDays:
-                    print("Existing .csv file for day {} contains same number of rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
+            print("No file for previous day {}".format(day-1))
+
+        allowedShrinkageDays = [33,68]
+        allowedSameDays = [33]
+        allowedJumpDays = [46,66]
+
+        if not force and os.path.isfile(newFile) and yesterDayRows >= 0:
+            existingFrame = dt.fread(newFile)
+            existingRows = existingFrame.nrows
+            if existingRows < yesterDayRows:
+                if not day in allowedShrinkageDays:
+                    print("Existing .csv file for day {} contains less rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
                     redo = True
                 else:
-                    print( "Existing .csv file for day {} contains same number of rows ({}) than previous day file ({}) but we can't do anything about it".format(
-                            day, existingRows, yesterDayRows))
-            elif (existingRows > yesterDayRows * 1.1) and (existingRows - yesterDayRows > 5000) and not day in allowedJumpDays:
-                print("Existing .csv file for day {} contains much more rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
-                redo = True
+                    print("On day {} the number of rows was reduced from {} to compared to yesterday's file ({})".format(day,existingRows,yesterDayRows))
+            else:
+                if existingRows == yesterDayRows:
+                    if not day in allowedSameDays:
+                        print("Existing .csv file for day {} contains same number of rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
+                        redo = True
+                    else:
+                        print( "Existing .csv file for day {} contains same number of rows ({}) than previous day file ({}) but we can't do anything about it".format(
+                                day, existingRows, yesterDayRows))
+                elif (existingRows > yesterDayRows * 1.1) and (existingRows - yesterDayRows > 5000) and not day in allowedJumpDays:
+                    print("Existing .csv file for day {} contains much more rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
+                    redo = True
 
-            print("Existing .csv file contains {} rows, {} more than yesterday".format(existingRows,existingRows-yesterDayRows))
+                print("Existing .csv file contains {} rows, {} more than yesterday".format(existingRows,existingRows-yesterDayRows))
 
     if force or redo or not os.path.isfile(newFile):
         print("Loading " + compressedJSONFile)
@@ -94,13 +95,15 @@ def main():
     parser.add_argument('files', metavar='fileName', type=str, nargs='+',
                         help='Convert ARD-RKI-dumps to .csv')
     parser.add_argument('-d', '--output-dir', dest='outputDir', default=".")
+    parser.add_argument("--skipchecks", help="don't check file growth, much faster", action="store_true")
+    parser.add_argument("--force", help="generate new files even if they exist", action="store_true")
     args = parser.parse_args()
     #print(args)
 
     dt.options.progress.enabled = False
 
     for f in sorted(args.files):
-        convert(f, args.outputDir)
+        convert(f, args.outputDir, args.force, args.skipchecks)
 
 if __name__ == "__main__":
     # execute only if run as a script

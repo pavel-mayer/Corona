@@ -642,8 +642,7 @@ def main():
     parser.add_argument('-i', '--incremental-update-dir', dest='incrementalUpdateDir', default="")
     parser.add_argument("--agegroups", help="also create columns for all seperate age groups", action="store_true")
     parser.add_argument("--gender", help="also create columns for all seperate gender groups", action="store_true")
-    parser.add_argument("-v", "--verbose", help="make more noise",
-                        action="store_true")
+    parser.add_argument("-v", "--verbose", help="make more noise", action="store_true")
     parser.add_argument("--memorylimit", type=int, help="number of records per partition")
 
     args = parser.parse_args()
