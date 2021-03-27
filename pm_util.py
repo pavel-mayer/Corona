@@ -5,7 +5,7 @@ import sys
 import os
 import psutil
 import glob
-import numpy as np
+import time
 
 csv.field_size_limit(sys.maxsize)
 
@@ -81,21 +81,27 @@ def printMemoryUsage(where):
     process = psutil.Process(os.getpid())
     print("Memory Usage @ {}: {:.3f} GB".format(where, process.memory_info().rss/1024/1024/1024))  # in bytes
 
-def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000, onlyWhenChanged=False):
+def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000, onlyWhenChanged=False, destructive=False,
+                          tempDir=None, memoryLimit=None, verbose=False):
     partitions = int(table.nrows / partitionSize) + 1
     print("partitions",partitions)
     for r in range(partitions):
         printMemoryUsage("saveJayTablePartioned {}".format(r))
         partitionFileName = "partition-{:04d}-{}".format(r, fileName)
-        start = r*partitionSize
-        end = min(start+partitionSize, table.nrows)
+        if destructive:
+            start = 0
+            end = min(partitionSize, table.nrows)
+            partition = table[0:end,:]
+        else:
+            start = r * partitionSize
+            end = min(start+partitionSize, table.nrows)
+            partition = table[start:end,:]
         newFile = os.path.join(destDir,partitionFileName)
-        partition = table[start:end,:]
         if os.path.isfile(newFile):
             if onlyWhenChanged:
                 printMemoryUsage("saveJayTablePartioned - reading existing {}".format(r))
                 try:
-                    oldTable = dt.fread(newFile)
+                    oldTable = dt.fread(newFile, tempdir=tempDir, memory_limit=memoryLimit, verbose=verbose)
                 except:
                     e = sys.exc_info()[0]
                     print("Could not read file {}, error= {}".format(newFile, e))
@@ -109,7 +115,6 @@ def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000
                                 continue
 
                 printMemoryUsage("saveJayTablePartioned - old table differs, will save {}".format(r))
-
             else:
                 bakFile = newFile + ".bak"
                 if os.path.isfile(bakFile):
@@ -117,7 +122,14 @@ def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000
                 os.rename(newFile, bakFile)
 
         print("Saving " + newFile)
+        start = time.perf_counter()
         partition.to_jay(newFile)
+        elapsed = time.perf_counter() - start
+        bytes = os.stat(newFile).st_size
+        print("Saved {} bytes, {:0f} bytes per sec, {:3f} MB, {:3f} MB per sec".format(bytes, bytes/elapsed, bytes/1024/1024, bytes/1024/1024/elapsed))
+        if destructive:
+            partition = None
+            del table[0:end,:]
     print("Saved all partitions of " + fileName)
 
 def getJayTablePartitions(pathName):
@@ -127,13 +139,13 @@ def getJayTablePartitions(pathName):
     files = sorted(glob.glob(globstr))
     return files
 
-def loadJayTablePartioned(fileName):
+def loadJayTablePartioned(fileName, tempDir=None, memoryLimit=None, verbose=False):
     files = getJayTablePartitions(fileName)
     fullTable = None
     for f in files:
         printMemoryUsage("before loading partition from '{}'".format(f))
         try:
-            newTable = dt.fread(f)
+            newTable = dt.fread(f, tempdir=tempDir, memory_limit=memoryLimit, verbose=verbose)
         except:
             e = sys.exc_info()[0]
             print("Could not read file {}, error= {}".format(f,e))

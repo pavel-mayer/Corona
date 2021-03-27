@@ -638,20 +638,24 @@ def main():
                         help='.Full unified NPGEO COVID19 Germany data as .csv or .jay file',
                         default="archive_v2/all-data.jay")
     parser.add_argument('-d', '--output-dir', dest='outputDir', default="series")
+    parser.add_argument('-t', '--temp-dir', dest='tempDir', default=".")
     parser.add_argument('-i', '--incremental-update-dir', dest='incrementalUpdateDir', default="")
     parser.add_argument("--agegroups", help="also create columns for all seperate age groups", action="store_true")
     parser.add_argument("--gender", help="also create columns for all seperate gender groups", action="store_true")
+    parser.add_argument("-v", "--verbose", help="make more noise",
+                        action="store_true")
+    parser.add_argument("--memorylimit", type=int, help="number of records per partition")
 
     args = parser.parse_args()
     #print(args)
     partitioned = False
     pmu.printMemoryUsage("after start")
     if len(pmu.getJayTablePartitions(args.file)) > 0:
-        fullTable = pmu.loadJayTablePartioned(args.file)
+        fullTable = pmu.loadJayTablePartioned(args.file, tempDir=args.tempDir, memoryLimit=args.memorylimit, verbose=args.verbose)
         partitioned = True
     elif os.path.isfile(args.file):
         print("Loading " + args.file)
-        fullTable = dt.fread(args.file)
+        fullTable = dt.fread(args.file, tempdir=args.tempDir, memory_limit=args.memoryLimit, verbose=args.verbose)
 
     print("Loading done loading table from ‘{}‘, rows: {} cols: {}".format(args.file, fullTable.nrows, fullTable.ncols))
     pmu.printMemoryUsage("after load")
