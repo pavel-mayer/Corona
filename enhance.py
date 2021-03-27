@@ -138,7 +138,7 @@ def ifcontains(name, stringlist):
 
 def einwohnerColName(colName):
     gender = ifcontains(colName,["_G_W","_G_M"])
-    age = ifcontains(colName,["_AG_A00_A04","_AG_A05_A14","_AG_A15_A34","_AG_A35_A59","_AG_A60_A79","_AG_80Plus"])
+    age = ifcontains(colName,["_AG_A00_A04","_AG_A05_A14","_AG_A15_A34","_AG_A35_A59","_AG_A60_A79","_AG_A80Plus"])
     result = "Einwohner"+gender+age
     return result
 
@@ -146,10 +146,12 @@ def addIncidences(table):
     #table = addIncidenceColumn(table, "AnzahlTodesfallNeu", "Einwohner", "InzidenzTodesfallNeu")
 
     candidatesColumns = [name for name in table.names if ("AnzahlFall" in name or "AnzahlTodesfall" in name)]
-    #print("addIncidences candidates:", candidatesColumns)
+    #   print("addIncidences candidates:", candidatesColumns)
     for c in candidatesColumns:
         newColName = c.replace("Anzahl","Inzidenz")
-        table = addIncidenceColumn(table, c, einwohnerColName(c), newColName)
+        ewc = einwohnerColName(c)
+        #print("ewc:"+ewc)
+        table = addIncidenceColumn(table, c, ewc, newColName)
         if "AnzahlTodesfall" in c:
             newColName = c.replace("AnzahlTodesfall", "Fallsterblichkeit_Prozent")
             caseColName = c.replace("AnzahlTodesfall", "AnzahlFall")
