@@ -81,8 +81,55 @@ def printMemoryUsage(where):
     process = psutil.Process(os.getpid())
     print("Memory Usage @ {}: {:.3f} GB".format(where, process.memory_info().rss/1024/1024/1024))  # in bytes
 
-def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000, onlyWhenChanged=False, destructive=False,
+def makePartitionFileName(partitionNumber, fileName):
+    return "partition-{:04d}-{}".format(partitionNumber, fileName)
+
+def lastJayTablePartition(fileName, destDir=".", partitionSize = 10000000,
                           tempDir=None, memoryLimit=None, verbose=False):
+
+    # count partition files
+    partitionNumber = 0
+    last = False
+    while True:
+        partitionFileName = makePartitionFileName(partitionNumber, fileName)
+        if not os.path.isfile(partitionFileName):
+            print("Last partition is {}".format(partitionFileName))
+            break
+        else:
+            partitionNumber = partitionNumber + 1
+
+    # check all partitions foe proper size
+    for p in range(partitionNumber):
+        partitionFileName = makePartitionFileName(p, fileName)
+        try:
+            partition = dt.fread(partitionFileName, tempdir=tempDir, memory_limit=memoryLimit, verbose=verbose)
+        except:
+            e = sys.exc_info()[0]
+            print("Could not read file {}, error= {}".format(partitionFileName, e))
+            return None
+        else:
+            if partitionSize != partition.nrows:
+                print("Partition file {} has wrong partition size, is {}, must be {}".format(partitionFileName, partition.nrows, partitionSize))
+                return None
+
+    partitionFileName = makePartitionFileName(partitionNumber, fileName)
+    partitionTable = dt.fread(partitionFileName, tempdir=tempDir, memory_limit=memoryLimit, verbose=verbose)
+    return partitionTable
+
+
+def appendToJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000,
+                          tempDir=None, memoryLimit=None, verbose=False):
+    partitionNumber = 0
+    last = False
+    while True:
+        partitionFileName = makePartitionFileName(partitionNumber, fileName)
+        if not os.path.isfile(partitionFileName):
+            break
+        partitionNumber = partitionNumber + 1
+
+
+def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000, onlyWhenChanged=False, destructive=False,
+                          tempDir=None, memoryLimit=None, verbose=False, lastPartitionOnly = False):
     partitions = int(table.nrows / partitionSize) + 1
     print("partitions",partitions)
     for r in range(partitions):

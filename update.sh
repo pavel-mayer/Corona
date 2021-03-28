@@ -52,5 +52,6 @@ python $CORONA/gather-results.py -o all-series-agegroups-gender.csv series-enhan
 #or incremental update, creates updated series in -d <dir>, runs 50-100 times faster:
 python $CORONA/database.py --agegroups --gender -i $CORONA/series-agegroups-gender -d $CORONA/series-updated-agegroups-gender
 python $CORONA/enhance.py -d $CORONA/series-enhanced-agegroups-gender $CORONA/series-updated-agegroups-gender/series-*.csv
-python $CORONA/gather-results.py -o all-series.csv series-enhanced-agegroups-gender/enhanced-series-*.csv
+python $CORONA/gather-results.py -o all-series-agegroups-gender.csv series-enhanced-agegroups-gender/enhanced-series-*.csv
+cp $CORONA/series-updated-agegroups-gender/series-*.csv $CORONA/series-agegroups-gender/series-*.csv
 

@@ -655,6 +655,9 @@ def main():
     elif os.path.isfile(args.file):
         print("Loading " + args.file)
         fullTable = dt.fread(args.file, tempdir=args.tempDir, memory_limit=args.memoryLimit, verbose=args.verbose)
+    else:
+        print("Failed to load table from ‘{}/{}‘".format(args.tempDir, args.file))
+        exit(1)
 
     print("Loading done loading table from ‘{}‘, rows: {} cols: {}".format(args.file, fullTable.nrows, fullTable.ncols))
     pmu.printMemoryUsage("after load")

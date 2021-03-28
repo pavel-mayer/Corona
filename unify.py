@@ -394,10 +394,10 @@ def main():
     parser.add_argument('-t', '--temp-dir', dest='tempDir', default=".")
     parser.add_argument("--flushread", help="flush full table an re-read after checkpoint lower memory footprint",
                         action="store_true")
-    parser.add_argument("--force", help="build new database anyway",
-                        action="store_true")
+    parser.add_argument("--force", help="build new database anyway", action="store_true")
     parser.add_argument("--destructivesave", help="release memory gradually while saving and reload after saving",
                     action="store_true")
+    parser.add_argument("--incremental", help="only load partial data", action="store_true")
     parser.add_argument("-v","--verbose", help="make more noise",
                         action="store_true")
     parser.add_argument("--partitionsize",  type=int, help="number of records per partition", default = 10000000)
