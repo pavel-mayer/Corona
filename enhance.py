@@ -170,11 +170,11 @@ def addMoreMetrics(table):
     table = enhanceDatenstandTagMax(table)
     table = addDifferenceColumn(table, "DatenstandTag_Max", "DatenstandTag", "DatenstandTag_Diff")
 
-    table = addIncidenceColumn(table, "MeldeTag_AnzahlFallNeu_Gestern_7TageSumme", "Einwohner", "MeldeTag_InzidenzFallNeu_Gestern_7TageSumme")
+    #table = addIncidenceColumn(table, "MeldeTag_AnzahlFallNeu_Gestern_7TageSumme", "Einwohner", "MeldeTag_InzidenzFallNeu_Gestern_7TageSumme")
     table = addDifferenceColumn(table, "AnzahlFallNeu_7TageSumme", "MeldeTag_AnzahlFallNeu_Gestern_7TageSumme", "AnzahlFallNeu_7TageSumme_Dropped")
     table = addRatioColumn(table, "AnzahlFallNeu_7TageSumme_Dropped", "AnzahlFallNeu_7TageSumme", "ProzentFallNeu_7TageSumme_Dropped", factor=100)
 
-    table = addIncidenceColumn(table, "MeldeTag_Vor7Tagen_AnzahlFallNeu_Vor8Tagen_7TageSumme", "Einwohner", "MeldeTag_Vor7Tagen_InzidenzFallNeu_Vor8Tagen_7TageSumme")
+    #table = addIncidenceColumn(table, "MeldeTag_Vor7Tagen_AnzahlFallNeu_Vor8Tagen_7TageSumme", "Einwohner", "MeldeTag_Vor7Tagen_InzidenzFallNeu_Vor8Tagen_7TageSumme")
     table = addRatioColumn(table, "MeldeTag_InzidenzFallNeu_Gestern_7TageSumme", "MeldeTag_Vor7Tagen_InzidenzFallNeu_Vor8Tagen_7TageSumme",
                            "MeldeTag_InzidenzFallNeu_Trend")
     table = add7dRColumn(table, "MeldeTag_InzidenzFallNeu_Trend", "MeldeTag_InzidenzFallNeu_R")
