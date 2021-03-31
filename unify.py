@@ -341,6 +341,10 @@ def isNewData(dataFilename, daysIncluded):
     ds = cd.datetimeFromDatenstandAny(dss)
     dsdy = cd.dayFromDate(ds)
     pmu.printMemoryUsage("isNewData")
+    if dsdy in [28,29]:
+        print("contains day {} which is not a proper dump, so we ignored it".format(dsdy))
+        return False
+
     isNew = dsdy not in daysIncluded
     if isNew:
         print("contains new day {}".format(dsdy))
@@ -394,10 +398,16 @@ def main():
     parser.add_argument('-t', '--temp-dir', dest='tempDir', default=".")
     parser.add_argument("--flushread", help="flush full table an re-read after checkpoint lower memory footprint",
                         action="store_true")
+    parser.add_argument("--partition", help="flush full table an re-read after checkpoint lower memory footprint",
+                        action="store_true")
+    parser.add_argument("--backup", help="create backup files before overwriting",
+                        action="store_true")
+    parser.add_argument("--unsafe", help="directly overwrite output files, will corrupt the output file when killed while writing, but uses less disk space (only applies to single .jay file in non-partition mode)",
+                        action="store_true")
     parser.add_argument("--force", help="build new database anyway", action="store_true")
-    parser.add_argument("--destructivesave", help="release memory gradually while saving and reload after saving",
+    parser.add_argument("--destructivesave", help="release memory gradually while saving and reload after saving (experimental, untested, only applies to partiioned write)",
                     action="store_true")
-    parser.add_argument("--incremental", help="only load partial data", action="store_true")
+    #parser.add_argument("--incremental", help="only load partial data", action="store_true")
     parser.add_argument("-v","--verbose", help="make more noise",
                         action="store_true")
     parser.add_argument("--partitionsize",  type=int, help="number of records per partition", default = 10000000)
@@ -423,15 +433,16 @@ def main():
 
     partitioned = False
     daysIncluded = []
-    if len(pmu.getJayTablePartitions(jayPath)) > 0:
-        fullTable = pmu.loadJayTablePartioned(jayPath, tempDir=args.tempDir, memoryLimit=args.memorylimit, verbose=args.verbose)
-        if fullTable == None:
-            print("The file {} is not a valid jay file, please remove it and retry")
-            exit(1)
-        partitioned = True
-    elif os.path.isfile(jayPath):
-        print("Loading " + jayPath)
-        fullTable = dt.fread(jayPath)
+    if not args.force:
+        if os.path.isfile(jayPath):
+            print("Loading " + jayPath)
+            fullTable = dt.fread(jayPath)
+        elif len(pmu.getJayTablePartitions(jayPath)) > 0:
+            fullTable = pmu.loadJayTablePartioned(jayPath, tempDir=args.tempDir, memoryLimit=args.memorylimit, verbose=args.verbose)
+            if fullTable == None:
+                print("The file {} is not a valid jay file, please remove it and retry")
+                exit(1)
+            partitioned = True
 
     if fullTable is not None:
         pmu.printMemoryUsage("after load")
@@ -472,25 +483,31 @@ def main():
                 print("-> File time {:.1f} secs or {:.1f} mins or {:.1f} hours".format(secs, secs/60, secs/60/60))
                 if time.perf_counter() - lastCheckPointTime > float(args.checkpoint) * 60:
                     print("Saving checkpoint @ {}".format(datetime.now()))
-                    pmu.saveJayTablePartioned(fullTable, jayFile, args.outputDir, args.partitionsize, True, args.destructivesave)
-                    if args.flushread or args.destructivesave:
-                        print("Re-reading checkpoint @ {}".format(datetime.now()))
-                        fullTable = None
-                        fullTable = pmu.loadJayTablePartioned(jayPath, tempDir=args.tempDir, memoryLimit=args.memorylimit, verbose=args.verbose)
+                    if args.partition:
+                        pmu.saveJayTablePartioned(fullTable, jayFile, args.outputDir, args.partitionsize, True, args.destructivesave)
+                        if args.flushread or args.destructivesave:
+                            print("Re-reading checkpoint @ {}".format(datetime.now()))
+                            fullTable = None
+                            fullTable = pmu.loadJayTablePartioned(jayPath, tempDir=args.tempDir, memoryLimit=args.memorylimit, verbose=args.verbose)
+                    else:
+                        pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir, args.backup, args.unsafe)
+
                     lastCheckPointTime = time.perf_counter()
                     print("Checkpoint done @ {}".format(datetime.now()))
 
-    if addedData or not partitioned:
+    if addedData or (args.partition != partitioned):
         pmu.printMemoryUsage("before full save")
-        #pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir)
-        pmu.saveJayTablePartioned(fullTable, "all-data.jay", args.outputDir, args.partitionsize, True, args.destructivesave)
+        if args.partition:
+            pmu.saveJayTablePartioned(fullTable, "all-data.jay", args.outputDir, args.partitionsize, True, args.destructivesave)
+        else:
+            pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir,args.backup, args.unsafe)
         pmu.printMemoryUsage("after full save")
     else:
-        print("No new data added, not saving 'all-data.jay'")
+        print("No new data added, not saving.'")
     #pmu.saveCsvTable(fullTable, "all-data.csv", args.outputDir)
     finish = time.perf_counter()
     secs = finish - start
-    print("--> Wall time {:.1f} secs or {:.1f} mins or {:.1f} hours".format(secs, secs/60, secs/60/60))
+    print("Finished in {:.1f} secs or {:.1f} mins or {:.1f} hours".format(secs, secs/60, secs/60/60))
 
 if __name__ == "__main__":
     # execute only if run as a script

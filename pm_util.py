@@ -65,17 +65,44 @@ def saveCsvTable(table, fileName, destDir="."):
     print("Saving "+newFile)
     table.to_csv(newFile)
 
-def saveJayTable(table, fileName, destDir="."):
-    newFile =  destDir+"/"+fileName
-    if os.path.isfile(newFile):
-        bakFile = newFile+".bak"
-        if os.path.isfile(bakFile):
-            os.remove(bakFile)
-        os.rename(newFile, bakFile)
+# def saveJayTable(table, fileName, destDir="."):
+#     newFile =  destDir+"/"+fileName
+#     if os.path.isfile(newFile):
+#         bakFile = newFile+".bak"
+#         if os.path.isfile(bakFile):
+#             os.remove(bakFile)
+#         os.rename(newFile, bakFile)
+#
+#     print("Saving "+newFile)
+#     table.to_jay(newFile)
+#     print("Saving done "+newFile)
 
-    print("Saving "+newFile)
-    table.to_jay(newFile)
-    print("Saving done "+newFile)
+# will remove the backup file before saving
+# and write to a temp file that will be renamed
+# after successful write, and the old file
+# is renamed to a .bak ending or deleted
+# when backup is not set.
+def saveJayTable(table, fileName, destDir=".", backup = False, unsafe=False):
+    newFile = destDir + "/" + fileName
+    print("Saving " + newFile)
+    newTmpFile = newFile+".saving"
+    if os.path.isfile(newTmpFile):
+        os.remove(newTmpFile)
+    bakFile = newFile + ".bak"
+    if os.path.isfile(bakFile):
+        os.remove(bakFile)
+
+    if unsafe:
+        table.to_jay(newFile)
+    else:
+        table.to_jay(newTmpFile)
+        if backup:
+            os.rename(newFile, bakFile)
+        else:
+            os.remove(newFile)
+        os.rename(newTmpFile, newFile)
+    print("Saving done " + newFile)
+
 
 def printMemoryUsage(where):
     process = psutil.Process(os.getpid())
@@ -129,7 +156,7 @@ def appendToJayTablePartioned(table, fileName, destDir=".", partitionSize = 1000
 
 
 def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000, onlyWhenChanged=False, destructive=False,
-                          tempDir=None, memoryLimit=None, verbose=False, lastPartitionOnly = False):
+                          tempDir=None, memoryLimit=None, verbose=False, lastPartitionOnly = False, noBackup = True):
     partitions = int(table.nrows / partitionSize) + 1
     print("partitions",partitions)
     for r in range(partitions):
@@ -166,7 +193,10 @@ def saveJayTablePartioned(table, fileName, destDir=".", partitionSize = 10000000
                 bakFile = newFile + ".bak"
                 if os.path.isfile(bakFile):
                     os.remove(bakFile)
-                os.rename(newFile, bakFile)
+                if noBackup:
+                    os.remove(newFile)
+                else:
+                    os.rename(newFile, bakFile)
 
         print("Saving " + newFile)
         start = time.perf_counter()
