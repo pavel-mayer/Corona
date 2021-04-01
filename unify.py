@@ -398,7 +398,7 @@ def main():
     parser.add_argument('-t', '--temp-dir', dest='tempDir', default=".")
     parser.add_argument("--flushread", help="flush full table an re-read after checkpoint lower memory footprint",
                         action="store_true")
-    parser.add_argument("--partition", help="flush full table an re-read after checkpoint lower memory footprint",
+    parser.add_argument("--partition", help="save data in partionions instead of one file; slower, but you can see progress and maybe need less memory, but ymmv",
                         action="store_true")
     parser.add_argument("--backup", help="create backup files before overwriting",
                         action="store_true")
@@ -412,7 +412,7 @@ def main():
                         action="store_true")
     parser.add_argument("--partitionsize",  type=int, help="number of records per partition", default = 10000000)
     parser.add_argument("--memorylimit",  type=int, help="maximum memory limit for a database file")
-    parser.add_argument("--checkpoint",  type=int, help="write checkpoint after amount of minutes elapsed", default = 10)
+    parser.add_argument("--checkpoint",  type=int, help="write checkpoint after amount of minutes elapsed", default = 60)
     parser.add_argument("--nthreads", type=int, help="number of concurrent threads used by python dataframes, 0 = as many as cores, 1 single-thread, -3 = 3 threads less than cores", default = 0)
 
     args = parser.parse_args()

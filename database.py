@@ -7,6 +7,7 @@ import pm_util as pmu
 import time
 import os
 import glob
+import re
 
 
 def cval(tableCell):
@@ -396,15 +397,15 @@ def analyzeDailyAndMeldeTagFast(fullTable, fromDay, toDay, byRegionColName, filt
     print(meldeTable.names)
     meldeTable.names = {"MeldeTag":"DatenstandTag", xMeldekeyName:xkeyName}
     #meldeTable.key = "DatenstandTag"
-    print("meldeTable.names renamed:")
-    print(meldeTable.names)
+    #print("meldeTable.names renamed:")
+    #print(meldeTable.names)
 
     # retrieve all comlums by Meldetag from 7-day old dump
     meldeTable7TageAlt = analyzeDailyFast(olderTable,fullfilter,"MeldeTag_Vor7Tagen_", postfix, "MeldeTag", byRegionColName)
     meldeTable7TageAlt.names = {"MeldeTag":"DatenstandTag", xMeldekeyName:xkeyName}
     #meldeTable7TageAlt.key = "DatenstandTag"
-    print("meldeTable7TageAlt.names:")
-    print(meldeTable7TageAlt.names)
+    #print("meldeTable7TageAlt.names:")
+    #print(meldeTable7TageAlt.names)
     #dayTable.key = "DatenstandTag"
 
     meldeKeys = set(meldeTable[:,xkeyName].to_list()[0])
@@ -576,7 +577,12 @@ def timeSeriesFast(fullTable, fromDay, toDay, byRegionColName, nameColumnName, A
     for i, lk in enumerate(regions[:, byRegion].to_list()[0]):
         regionName = regions[i,nameColumn][0,0]
         print("Extracting Region '{}'".format(regionName))
-        dailysByCriteria[lk] = allDaysAndRegions[byRegion == lk,:]
+        extractedRegion = allDaysAndRegions[byRegion == lk,:]
+        extractedRegion.materialize()
+        joinKeyN =joinKeyName("DatenstandTag",byRegionColName)
+        joinKey = dt.f[joinKeyN]
+        extractedRegion = extractedRegion[:,dt.f[:].remove(joinKey)]
+        dailysByCriteria[lk] = extractedRegion
         print("Done {} of {}, key = {} name = {}".format(i+1, regions.nrows, lk, regions[i,nameColumn][0,0]))
 
     return regions, dailysByCriteria
@@ -757,29 +763,47 @@ def loadFlaechen(fileName="covid-19-germany-landkreise.csv"):
 #     return result
 
 def insertDates(table):
+    #print("insertDates: table {}".format(table.names))
     days = table[:,"DatenstandTag"].to_list()[0]
     dates = [cd.dateStrFromDay(day) for day in days]
     result = table[:,dt.f["DatenstandTag"].extend({"Datum": ""})]
     result[:,"Datum"] = dt.Frame(dates)
     result.cbind(table[:,1:])
+    #print("insertDates: result {}".format(result.names))
+    return result
+
+def insertDates2(table):
+    #print("insertDates: table {}".format(table.names))
+    days = table[:,"DatenstandTag"].to_list()[0]
+    dates = [cd.dateStrFromDay(day) for day in days]
+    result = table[:,dt.f["DatenstandTag"].extend({"Datum": ""})]
+    result[:,"Datum"] = dt.Frame(dates)
+    result.cbind(table[:,2:])
+    #print("insertDates: result {}".format(result.names))
     return result
 
 def insertRegionInfo(table,IdLandkreis, Landkreis, LandkreisTyp, IdBundesland, Bundesland, Flaeche):
+    #print("insertRegionInfo: table {}".format(table.names))
     if "IdLandkreis" in table.names:
         result = table[:, dt.f[:3].extend({"Landkreis": Landkreis, "LandkreisTyp": LandkreisTyp, "IdBundesland": IdBundesland,
                                             "Bundesland": Bundesland, "Flaeche": Flaeche})]
+        #print("binding1: adding {}".format(table.names[4:]))
         result.cbind(table[:, 4:])
     elif "IdBundesland" in table.names:
         result = table[:, dt.f[:2].extend(
         {"IdLandkreis": IdLandkreis, "Landkreis": Landkreis, "LandkreisTyp": LandkreisTyp})]
+        #print("binding2: adding {}".format("IdBundesland"))
         result.cbind(table[:, IdBundesland])
         result = result[:, dt.f[:5].extend({"Bundesland": Bundesland, "Flaeche": Flaeche})]
+        #print("binding3: adding {}".format(table.names[4:]))
         result.cbind(table[:, 4:])
     else:
         result = table[:, dt.f[:2].extend(
             {"IdLandkreis": IdLandkreis, "Landkreis": Landkreis, "LandkreisTyp": LandkreisTyp, "IdBundesland": IdBundesland,
              "Bundesland": Bundesland, "Flaeche": Flaeche})]
+        #print("binding5: adding {}".format(table.names[2:]))
         result.cbind(table[:,2:])
+    #print("bound: result {}".format(result.names))
     return result
 
 def computeRunningSums(table):
@@ -973,9 +997,10 @@ def analyze(fullTable, args, oldTables):
 
         #deutschland = makeIncidenceColumns(deutschland, censusDeutschland, Altersgruppen, Geschlechter)
         #print(deutschland)
-        if len(oldTables) > 0: deutschland = updateOldTable(oldTables[0], deutschland)
+        if len(oldTables) > 0:
+            deutschland = updateOldTable(oldTables[0], deutschland)
         pmu.printMemoryUsage("pre save")
-        pmu.saveCsvTable(deutschland, "series-{}-{}.csv".format(0, "Deutschland"), args.outputDir)
+        pmu.saveCsvTable(deutschland, pmu.seriesFileName(0, "Deutschland"), args.outputDir)
         pmu.printMemoryUsage("post save")
         deutschland = None
 
@@ -990,7 +1015,7 @@ def analyze(fullTable, args, oldTables):
         bl_id=bundeslaender[i,dt.f.IdBundesland].to_list()[0][0]
 
         if bl_id > 0:
-            bundeslaender_numbers[bl_id] = insertDates(bundeslaender_numbers[bl_id])
+            bundeslaender_numbers[bl_id] = insertDates2(bundeslaender_numbers[bl_id])
             bundeslaender_numbers[bl_id] = insertRegionInfo(bundeslaender_numbers[bl_id], bl_id, bl_name, "BL", bl_id, bl_name, flaechen[0])
             censusBL = census[dt.f.IdLandkreis == bl_id, :]
             bundeslaender_numbers[bl_id] = insertEinwohnerColumns(bundeslaender_numbers[bl_id], censusBL, Altersgruppen, Geschlechter, "Flaeche")
@@ -999,7 +1024,7 @@ def analyze(fullTable, args, oldTables):
             print(censusBL)
 
         pmu.printMemoryUsage("pre save {}".format(bl_name))
-        pmu.saveCsvTable(bundeslaender_numbers[bl_id], "series-{}-{}.csv".format(bl_id, bl_name), args.outputDir)
+        pmu.saveCsvTable(bundeslaender_numbers[bl_id], pmu.seriesFileName(bl_id, bl_name), args.outputDir)
     bundeslaender = None
     bundeslaender_numbers = None
 
@@ -1022,7 +1047,7 @@ def analyze(fullTable, args, oldTables):
             bl_id = censusLK[0, dt.f.IdBundesland].to_list()[0][0]
             lk_typ = landKreisTyp(lk_id, lk_name)
 
-            landkreise_numbers[lk_id] = insertDates(landkreise_numbers[lk_id])
+            landkreise_numbers[lk_id] = insertDates2(landkreise_numbers[lk_id])
             landkreise_numbers[lk_id] = insertRegionInfo(landkreise_numbers[lk_id], lk_id, lk_name, lk_typ, bl_id,
                                                              bl_name, flaechen[lk_id])
             #print(censusLK)
@@ -1032,7 +1057,7 @@ def analyze(fullTable, args, oldTables):
                 landkreise_numbers[lk_id] = updateOldTable(oldTables[lk_id], landkreise_numbers[lk_id])
 
         pmu.printMemoryUsage("pre save {}".format(lk_name))
-        pmu.saveCsvTable(landkreise_numbers[lk_id], "series-{}-{}.csv".format(lk_id, lk_name), args.outputDir)
+        pmu.saveCsvTable(landkreise_numbers[lk_id], pmu.seriesFileName(lk_id, lk_name), args.outputDir)
     #print(landKreise)
 
     return fullTable

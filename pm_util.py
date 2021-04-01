@@ -6,6 +6,7 @@ import os
 import psutil
 import glob
 import time
+import re
 
 csv.field_size_limit(sys.maxsize)
 
@@ -54,16 +55,16 @@ def saveCsv(filename, records):
     except IOError:
         print("I/O error")
 
-def saveCsvTable(table, fileName, destDir="."):
-    newFile =  destDir+"/"+fileName
-    if os.path.isfile(newFile):
-        bakFile = newFile + ".bak"
-        if os.path.isfile(bakFile):
-            os.remove(bakFile)
-        os.rename(newFile, bakFile)
-
-    print("Saving "+newFile)
-    table.to_csv(newFile)
+# def saveCsvTable(table, fileName, destDir="."):
+#     newFile =  destDir+"/"+fileName
+#     if os.path.isfile(newFile):
+#         bakFile = newFile + ".bak"
+#         if os.path.isfile(bakFile):
+#             os.remove(bakFile)
+#         os.rename(newFile, bakFile)
+#
+#     print("Saving "+newFile)
+#     table.to_csv(newFile)
 
 # def saveJayTable(table, fileName, destDir="."):
 #     newFile =  destDir+"/"+fileName
@@ -98,10 +99,49 @@ def saveJayTable(table, fileName, destDir=".", backup = False, unsafe=False):
         table.to_jay(newTmpFile)
         if backup:
             os.rename(newFile, bakFile)
-        else:
+        elif os.path.isfile(newFile):
             os.remove(newFile)
         os.rename(newTmpFile, newFile)
     print("Saving done " + newFile)
+
+def saveCsvTable(table, fileName, destDir=".", backup = False, unsafe=False):
+    newFile = destDir + "/" + fileName
+    print("Saving " + newFile)
+    newTmpFile = newFile+".saving"
+    if os.path.isfile(newTmpFile):
+        os.remove(newTmpFile)
+    bakFile = newFile + ".bak"
+    if os.path.isfile(bakFile):
+        os.remove(bakFile)
+
+    if unsafe:
+        table.to_csv(newFile)
+    else:
+        table.to_csv(newTmpFile)
+        if backup:
+            os.rename(newFile, bakFile)
+        elif os.path.isfile(newFile):
+            os.remove(newFile)
+        os.rename(newTmpFile, newFile)
+    print("Saving done " + newFile)
+
+def ascify(name):
+    replacements = {"Ä" : "Ae",
+                    "Ö" : "Oe",
+                    "Ü" : "Ue",
+                    "ä" : "ae",
+                    "ö" : "oe",
+                    "ü" : "ue",
+                    "ß": "ss",
+                    " ": "_",
+                    }
+    for key, value in replacements.items():
+        name = name.replace(key,value)
+    name = re.sub("[^0-9a-zA-Z_\(\)\.\-]+", "#", name)
+    return name
+
+def seriesFileName(id, name):
+    return "series-{:05d}-{}.csv".format(id, ascify(name))
 
 
 def printMemoryUsage(where):

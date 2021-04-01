@@ -241,6 +241,7 @@ def enhance(inputFile, destDir="."):
     path = os.path.normpath(inputFile)
     fileName = path.split(os.sep)[-1]
     newFile = destDir + "/"+"enhanced-"+fileName
+
     newTable.to_csv(newFile)
 
 
