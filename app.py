@@ -104,6 +104,12 @@ FormatFixed2 = Format(
     symbol=Symbol.no,
     decimal_delimiter=',',
 )
+FormatFixed3 = Format(
+    precision=3,
+    scheme=Scheme.fixed,
+    symbol=Symbol.no,
+    decimal_delimiter=',',
+)
 
 FormatInt_EN = Format(
                 precision=0,
@@ -249,7 +255,7 @@ def colWidthStr(pixels):
     return "{}px".format(colWidth(pixels))
 
 Selectable = True
-Deletable = True
+Deletable = False
 NotSelectable = False
 NotDeletable = False
 
@@ -397,38 +403,34 @@ def makeColumns(withGender=False, withAges=False):
         ('InzidenzTodesfallNeu_7TageSumme_Trend', ['Todesfälle je 100.000', 'Trend'], 'numeric', FormatFixed2, colWidth(defaultColWidth), Deletable, Selectable),
         ('InzidenzTodesfall', ['Todesfälle je 100.000', 'total'], 'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
     ]
-    agesOrder = [
-        ('InzidenzFallNeu_AG_A00_A04_7TageSumme', ['Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert', '0-4'],
-         'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
-        (
-        'InzidenzFallNeu_AG_A05_A14_7TageSumme', ['Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert', '5-14'],
-        'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
-        (
-        'InzidenzFallNeu_AG_A15_A34_7TageSumme', ['Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert', '15-34'],
-        'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
-        (
-        'InzidenzFallNeu_AG_A35_A59_7TageSumme', ['Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert', '35-59'],
-        'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
-        (
-        'InzidenzFallNeu_AG_A60_A79_7TageSumme', ['Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert', '60-79'],
-        'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
-        (
-        'InzidenzFallNeu_AG_A80Plus_7TageSumme', ['Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert', '80+'],
-        'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
-    ]
+
     if withAges:
+        desiredOrder = desiredOrder + makeAgesColumns('Einwohner{AG}',
+                                                      'Einwohner nach Alter',
+                                                      FormatInt, colWidth(90))
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzFallNeu{AG}_7TageSumme',
                                                       'Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert',
                                                       FormatFixed2, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('AnzahlFall{AG}',
+                                                      'Fälle nach Alter kumuliert',
+                                                      FormatInt, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('InzidenzFall{AG}',
+                                                  'Fälle je 100.000 nach Alter kumuliert',
+                                                  FormatFixed2, colWidth(62))
+
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfallNeu{AG}_7TageSumme',
                                                       'Todesfälle je 100.000 nach Alter in letzten 7 Tagen publiziert',
                                                       FormatFixed2, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('MeldeTag_AnzahlTodesfall{AG}',
+                                                      'Todesfälle nach Alter kumuliert (nach Meldetag)',
+                                                      FormatInt, colWidth(62))
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfall{AG}',
-                                                  'Todesfälle je 100.000 nach Alter kumuliert',
+                                                     'Todesfälle je 100.000 nach Alter kumuliert',
                                                   FormatFixed2, colWidth(62))
+
         desiredOrder = desiredOrder + makeAgesColumns('MeldeTag_Fallsterblichkeit_ProzentNeu{AG}_7TageSumme',
                                                       'Fallsterblichkeit in Prozent nach Altergruppen',
-                                                      FormatFixed2, colWidth(62))
+                                                      FormatFixed3, colWidth(62))
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfallNeu{AG}_7TageSumme_Trend',
                                               'Fallsterblichkeit Trend nach Altergruppen',
                                               FormatFixed2, colWidth(62))
