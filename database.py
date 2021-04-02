@@ -147,12 +147,19 @@ def makeDoubleKey(table, newKeyName, keyCol2Name, keyCol1Name):
     min2t = table[:,key2].min().to_list()[0][0]
     max2t = table[:,key2].max().to_list()[0][0]
 
-    if min1t < minAllowed or min2t < minAllowed:
-        print("key value too small for double key")
-        exit(1)
-    if max1t > maxAllowed or max2t > maxAllowed:
-        print("key value too big for double key")
-        exit(1)
+    if min1t is not None and min2t is not None:
+        if min1t < minAllowed or min2t < minAllowed:
+            print("makeDoubleKey: key value too small for double key")
+            exit(1)
+    else:
+        print("makeDoubleKey: key values missing in this table:")
+        print(table)
+
+    if max1t is not None and max2t is not None:
+        if max1t > maxAllowed or max2t > maxAllowed:
+            print("key value too big for double key")
+            exit(1)
+
 
     table = table[:, dt.f[:].extend({newKeyName: (key1 - minAllowed) * maxAllowed + (key2 - minAllowed) })]
     return table

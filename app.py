@@ -10,8 +10,7 @@
 import locale
 
 print("Locale:"+str(locale.getlocale()))
-locale.setlocale(locale.LC_ALL, 'de_DE')
-print("Locale set to:"+str(locale.getlocale()))
+#locale.setlocale(locale.LC_ALL, 'de_DE')print("Locale set to:"+str(locale.getlocale()))
 
 import cov_dates as cd
 import pm_util as pmu
@@ -49,6 +48,7 @@ versionStr="1.0.2.0"
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
 WITH_GRPAH = True
+WITH_AG=True
 
 pio.templates.default = "plotly_dark"
 
@@ -267,7 +267,9 @@ class DataKind(Enum):
     deaths_incidence_7d = 10,
     trend_7d = 11,
     R_7d = 12,
-    CFR_Percent = 13
+    CFR_Percent = 13,
+    cases_7d = 14,
+    deaths_7d = 15,
 
 axisDescription=dict(
     unknown="Wert",
@@ -283,7 +285,9 @@ axisDescription=dict(
     deaths_incidence_7d="Todesfallinzidenz 7 Tage je 100.000 Einwohner",
     trend_7d="7-Tage-Trend",
     R_7d="7-Tage-R-Wert",
-    CFR_Percent="Fallsterblichkeit (CFR)"
+    CFR_Percent="Fallsterblichkeit (CFR)",
+    cases_7d = "Fälle in 7 Tagen",
+    deaths_7d = "Todesfälle in 7 Tagen",
 )
 
 def classifyColumn(cn):
@@ -310,9 +314,9 @@ def classifyColumn(cn):
     elif Trend:
         return DataKind.trend_7d
     elif Summe7Tage and AnzahlFallNeu:
-        return DataKind.cases_incidence_7d
+        return DataKind.cases_7d
     elif Summe7Tage and AnzahlTodesfallNeu:
-        return DataKind.deaths_incidence_7d
+        return DataKind.deaths_7d
     elif AnzahlTodesfallNeu:
         return DataKind.new_deaths
     elif AnzahlFallNeu:
@@ -477,7 +481,6 @@ dataFilename = "data.csv"
 
 csvData = open(dataFilename,"rb").read().decode('utf-8')
 
-WITH_AG=True
 if WITH_AG:
     fullTableFilename="all-series-agegroups-gender.csv"
 else:
