@@ -420,6 +420,18 @@ def makeColumns(withGender=False, withAges=False):
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzFallNeu{AG}_7TageSumme',
                                                       'Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert',
                                                       FormatFixed2, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfallNeu{AG}_7TageSumme',
+                                                      'Todesfälle je 100.000 nach Alter in letzten 7 Tagen publiziert',
+                                                      FormatFixed2, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfall{AG}',
+                                                  'Todesfälle je 100.000 nach Alter kumuliert',
+                                                  FormatFixed2, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('MeldeTag_Fallsterblichkeit_ProzentNeu{AG}_7TageSumme',
+                                                      'Fallsterblichkeit in Prozent nach Altergruppen',
+                                                      FormatFixed2, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfallNeu{AG}_7TageSumme_Trend',
+                                              'Fallsterblichkeit Trend nach Altergruppen',
+                                              FormatFixed2, colWidth(62))
 
 
     orderedCols, orderedNames, orderedTypes, orderFormats, orderWidths, orderDeletable, orderSelectable = zip(*desiredOrder)
@@ -465,7 +477,7 @@ app = dash.Dash(
 
 # fullTableFilename = "full-latest.csv"
 # cacheFilename = "data-cached.feather"
-dataFilename = "data.csv"
+#dataFilename = "data.csv"
 #
 # FORCE_REFRESH_CACHE = debugFlag
 # #FORCE_REFRESH_CACHE = True
@@ -479,7 +491,8 @@ dataFilename = "data.csv"
 #     dframe = pd.read_feather(cacheFilename)
 #
 
-csvData = open(dataFilename,"rb").read().decode('utf-8')
+#csvData = open(dataFilename,"rb").read().decode('utf-8')
+csvData = "Not available"
 
 if WITH_AG:
     fullTableFilename="all-series-agegroups-gender.csv"
