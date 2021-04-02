@@ -26,10 +26,11 @@ import dash_table
 from dash_table.Format import Format, Scheme, Sign, Symbol
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 
 import plotly.graph_objects as go
 import plotly.express as px
+import plotly.io as pio
 
 import pandas as pd
 import numpy as np
@@ -39,12 +40,17 @@ import dash_table.FormatTemplate as FormatTemplate
 #import markdown
 import socket
 import time
+from enum import Enum
+# Import math Library
+import math
 
 versionStr="1.0.2.0"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
 WITH_GRPAH = True
+
+pio.templates.default = "plotly_dark"
 
 print("Running on host '{}', debug={}".format(socket.gethostname(), debugFlag))
 
@@ -191,7 +197,7 @@ def getTableForDay(fullTable, day):
             print("{}: BAD: {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
             exit(1)
         #else:
-            #print("{}: ok : {} {} == {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
+        #    print("{}: ok : {} {} == {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
 
     todayTableById=todayTableById[:,dt.f[:].extend({"RangChange": 0})]
     rangChange = np.subtract(yesterdayTableById[:,"Rang"],todayTableById[:,"Rang"])
@@ -247,7 +253,95 @@ Deletable = True
 NotSelectable = False
 NotDeletable = False
 
-def makeColumns():
+class DataKind(Enum):
+    unknown = 0,
+    new_cases = 1,
+    new_deaths = 2,
+    cum_cases = 3,
+    cum_deaths = 4,
+    new_cases_incidence = 5,
+    new_deaths_incidence = 6,
+    cum_cases_incidence = 7,
+    cum_deaths_incidence = 8,
+    cases_incidence_7d = 9,
+    deaths_incidence_7d = 10,
+    trend_7d = 11,
+    R_7d = 12,
+    CFR_Percent = 13
+
+axisDescription=dict(
+    unknown="Wert",
+    new_cases="Neue Fälle pro Tag",
+    new_deaths="Neue Todesfälle pro Tag",
+    cum_cases="Fälle kumuliert",
+    cum_deaths="Todesfälle kumuliert",
+    new_cases_incidence="Neue Fälle pro Tag je 100.000 Einwohner",
+    new_deaths_incidence="Neue Todesfälle pro Tag je 100.000 Einwohner",
+    cum_cases_incidence="Fälle kumuliert je 100.000 Einwohner",
+    cum_deaths_incidence="Todesfälle kumuliert je 100.000 Einwohner",
+    cases_incidence_7d="Fallinzidenz 7 Tage je 100.000 Einwohner",
+    deaths_incidence_7d="Todesfallinzidenz 7 Tage je 100.000 Einwohner",
+    trend_7d="7-Tage-Trend",
+    R_7d="7-Tage-R-Wert",
+    CFR_Percent="Fallsterblichkeit (CFR)"
+)
+
+def classifyColumn(cn):
+    AnzahlFallNeu = "AnzahlFallNeu" in cn
+    AnzahlFall = "AnzahlFall" in cn and not AnzahlFallNeu
+    AnzahlTodesfallNeu = "AnzahlTodesfallNeu" in cn
+    AnzahlTodesfall = "AnzahlTodesfall" in cn and not AnzahlTodesfallNeu
+    
+    InzidenzFallNeu = "InzidenzFallNeu" in cn
+    InzidenzFall = "InzidenzFall" in cn and not InzidenzFallNeu
+    InzidenzTodesfallNeu = "InzidenzTodesfallNeu" in cn
+    InzidenzTodesfall = "InzidenzTodesfall" in cn and not InzidenzTodesfallNeu
+
+    Trend = "Trend" in cn
+    Summe7Tage = InzidenzFallNeu = "7TageSumme" in cn and not Trend
+
+    R_Value = cn.endswith("_R")
+    CFR_Percent = "Fallsterblichkeit_Prozent" in cn
+    
+    if CFR_Percent:
+        return DataKind.CFR_Percent
+    elif R_Value:
+        return DataKind.R_7d
+    elif Trend:
+        return DataKind.trend_7d
+    elif Summe7Tage and AnzahlFallNeu:
+        return DataKind.cases_incidence_7d
+    elif Summe7Tage and AnzahlTodesfallNeu:
+        return DataKind.deaths_incidence_7d
+    elif AnzahlTodesfallNeu:
+        return DataKind.new_deaths
+    elif AnzahlFallNeu:
+        return DataKind.new_cases
+    elif AnzahlTodesfall:
+        return DataKind.cum_deaths
+    elif AnzahlFall:
+        return DataKind.cum_cases
+    elif InzidenzTodesfallNeu:
+        return DataKind.new_deaths_incidence
+    elif InzidenzFallNeu:
+        return DataKind.new_cases_incidence
+    elif InzidenzTodesfall:
+        return DataKind.cum_deaths_incidence
+    elif InzidenzFall:
+        return DataKind.cum_cases_incidence
+    return DataKind.unknown
+
+def makeAgesColumns(baseColName, title, format, columnsWidth):
+    ages = ["_AG_A00_A04","_AG_A05_A14","_AG_A15_A34","_AG_A35_A59","_AG_A60_A79","_AG_A80Plus"]
+    agesTitle = ["0-4","5-14","15-34","35-59","60-79","80+"]
+    agesOrder = []
+    for i, a in enumerate(ages):
+        srcColName = baseColName.replace("{AG}",a)
+        coldef = ( srcColName,[title, agesTitle[i]], 'numeric', format, columnsWidth, Deletable, Selectable )
+        agesOrder.append(coldef)
+    return agesOrder
+
+def makeColumns(withGender=False, withAges=False):
     desiredOrder = [
         ('Rang', ['Rang', 'Rang'], 'numeric', FormatInt, colWidth(40), NotDeletable, NotSelectable),
         ('RangChangeStr', ['Rang', ''], 'text', Format(), colWidth(20), NotDeletable, NotSelectable),
@@ -299,7 +393,7 @@ def makeColumns():
         ('InzidenzTodesfallNeu_7TageSumme_Trend', ['Todesfälle je 100.000', 'Trend'], 'numeric', FormatFixed2, colWidth(defaultColWidth), Deletable, Selectable),
         ('InzidenzTodesfall', ['Todesfälle je 100.000', 'total'], 'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
     ]
-    moreOrder = [
+    agesOrder = [
         ('InzidenzFallNeu_AG_A00_A04_7TageSumme', ['Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert', '0-4'],
          'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
         (
@@ -318,7 +412,10 @@ def makeColumns():
         'InzidenzFallNeu_AG_A80Plus_7TageSumme', ['Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert', '80+'],
         'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
     ]
-
+    if withAges:
+        desiredOrder = desiredOrder + makeAgesColumns('InzidenzFallNeu{AG}_7TageSumme',
+                                                      'Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert',
+                                                      FormatFixed2, colWidth(62))
 
 
     orderedCols, orderedNames, orderedTypes, orderFormats, orderWidths, orderDeletable, orderSelectable = zip(*desiredOrder)
@@ -380,7 +477,12 @@ dataFilename = "data.csv"
 
 csvData = open(dataFilename,"rb").read().decode('utf-8')
 
-fullTableFilename="all-series.csv"
+WITH_AG=True
+if WITH_AG:
+    fullTableFilename="all-series-agegroups-gender.csv"
+else:
+    fullTableFilename="all-series.csv"
+
 csvFullData = open(fullTableFilename,"rb").read().decode('utf-8')
 
 dataURL = '/covid/risks/data.csv'
@@ -401,7 +503,7 @@ def csv_fulldata():
 
 ###########################################################################################
 # Start of table initialization
-columns, colWidths, totalWidth, minWidth, maxWidth, usedColumns = makeColumns()
+columns, colWidths, totalWidth, minWidth, maxWidth, usedColumns = makeColumns(WITH_AG, WITH_AG)
 totalWidthStr = colWidthStr(totalWidth)
 minWidthStr = colWidthStr(minWidth)
 maxWidthStr = colWidthStr(maxWidth)
@@ -410,10 +512,20 @@ maxWidthStr = colWidthStr(maxWidth)
 fullTable = loadData(fullTableFilename)
 
 #maxDay = float(dframe["MeldeDay"].max())
-maxDay = fullTable[:,"DatenstandTag"].max().to_list()[0][0]
-print(maxDay)
+minDay = int(fullTable[:,"DatenstandTag"].min().to_list()[0][0])
+maxDay = int(fullTable[:,"DatenstandTag"].max().to_list()[0][0])
+print("minDay",minDay)
+print("maxDay",maxDay)
 dataVersionDate = cd.dateStrWDMYFromDay(maxDay)
 print("Loading done, max Day {} date {}".format(maxDay, dataVersionDate))
+fullDayRange=range(minDay,maxDay+1)
+fullDayList=[day for day in fullDayRange]
+fullDateList=[cd.dateStrFromDay(day) for day in fullDayRange]
+
+def indexOfday(day):
+    if day >= minDay and day <= maxDay:
+        return int(day - minDay)
+    return None
 
 print("Creating Datatable")
 
@@ -1194,45 +1306,179 @@ chartDataFrame = getTimeSeries(fullTable,0,visualizeColumns).to_pandas()
 
 #print(chartDataFrame)
 
+# @app.callback(
+#     Output("time-series-chart", "figure"),
+#     [Input('fig-width', 'value')],
+#     [State("time-series-chart", "figure")])
+# def resize_figure(width, fig_json):
+#     fig = go.Figure(fig_json)
+#     fig.update_layout(width=int(width))
+#
+#     return fig
+
 @app.callback(
     Output("time-series-chart", "figure"),
     Input('table', 'selected_columns'),
     Input('table', 'selected_rows'),
+    Input('fig-width-slider', 'value'),
+    Input('fig-height-slider', 'value'),
 )
-def display_time_series(selected_columns,selected_rows):
-    print("---------------------->")
-    print(selected_columns)
-    print(selected_rows)
+def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
+    # print("---------------------->")
+    # print(selected_columns)
+    # print(selected_rows)
     fig = go.Figure()
+
+    #only do stuff if at least one columns and one row are selected
     if not (selected_columns is None or selected_rows is None):
         #print(table[selected_rows, visualizeColumns])
         #print(table[selected_rows, "Landkreis"])
         #print(table[selected_rows, "IdLandkreis"])
 
-        names = table[selected_rows, "Landkreis"].to_list()[0]
-        IDs = table[selected_rows, "IdLandkreis"].to_list()[0]
-        #print(names)
-        #print(IDs)
+        regionNames = table[selected_rows, "Landkreis"].to_list()[0]
+        regionIDs = table[selected_rows, "IdLandkreis"].to_list()[0]
+        # print(regionNames)
+        # print(regionIDs)
 
+        fig.layout.height = int(fig_height)
+        fig.layout.width = int(fig_width)
+        legendMargin=500
+        fig.layout.margin.t = 0
+        # fig.layout.margin.l = 0
+        # fig.layout.margin.b = 0
+        fig.layout.margin.r = legendMargin # right margin for Legend
+        # fig.layout.margin.pad = 0
 
-        for i, id in enumerate(IDs):
-            print("i: {} : col: {}".format(i, id))
+        # determine how many different types of y-axes we need and what kind
+        colType = {}
+        colTypeCount = {}
+        for col in selected_columns:
+            ct = classifyColumn(col)
+            colType[col] = ct
+            if ct in colTypeCount.keys():
+                colTypeCount[ct] = colTypeCount[ct] + 1
+            else:
+                colTypeCount[ct] = 1
 
-            lkTable = getTimeSeries(fullTable,id, ["Datum"]+selected_columns)
+        numColTypes = len(colTypeCount)
+        # print("colType", colType)
+        # print("colTypeCount", colTypeCount)
+        # print("numColTypes", numColTypes)
+
+        # layout the axis and the plot area
+        leftaxes = int((numColTypes+1)/2)
+        rightaxes = int(numColTypes/2)
+
+        widthAvailable = fig_width-legendMargin
+        widthAxis = 100
+        widthAxisInDomain = widthAxis / widthAvailable
+        leftAxesWidth = (leftaxes-1) * widthAxis
+        rightAxesWidth = rightaxes * widthAxis
+        xaxisDomainStart = leftAxesWidth / widthAvailable
+        xaxisDomainEnd = 1.0 - (rightAxesWidth / widthAvailable)
+
+        # compute the attribute names for each axis
+        # the names are None ,y2,y3 ...
+        # the attribute names are yaxis, yaxis2, yaxis3...
+        colTypeAxis = {}
+        colTypeAxisName = {}
+        colTypeAxisArg = {}
+        colTypeAxisTitle = {}
+
+        for j, ct in enumerate(colTypeCount.keys()):
+            colTypeAxis[ct] = j
+            #print("j={}, ct={}".format(j,ct))
+            colTypeAxisTitle[ct] = axisDescription[ct.name]
+            if j > 0:
+                colTypeAxisName[ct] = "y" + str(j + 1)
+                colTypeAxisArg[ct] = "yaxis" + str(j + 1)
+            else:
+                colTypeAxisName[ct] = None
+                colTypeAxisArg[ct] = "yaxis"
+
+        # print("colTypeAxis", colTypeAxis)
+        # print("colTypeAxisName", colTypeAxisName)
+        # print("colTypeAxisArg", colTypeAxisArg)
+
+        for i, regionid in enumerate(regionIDs):
+            #print("------> i: {} : col: {}".format(i, regionid))
+
+            regionTable = getTimeSeries(fullTable,regionid, ["DatenstandTag","Datum"]+selected_columns)
             #print(IDs)
             #print(lkTable)
 
-            dates = lkTable[:,"Datum"].to_list()[0]
+            dates = regionTable[:,"Datum"].to_list()[0]
+            days = regionTable[:,"DatenstandTag"].to_list()[0]
             #print("dates",dates)
-            ##tables[id] = lkTable
+            ##tables[id] = regionTable
+
             for col in selected_columns:
-                print("col",col)
-                values = lkTable[:, col].to_list()[0]
-                name = names[i]+":"+col
-                print("adding scatter trace {} name {} col {}".format(i, name, col))
-                print(dates)
-                print(values)
-                fig.add_trace(go.Scatter(x=dates, y=values, name=name))
+                #print("col",col)
+                values = regionTable[:, col].to_list()[0]
+                #print("i {} regionNames {} col {}".format(i, regionNames, col))
+                name = regionNames[i]+":"+col
+                #print("adding scatter trace {} name {} col {}".format(i, name, col))
+
+                fullValues = [None]*len(fullDayList)
+                #print(fullValues)
+                n = 0
+                for k, day in enumerate(days):
+                    if values[k] != None and not math.isnan(values[k]):
+                        #print("i={}, day={}, indexOfday(day)={}".format(i, day, indexOfday(day)))
+                        fullValues[indexOfday(day)] = values[k]
+                        #else:
+                            #fullValues[i] = None
+
+                #print(fullDateList)
+                #print(values)
+                if len(fullDayRange) != len(fullValues):
+                    print("Len mismatch, dates={}, values={}".format(dates,values))
+                else:
+                    ct =colType[col]
+                    #print("ct",ct)
+                    ctAxisName = colTypeAxisName[ct]
+                    #print("ctAxisName",ctAxisName)
+                    fig.add_trace(go.Scatter(x=fullDateList, y=fullValues, name=name, yaxis=ctAxisName))
+
+        layoutArgs = {}
+        for k, axis in enumerate(colTypeAxisArg.keys()):
+            #print("axis arg {}:{}".format(k,axis.name))
+
+            axisTitle = colTypeAxisTitle[axis]
+            #print("axisTitle", axisTitle)
+
+            axisNamme = colTypeAxisName[axis]
+            #print("axisNamme", axisNamme)
+
+            axisArg = colTypeAxisArg[axis]
+            #print("axisArg", axisArg)
+
+            layoutArgs[axisArg] = {
+                "title": axisTitle,
+            }
+            if k > 0:
+                #print("k",k)
+                #print("k % 2",k % 2)
+                layoutArgs[axisArg]["overlaying"] = "y"
+                if k == 1:
+                    layoutArgs[axisArg]["anchor"] =  "x"
+                else:
+                    layoutArgs[axisArg]["anchor"] =  "free"
+                    if k % 2 == 0:
+                        layoutArgs[axisArg]["position"] = widthAxisInDomain * int((k-2)/2)
+                    else:
+                        layoutArgs[axisArg]["position"] = xaxisDomainEnd + widthAxisInDomain * (k-1)/2
+
+
+
+            layoutArgs[axisArg]["side"] =   "left" if k%2==0 else "right"
+            #layoutArgs[axisArg]["side"] =   "left"
+
+        layoutArgs["xaxis"] = {
+                "domain": [xaxisDomainStart,xaxisDomainEnd],
+        }
+        #print(pretty(layoutArgs))
+        fig.update_layout(layoutArgs)
 
         #print(fullTable[selected_rows, visualizeColumns])
         #chartDataFrame = fullTable[selected_rows, visualizeColumns].to_pandas()
@@ -1240,11 +1486,60 @@ def display_time_series(selected_columns,selected_rows):
         #fig.show()
     return fig
 
-h_graph = dcc.Graph(
-        id='time-series-chart',
-        figure=px.line(chartDataFrame, x='Datum', y="AnzahlFallNeu_7TageSumme"),
-    )
+# @app.callback(
+#     Output('fig-height-slider', 'verticalHeight'),
+#     Input("time-series-chart", "frames"),
+# )
+# def adjustSliderHeight(figure):
+#     print("adjust slider height to",figure)
+#     #print("adjust slider height to",pmu.pretty()figure["layout"])
+#     #print("adjust slider height to",figure["layout"]["height"])
+#     #return figure["layout"]["height"]
+#     return figure
 
+@app.callback(
+    Output('fig-height-slider', 'verticalHeight'),
+    Input('fig-height-slider', 'value'),
+)
+def adjustSliderHeight(fig_height):
+    print("adjust slider height to",fig_height)
+    return fig_height
+
+# app.clientside_callback(
+#     """
+#     function(fig_height) {
+#         return fig_height;
+#     }
+#     """,
+#     Output('fig-height-slider', 'verticalHeight'),
+#     Input('fig-height-slider', 'value'),
+# )
+
+h_width_slider =  dcc.Slider(id='fig-width-slider', min=1000, max=3000, step=10, value=1200,
+               marks={x: str(x) for x in [1000, 1200, 1400, 1800, 2000, 2200, 2400, 2600, 2800, 3000]})
+
+h_height_slider =  dcc.Slider(id='fig-height-slider', min=500, max=2000, step=10, value=500, vertical=True,verticalHeight=500,
+               marks={x: str(x) for x in [500, 600, 700, 800, 1000, 1200, 1400, 1600, 1800, 2000]})
+
+h_graph = html.Table([
+            html.Tr([
+                html.Td(html.Div(h_height_slider)),
+                html.Td(
+                    dcc.Graph(
+                        id='time-series-chart',
+                        #figure=px.line(chartDataFrame, x='Datum', y="AnzahlFallNeu_7TageSumme"),
+                        figure={"layout": {"width": 1000}},
+                        config={
+                            "showAxisDragHandles": True,
+                            "showAxisRangeEntryBoxes" : True,
+                            "showLink": True,
+                            "sendData": True,
+                        },
+                    )
+                ),
+            ]),
+            html.Tr([html.Td([html.Div("X")]),html.Td(html.Div([h_width_slider]))]),
+])
 
 app.title = appTitle
 
