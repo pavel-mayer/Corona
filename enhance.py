@@ -2,6 +2,7 @@ import argparse
 import datatable as dt
 import os
 import glob
+import time
 
 from datatable import dt, f, by, ifelse, update
 
@@ -13,6 +14,16 @@ def add7dSumColumn(table, srcColumn, newColumn):
 
     newTable = table[:, dt.f[:].extend({newColumn: src + dt.shift(src, n=1) + dt.shift(src, n=2) + dt.shift(src, n=3)+
                                                    dt.shift(src, n=4)+ dt.shift(src, n=5)+ dt.shift(src, n=6)})]
+    #print(newTable)
+    return newTable
+
+def add7dDifferenceColumn(table, srcColumn, newColumn):
+    src = dt.f[srcColumn]
+    #src_na = dt.math.isna(src)
+    src_na = dt.math.isna(src)
+    table[src_na, src] = 0
+
+    newTable = table[:, dt.f[:].extend({newColumn: src - dt.shift(src, n=7)})]
     #print(newTable)
     return newTable
 
@@ -192,14 +203,17 @@ def add7DayAverages(table):
     for c in candidatesColumns:
         if not ("Publikationsdauer" in c):
             table = add7dSumColumn(table, c, c+"_7TageSumme")
+            #table = add7dDifferenceColumn(table, c.replace("Neu",""), c + "_7TageSumme")
         if not ("MeldeTag" in c or "Publikationsdauer" in c):
             table = add7dTrendColumn(table, c+"_7TageSumme", c+"_7TageSumme_Trend")
+            table = add7dRColumn(table, c+"_7TageSumme_Trend", c + "_7TageSumme_R")
+            table = add7dWTrendColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial")
+            table = add7dRColumn(table, c+"_7TageSumme_Trend_Spezial", c + "_7TageSumme_R_Spezial")
         if c in ["AnzahlFallNeu","InzidenzFallNeu","AnzahlTodesfallNeu","InzidenzTodesfallNeu"]:
             table = add7dBeforeColumn(table, c + "_7TageSumme", c + "_7TageSumme_7_Tage_davor")
         if c in ["InzidenzFallNeu", "InzidenzTodesfallNeu"]:
-            table = add7dWTrendColumn(table, c+"_7TageSumme", c+"_7TageSumme_Trend_Spezial")
             if c in ["InzidenzFallNeu"]:
-                table = add7dRColumn(table, c + "_7TageSumme_Trend", c + "_7TageSumme_R")
+                #table = add7dRColumn(table, c + "_7TageSumme_Trend", c + "_7TageSumme_R")
                 table = addPredictionsColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial", c + "_Prognose_1_Wochen", 1)
                 table = addPredictionsColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial", c + "_Prognose_2_Wochen", 2)
                 table = addPredictionsColumn(table, c + "_7TageSumme", c + "_7TageSumme_Trend_Spezial", c + "_Prognose_4_Wochen", 4)
@@ -230,6 +244,11 @@ def enhance(inputFile, destDir="."):
     #print(table.names)
     #print(table.stypes)
 
+    candidatesColumns = [name for name in  table.names if not "_G_W" in name and not "_G_M" in name]
+    #removeColumns = [name for name in  table.names if  "_G_W" in name or "_G_M" in name]
+    table = table[:,candidatesColumns]
+
+
     numericColumns = [name for name in table.names if "Anzahl" in name or "Inzidenz" in name or "DatenstandTag_Max" in name]
     fillEmptyCellsWithZeroes(table, numericColumns)
 
@@ -243,6 +262,7 @@ def enhance(inputFile, destDir="."):
     newFile = destDir + "/"+"enhanced-"+fileName
 
     newTable.to_csv(newFile)
+    return table, newTable
 
 
     # testCols = ["MeldeTag_InzidenzFall_G_M_AG_A00_A04_Gestern",
@@ -290,7 +310,13 @@ def main():
         for f in files:
             if not f.endswith("--nicht erhoben-.csv"):
                 print("Enhancing {}".format(f))
-                enhance(f, args.outputDir)
+                start = time.perf_counter()
+                table, newtable = enhance(f, args.outputDir)
+                finish = time.perf_counter()
+                duration = finish - start
+                print("Enhancing {} -> {} columns took {:.2f} seconds, {:.2f} columns/sec".format(
+                    table.ncols, newtable.ncols, duration, (newtable.ncols-table.ncols)/duration))
+
 
 if __name__ == "__main__":
     # execute only if run as a script

@@ -310,7 +310,7 @@ def classifyColumn(cn):
     Trend = "Trend" in cn
     Summe7Tage = InzidenzFallNeu = "7TageSumme" in cn and not Trend
 
-    R_Value = cn.endswith("_R")
+    R_Value = cn.endswith("_R")or cn.endswith("_R_Spezial")
     CFR_Percent = "Fallsterblichkeit_Prozent" in cn
     
     if CFR_Percent:
@@ -417,6 +417,12 @@ def makeColumns(withGender=False, withAges=False):
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzFall{AG}',
                                                   'Fälle je 100.000 nach Alter kumuliert',
                                                   FormatFixed2, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('InzidenzFallNeu{AG}_7TageSumme_Trend',
+                                                      'Fallinzidenz Trend nach Altergruppen',
+                                                      FormatFixed2, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('AnzahlFallNeu{AG}_7TageSumme_R_Spezial',
+                                                      '7-Tage R-Spezial nach Altergruppen',
+                                                      FormatFixed2, colWidth(62))
 
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfallNeu{AG}_7TageSumme',
                                                       'Todesfälle je 100.000 nach Alter in letzten 7 Tagen publiziert',
@@ -427,13 +433,13 @@ def makeColumns(withGender=False, withAges=False):
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfall{AG}',
                                                      'Todesfälle je 100.000 nach Alter kumuliert',
                                                   FormatFixed2, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfallNeu{AG}_7TageSumme_Trend',
+                                                      'InzidenzTodesfall Trend nach Altergruppen',
+                                                      FormatFixed2, colWidth(62))
 
         desiredOrder = desiredOrder + makeAgesColumns('MeldeTag_Fallsterblichkeit_ProzentNeu{AG}_7TageSumme',
                                                       'Fallsterblichkeit in Prozent nach Altergruppen',
                                                       FormatFixed3, colWidth(62))
-        desiredOrder = desiredOrder + makeAgesColumns('InzidenzTodesfallNeu{AG}_7TageSumme_Trend',
-                                              'Fallsterblichkeit Trend nach Altergruppen',
-                                              FormatFixed2, colWidth(62))
 
 
     orderedCols, orderedNames, orderedTypes, orderFormats, orderWidths, orderDeletable, orderSelectable = zip(*desiredOrder)
