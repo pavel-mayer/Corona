@@ -408,11 +408,17 @@ def makeColumns(withGender=False, withAges=False):
         desiredOrder = desiredOrder + makeAgesColumns('Einwohner{AG}',
                                                       'Einwohner nach Alter',
                                                       FormatInt, colWidth(90))
+        desiredOrder = desiredOrder + makeAgesColumns('InzidenzFallNeu{AG}',
+                                                      'Fälle je 100.000 nach Alter Neu',
+                                                      FormatFixed2, colWidth(62))
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzFallNeu{AG}_7TageSumme',
                                                       'Fälle je 100.000 nach Alter in letzten 7 Tagen publiziert',
                                                       FormatFixed2, colWidth(62))
         desiredOrder = desiredOrder + makeAgesColumns('AnzahlFall{AG}',
                                                       'Fälle nach Alter kumuliert',
+                                                      FormatInt, colWidth(62))
+        desiredOrder = desiredOrder + makeAgesColumns('AnzahlFallNeu{AG}',
+                                                      'Fälle nach Alter Neu',
                                                       FormatInt, colWidth(62))
         desiredOrder = desiredOrder + makeAgesColumns('InzidenzFall{AG}',
                                                   'Fälle je 100.000 nach Alter kumuliert',
