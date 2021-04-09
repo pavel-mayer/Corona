@@ -1094,7 +1094,7 @@ def main():
         print("Loading " + args.file)
         fullTable = dt.fread(args.file, tempdir=args.tempDir, memory_limit=args.memorylimit, verbose=args.verbose)
     elif len(pmu.getJayTablePartitions(args.file)) > 0:
-        fullTable = pmu.loadJayTablePartioned(args.file, tempDir=args.tempDir, memoryLimit=args.memorylimit, verbose=args.verbose)
+        fullTable = pmu.loadJayTablePartioned(args.file, tempdir=args.tempDir, memory_limit=args.memorylimit, verbose=args.verbose)
         partitioned = True
         print("Saving " + args.file)
         fullTable.to_jay(args.file)

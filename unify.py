@@ -11,6 +11,7 @@ import sys
 import glob
 import time
 import pandas as pd # pd.to_datetime(ds)
+import calendar
 
 csv.field_size_limit(sys.maxsize)
 
@@ -206,8 +207,13 @@ def datetimeFrom(st):
 # Parse date string like "2020/11/25 00:00:00"
 def datetimeFromDateStr3(ds):
     st = None
-    if ds.endswith("T00:00:00.000Z"):
+    if ds.isnumeric():
+        return datetime.fromtimestamp(int(ds) / 1000)
+    elif ds.endswith("T00:00:00.000Z"):
         st = time.strptime(ds, "%Y-%m-%dT00:00:00.000Z")
+        return datetimeFrom(st)
+    elif ds.endswith(" 00:00") and ds[2] == '.':
+        st = time.strptime(ds, "%d.%m.%y 00:00")
         return datetimeFrom(st)
     elif ds.endswith("T00:00:00Z"):
         st = time.strptime(ds, "%Y-%m-%dT00:00:00Z")
@@ -230,6 +236,9 @@ def datetimeFromDateStr3(ds):
         dt = dt.replace(tzinfo=None)
         return dt
 
+def ticksFromDateTime(dt):
+    return calendar.timegm(dt.timetuple())*1000
+
 import timeit
 
 def testDatePerf():
@@ -246,11 +255,15 @@ Flaeche = loadLandkreisFlaeche()
 Census = loadCensus()
 
 # much faster than the version above
-def unify(table):
+def unify(table, makeFallGruppe=False):
     dss = table[0,"Datenstand"]
     ds = cd.datetimeFromDatenstandAny(dss)
 
+    if 'FID' in table.names:
+        table.names = {"FID":"ObjectId"}
+
     dsdy = cd.dayFromDate(ds)
+    dsisodate = cd.dateStrYMDFromDay(dsdy)
     hasRefdatum = "Refdatum" in table.names
     hasErkrankungsbeginn = "IstErkrankungsbeginn" in table.names
     #t = table.copy()
@@ -258,29 +271,29 @@ def unify(table):
     if "Altersgruppe2" in table.names:
         t = t[:,dt.f[:].remove(dt.f["Altersgruppe2"])]
     if not "DatenstandISO" in table.names:
-        isodate = cd.dateStrYMDFromDay(dsdy)
-        t = t[:, dt.f[:].extend({"DatenstandISO": isodate})]
+        t = t[:, dt.f[:].extend({"DatenstandISO": dsisodate})]
     if not hasRefdatum:
-        t = t[:, dt.f[:].extend({"Refdatum": str(cd.day0d), "RefdatumISO": dt.f.MeldedatumISO})]
+        t = t[:, dt.f[:].extend({"Refdatum": 0})]
+
+    hasRefdatumISO = "RefdatumISO" in table.names
+    if not hasRefdatumISO:
+        #print("t1",t.names)
+        t = t[:, dt.f[:].extend({"RefdatumISO": ""})]
+        #print("t2",t.names)
+
+    hasMeldedatumISO = "MeldedatumISO" in table.names
+    if not hasMeldedatumISO:
+        t = t[:, dt.f[:].extend({"MeldedatumISO": ""})]
+
     if not hasErkrankungsbeginn:
         t = t[:, dt.f[:].extend({"IstErkrankungsbeginn": 0})]
 
     if "NeuGenesen" not in table.names:
         t = t[:, dt.f[:].extend({"NeuGenesen":-9, "AnzahlGenesen":0})]
 
-    t = t[:, dt.f[:].extend({"FallGruppe":"", "MeldeTag":nan, "RefTag":nan, "DatenstandTag":dsdy})]
-
-    #t = t[:, dt.f[:].extend({"Bevoelkerung":0, "FaellePro100k":0.0, "TodesfaellePro100k":0.0, "isStadt":False})]
-    #t = t[:, dt.f[:].extend({"Flaeche":0.0, "FaelleProKm2":0.0, "TodesfaelleProKm2":0.0, "Dichte":0.0})]
-
-    #print("unified fields", t.names)
-
-    #Bevoelkerung = loadLandkreisBeveolkerung()
-    #Flaeche = loadLandkreisFlaeche()
-    #Census = loadCensus()
-
-    #pmu.printMemoryUsage("unify pre realize ")
-    #t.materialize(to_memory=True)
+    if makeFallGruppe:
+        t = t[:, dt.f[:].extend({"FallGruppe":"", "MeldeTag":nan, "RefTag":nan, "DatenstandTag":dsdy})]
+    t = t[:, dt.f[:].extend({"MeldeTag":nan, "RefTag":nan, "DatenstandTag":dsdy})]
 
     pmu.printMemoryUsage("unify pre dict")
     d = t.to_dict()
@@ -294,24 +307,35 @@ def unify(table):
             md = cd.datetimeFromStampStr(mds)
         else:
             md = datetimeFromDateStr3(mds)
+            d["Meldedatum"][r]=ticksFromDateTime(md)
+
         mdy = cd.dayFromDate(md)
         d["MeldeTag"][r] = mdy
         if not hasRefdatum:
-            d["Refdatum"][r]= str(md)
+            d["Refdatum"][r]= ticksFromDateTime(md)
             d["RefTag"][r]= mdy
+        if not hasMeldedatumISO:
+            d["MeldedatumISO"][r] = cd.dateStrYMDFromDay(mdy)
 
-        fg = str(d["IdLandkreis"][r]) + d["Altersgruppe"][r]+ d["Geschlecht"][r]+str(int(d["MeldeTag"][r]))
+        if makeFallGruppe:
+            fg = str(d["IdLandkreis"][r]) + d["Altersgruppe"][r]+ d["Geschlecht"][r]+str(int(d["MeldeTag"][r]))
 
-        if int(d["IstErkrankungsbeginn"][r]) == 1:
-            rds = d["Refdatum"][r]
-            if pmu.is_int(rds):
-                rd = cd.datetimeFromStampStr(rds)
-            else:
-                rd = datetimeFromDateStr3(rds)
-            rdy = cd.dayFromDate(rd)
-            d["RefTag"][r] = rdy
+        #if int(d["IstErkrankungsbeginn"][r]) == 1:
+        rds = d["Refdatum"][r]
+        if pmu.is_int(rds):
+            rd = cd.datetimeFromStampStr(rds)
+        else:
+            rd = datetimeFromDateStr3(rds)
+            d["Refdatum"][r]=ticksFromDateTime(rd)
+        rdy = cd.dayFromDate(rd)
+        d["RefTag"][r] = rdy
+        if not hasRefdatumISO:
+            d["RefdatumISO"][r] = cd.dateStrYMDFromDay(rdy)
+        if makeFallGruppe:
             fg = fg+":"+str(rdy)
-        d["FallGruppe"][r] = fg
+
+        if makeFallGruppe:
+            d["FallGruppe"][r] = fg
         checkLandkreisData(d, r, Census, Flaeche)
 
     finish = time.perf_counter()
@@ -329,6 +353,16 @@ def save(table, origFileName, destDir="."):
     newFile =  destDir+"/X-"+fileName
     print("Saving "+newFile)
     table.to_csv(newFile)
+
+def load(origFileName, destDir="."):
+    path = os.path.normpath(origFileName)
+    fileName = path.split(os.sep)[-1]
+    newFile =  destDir+"/X-"+fileName
+    if os.path.isfile(newFile):
+        print("Loading "+newFile)
+        result = dt.fread(newFile)
+        return result
+    return None
 
 def isNewData(dataFilename, daysIncluded):
     pmu.printMemoryUsage("begin of isNewData")
@@ -402,6 +436,8 @@ def main():
                         action="store_true")
     parser.add_argument("--backup", help="create backup files before overwriting",
                         action="store_true")
+    parser.add_argument("--resume", help="create backup files before overwriting",
+                        action="store_true")
     parser.add_argument("--unsafe", help="directly overwrite output files, will corrupt the output file when killed while writing, but uses less disk space (only applies to single .jay file in non-partition mode)",
                         action="store_true")
     parser.add_argument("--force", help="build new database anyway", action="store_true")
@@ -432,53 +468,66 @@ def main():
     pmu.printMemoryUsage("after start")
 
     partitioned = False
-    daysIncluded = []
     if not args.force:
         if os.path.isfile(jayPath):
             print("Loading " + jayPath)
-            fullTable = dt.fread(jayPath)
+            fullTable = dt.fread(jayPath, tempdir=args.tempDir, memory_limit=args.memorylimit, verbose=args.verbose)
         elif len(pmu.getJayTablePartitions(jayPath)) > 0:
-            fullTable = pmu.loadJayTablePartioned(jayPath, tempDir=args.tempDir, memoryLimit=args.memorylimit, verbose=args.verbose)
+            fullTable = pmu.loadJayTablePartioned(jayPath, tempdir=args.tempDir, memory_limit=args.memorylimit, verbose=args.verbose)
             if fullTable == None:
                 print("The file {} is not a valid jay file, please remove it and retry")
                 exit(1)
             partitioned = True
 
-    if fullTable is not None:
-        pmu.printMemoryUsage("after load")
-        daysIncluded = sorted(fullTable[:, [dt.first(dt.f.DatenstandTag)], dt.by(dt.f.DatenstandTag)].to_list()[0])
-        print("Days in full table:")
-        print(daysIncluded)
-        pmu.printMemoryUsage("after first query")
-
+    daysIncluded = []
     addedData = False
+    version = 1
+    lastversion = 0
     for fa in args.files:
         files = sorted(glob.glob(fa))
         for f in files:
-            if isNewData(f, daysIncluded):
-                addedData = True
-                fstart = time.perf_counter()
-                pmu.printMemoryUsage("after isNewData query")
-                t = tableData(f)
-                pmu.printMemoryUsage("after tabledata query")
+            if fullTable is not None and version != lastversion:
+                pmu.printMemoryUsage("after load")
+                daysIncluded = sorted(
+                    fullTable[:, [dt.first(dt.f.DatenstandTag)], dt.by(dt.f.DatenstandTag)].to_list()[0])
+                print("Days in full table:")
+                print(daysIncluded)
+                pmu.printMemoryUsage("after first query")
+                lastversion = version
 
-                print("Hashing " + f)
-                newTable = unify(t)
-                pmu.printMemoryUsage("after hashing")
-                save(newTable,f,args.outputDir)
-                pmu.printMemoryUsage("after newTable save")
+            if isNewData(f, daysIncluded):
+                pmu.printMemoryUsage("after isNewData query")
+                fstart = time.perf_counter()
+                unifiedTable = None
+                if args.resume:
+                    unifiedTable = load(f,args.outputDir)
+
+                addedData = True
+                version = version + 1
+                if unifiedTable is None:
+                    t = tableData(f)
+                    pmu.printMemoryUsage("after tabledata query")
+
+                    print("Unifying " + f)
+                    unifiedTable = unify(t)
+                    pmu.printMemoryUsage("after hashing")
+                    save(unifiedTable,f,args.outputDir)
+                    pmu.printMemoryUsage("after unifiedTable save")
                 if fullTable is None:
-                    fullTable = newTable
+                    fullTable = unifiedTable
                 else:
                     #print("full fields", fullTable.names)
-                    checkColumns(fullTable.names, newTable.names)
+                    checkColumns(fullTable.names, unifiedTable.names)
+                    #print("unifiedTable.names",unifiedTable.names)
                     pmu.printMemoryUsage("before fulltable rbind")
-                    fullTable.rbind(newTable)  # memory gets used here
+                    fullTable.rbind(unifiedTable)  # memory gets used here
+                    #print("fullTable.names",fullTable.names)
+
                     pmu.printMemoryUsage("after rbind")
                 ffinish = time.perf_counter()
                 secs = ffinish - fstart
                 #print("fullTable", fullTable)
-                print("newTable rows = {}".format(newTable.nrows))
+                print("unifiedTable rows = {}".format(unifiedTable.nrows))
                 print("fullTable rows = {}".format(fullTable.nrows))
                 print("-> File time {:.1f} secs or {:.1f} mins or {:.1f} hours".format(secs, secs/60, secs/60/60))
                 if time.perf_counter() - lastCheckPointTime > float(args.checkpoint) * 60:
@@ -488,7 +537,7 @@ def main():
                         if args.flushread or args.destructivesave:
                             print("Re-reading checkpoint @ {}".format(datetime.now()))
                             fullTable = None
-                            fullTable = pmu.loadJayTablePartioned(jayPath, tempDir=args.tempDir, memoryLimit=args.memorylimit, verbose=args.verbose)
+                            fullTable = pmu.loadJayTablePartioned(jayPath, tempdir=args.tempDir, memory_limit=args.memorylimit, verbose=args.verbose)
                     else:
                         pmu.saveJayTable(fullTable, "all-data.jay", args.outputDir, args.backup, args.unsafe)
 

@@ -256,13 +256,13 @@ def getJayTablePartitions(pathName):
     files = sorted(glob.glob(globstr))
     return files
 
-def loadJayTablePartioned(fileName, tempDir=None, memoryLimit=None, verbose=False):
+def loadJayTablePartioned(fileName, tempdir=None, memory_limit=None, verbose=False):
     files = getJayTablePartitions(fileName)
     fullTable = None
     for f in files:
         printMemoryUsage("before loading partition from '{}'".format(f))
         try:
-            newTable = dt.fread(f, tempdir=tempDir, memory_limit=memoryLimit, verbose=verbose)
+            newTable = dt.fread(f, tempdir=tempdir, memory_limit=memory_limit, verbose=verbose)
         except:
             e = sys.exc_info()[0]
             print("Could not read file {}, error= {}".format(f,e))
