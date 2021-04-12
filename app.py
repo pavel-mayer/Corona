@@ -574,13 +574,21 @@ print("maxDay",maxDay)
 dataVersionDate = cd.dateStrWDMYFromDay(maxDay)
 print("Loading done, max Day {} date {}".format(maxDay, dataVersionDate))
 fullDayRange=range(minDay,maxDay+1)
-fullDayList=[day for day in fullDayRange]
-fullDateList=[cd.dateStrFromDay(day) for day in fullDayRange]
+fullMeldeDayRange=range(minDay-1,maxDay)
 
-def indexOfday(day):
-    if day >= minDay and day <= maxDay:
-        return int(day - minDay)
+fullDayList=[day for day in fullDayRange]
+fullMeldeDayList=[day for day in fullMeldeDayRange]
+
+fullDateList=[cd.dateStrFromDay(day) for day in fullDayRange]
+fullMeldeDateList=[cd.dateStrFromDay(day) for day in fullMeldeDayRange]
+
+def indexOfday(day, minday = minDay, maxday=maxDay):
+    if day >= minday and day <= maxday:
+        return int(day - minday)
     return None
+
+def indexOfMeldeday(day):
+    return indexOfday(day, minDay-1, maxDay-1)
 
 print("Creating Datatable")
 
@@ -1386,6 +1394,8 @@ def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
 
     #only do stuff if at least one columns and one row are selected
     if not (selected_columns is None or selected_rows is None):
+        selected_columns = sorted(selected_columns)
+        selected_rows = sorted(selected_rows)
         #print(table[selected_rows, visualizeColumns])
         #print(table[selected_rows, "Landkreis"])
         #print(table[selected_rows, "IdLandkreis"])
@@ -1468,21 +1478,34 @@ def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
             ##tables[id] = regionTable
 
             for col in selected_columns:
-                #print("col",col)
+                print("col",col)
                 values = regionTable[:, col].to_list()[0]
                 #print("i {} regionNames {} col {}".format(i, regionNames, col))
                 name = regionNames[i]+":"+col
                 #print("adding scatter trace {} name {} col {}".format(i, name, col))
 
-                fullValues = [None]*len(fullDayList)
+                dateOffset = 0
+                if "_Vor8Tagen" in col:
+                    dateOffset = 7
+                # elif "Gestern_" in col:
+                #     dateOffset = 0
+                # elif not "MeldeTag_" in col:
+                #     dateOffset = 1
+
+                fullValues = [None]*(len(fullDayList))
                 #print(fullValues)
                 n = 0
                 for k, day in enumerate(days):
-                    if values[k] != None and not math.isnan(values[k]):
-                        #print("i={}, day={}, indexOfday(day)={}".format(i, day, indexOfday(day)))
-                        fullValues[indexOfday(day)] = values[k]
-                        #else:
-                            #fullValues[i] = None
+                    if k >= dateOffset:
+                        if values[k] != None and not math.isnan(values[k]):
+                            #print("i={}, day={}, , indexOfday(day)={},indexOfday(day)={}, indexOfMeldeday(day)={}".format(
+                            #    i, day, indexOfday(day), day, indexOfMeldeday(day)))
+                            if "MeldeTag_" in col:
+                                fullValues[indexOfMeldeday(day-dateOffset-1)] = values[k]
+                            else:
+                                fullValues[indexOfday(day-dateOffset)] = values[k]
+                            #else:
+                                #fullValues[i] = None
 
                 #print(fullDateList)
                 #print(values)
@@ -1493,7 +1516,11 @@ def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
                     #print("ct",ct)
                     ctAxisName = colTypeAxisName[ct]
                     #print("ctAxisName",ctAxisName)
-                    fig.add_trace(go.Scatter(x=fullDateList, y=fullValues, name=name, yaxis=ctAxisName))
+                    if "MeldeTag_" in col:
+                        fig.add_trace(go.Scatter(x=fullMeldeDateList, y=fullValues, name=name, yaxis=ctAxisName, xaxis="x2"))
+                    else:
+                        fig.add_trace(go.Scatter(x=fullDateList, y=fullValues, name=name, yaxis=ctAxisName))
+
 
         layoutArgs = {}
         for k, axis in enumerate(colTypeAxisArg.keys()):
@@ -1530,11 +1557,20 @@ def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
             #layoutArgs[axisArg]["side"] =   "left"
 
         layoutArgs["xaxis"] = {
-                "domain": [xaxisDomainStart,xaxisDomainEnd],
+            "domain": [xaxisDomainStart, xaxisDomainEnd],
+            'title': 'Publikationstag'
         }
-        #print(pretty(layoutArgs))
-        fig.update_layout(layoutArgs)
+        layoutArgs["xaxis2"] = {
+            'anchor': 'y',
+            'overlaying': 'x',
+            'side': 'top',
+            'title': 'Meldetag'
+        }
 
+        print(pretty(layoutArgs))
+        fig.update_layout(layoutArgs)
+        #fig.update_layout(xaxis2={'anchor': 'y', 'overlaying': 'x', 'side': 'top'},
+        #                  yaxis_domain=[0, 0.94]);
         #print(fullTable[selected_rows, visualizeColumns])
         #chartDataFrame = fullTable[selected_rows, visualizeColumns].to_pandas()
         #fig = px.line(chartDataFrame, x='Datum', y=selected_columns)

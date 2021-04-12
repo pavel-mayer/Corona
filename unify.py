@@ -82,7 +82,7 @@ from dateutil.parser import parse
 #     return t
 
 
-def loadCensus(fileName="../CensusByRKIAgeGroups.csv"):
+def loadCensus(fileName="CensusByRKIAgeGroups.csv"):
     census = dt.fread(fileName)
     sKeys = census[:, "IdLandkreis"].to_list()[0]
     values = census[:, "Landkreis"].to_list()[0]
@@ -102,7 +102,7 @@ def loadCensus(fileName="../CensusByRKIAgeGroups.csv"):
 #                 result[LandkreisID] = int(BevoelkerungStr)
 #     return result
 
-def loadLandkreisFlaeche(fileName="../covid-19-germany-landkreise.csv"):
+def loadLandkreisFlaeche(fileName="covid-19-germany-landkreise.csv"):
     result = {}
     with open(fileName, newline='') as csvfile:
         reader = csv.DictReader(csvfile, delimiter=';')
@@ -436,7 +436,7 @@ def main():
                         action="store_true")
     parser.add_argument("--backup", help="create backup files before overwriting",
                         action="store_true")
-    parser.add_argument("--resume", help="create backup files before overwriting",
+    parser.add_argument("--resume", help="read already unified .csv files first",
                         action="store_true")
     parser.add_argument("--unsafe", help="directly overwrite output files, will corrupt the output file when killed while writing, but uses less disk space (only applies to single .jay file in non-partition mode)",
                         action="store_true")
