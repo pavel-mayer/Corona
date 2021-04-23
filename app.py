@@ -408,7 +408,9 @@ def makeColumns(withGender=False, withAges=False):
         ('AnzahlTodesfallNeu_7TageSumme', ['Todesfälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth), Deletable, Selectable),
         ('AnzahlTodesfallNeu_7TageSumme_7_Tage_davor', ['Todesfälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth), Deletable, Selectable),
         ('AnzahlTodesfall', ['Todesfälle', 'total'], 'numeric', FormatInt, colWidth(defaultColWidth), Deletable, Selectable),
-        ('Fallsterblichkeit_Prozent', ['Todesfälle', 'CFR in %'], 'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
+        ('MeldeTag_Fallsterblichkeit_Prozent', ['Todesfälle', 'CFR cum in %'], 'numeric', FormatFixed2, colWidth(62), Deletable, Selectable),
+        ('MeldeTag_Fallsterblichkeit_ProzentNeu_7TageSumme', ['Todesfälle', 'CFR 7d in %'], 'numeric', FormatFixed2, colWidth(62), Deletable,
+         Selectable),
 
         ('InzidenzTodesfallNeu', ['Todesfälle je 100.000', 'Neu'], 'numeric', FormatFixed2, colWidth(defaultColWidth), Deletable, Selectable),
         ('InzidenzTodesfallNeu_7TageSumme', ['Todesfälle je 100.000', 'letzte 7 Tage'], 'numeric', FormatFixed2, colWidth(defaultColWidth), Deletable, Selectable),
@@ -469,9 +471,11 @@ def makeColumns(withGender=False, withAges=False):
                                                       FormatFixed2, colWidth(62))
 
         desiredOrder = desiredOrder + makeAgesColumns('MeldeTag_Fallsterblichkeit_ProzentNeu{AG}_7TageSumme',
+                                                      'Fallsterblichkeit 7 Tage in Prozent nach Altergruppen',
+                                                      FormatFixed3, colWidth(72))
+        desiredOrder = desiredOrder + makeAgesColumns('MeldeTag_Fallsterblichkeit_Prozent{AG}',
                                                       'Fallsterblichkeit in Prozent nach Altergruppen',
-                                                      FormatFixed3, colWidth(62))
-
+                                                      FormatFixed3, colWidth(72))
 
     orderedCols, orderedNames, orderedTypes, orderFormats, orderWidths, orderDeletable, orderSelectable = zip(*desiredOrder)
     #orderedIndices = np.array(orderedIndices)+1
@@ -1426,13 +1430,15 @@ def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
                 colTypeCount[ct] = 1
 
         numColTypes = len(colTypeCount)
-        # print("colType", colType)
-        # print("colTypeCount", colTypeCount)
-        # print("numColTypes", numColTypes)
+        print("colType", colType)
+        print("colTypeCount", colTypeCount)
+        print("numColTypes", numColTypes)
 
         # layout the axis and the plot area
         leftaxes = int((numColTypes+1)/2)
         rightaxes = int(numColTypes/2)
+        print("leftaxes", leftaxes)
+        print("rightaxes", rightaxes)
 
         widthAvailable = fig_width-legendMargin
         widthAxis = 100
@@ -1561,6 +1567,7 @@ def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
             'title': 'Publikationstag'
         }
         layoutArgs["xaxis2"] = {
+            "domain": [xaxisDomainStart, xaxisDomainEnd],
             'anchor': 'y',
             'overlaying': 'x',
             'side': 'top',

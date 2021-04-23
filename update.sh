@@ -23,10 +23,11 @@ mkdir -p tmp
 source /usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc
 gsutil rsync -d -r gs://brdata-public-data/rki-corona-archiv/ ard-data
 
-cd $CORONA/ard-data/2_parsed
-python $CORONA/convertARD.py -d $CORONA/archive_ard/ *.xz
+#cd $CORONA/ard-data/2_parsed
+#python $CORONA/convertARD.py -d $CORONA/archive_ard/ *.xz
+python $CORONA/convertARD.py -d $CORONA/archive_ard/ $CORONA/ard-data/2_parsed/*.xz
 
-cd $CORONA/archive_ard/
+#cd $CORONA
 ##python $CORONA/unify.py -d $CORONA/archive_v2 $CORONA/archive_ard/NPGEO-RKI-*.csv
 python $CORONA/unify.py --resume -d $CORONA/archive_v2 $CORONA/archive_csv/NPGEO-RKI-*.csv $CORONA/archive_ard/NPGEO-RKI-*.csv
 
@@ -39,7 +40,6 @@ python $CORONA/database.py -i $CORONA/series -d $CORONA/series-updated
 python $CORONA/enhance.py -d $CORONA/series-enhanced series-updated/series-*.csv
 #python $CORONA/enhance.py -d $CORONA/series-enhanced series/series-*.csv
 
-cd $CORONA/
 python $CORONA/gather-results.py -o all-series.csv series-enhanced/enhanced-series-*.csv
 
 exit

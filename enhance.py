@@ -163,12 +163,21 @@ def addIncidences(table):
         ewc = einwohnerColName(c)
         #print("ewc:"+ewc)
         table = addIncidenceColumn(table, c, ewc, newColName)
-        if "AnzahlTodesfall" in c:
-            newColName = c.replace("AnzahlTodesfall", "Fallsterblichkeit_Prozent")
-            caseColName = c.replace("AnzahlTodesfall", "AnzahlFall")
-            table = addRatioColumn(table, c, caseColName, newColName, factor=100)
 
     return table
+
+def addCaseFatalityRates(table):
+    #table = addIncidenceColumn(table, "AnzahlTodesfallNeu", "Einwohner", "InzidenzTodesfallNeu")
+
+    candidatesColumns = [name for name in table.names if ("AnzahlTodesfall" in name) and (not "Neu" in name or "7TageSumme" in name)]
+    #   print("addIncidences candidates:", candidatesColumns)
+    for c in candidatesColumns:
+        newColName = c.replace("AnzahlTodesfall", "Fallsterblichkeit_Prozent")
+        caseColName = c.replace("AnzahlTodesfall", "AnzahlFall")
+        table = addRatioColumn(table, c, caseColName, newColName, factor=100)
+
+    return table
+
 
 def enhanceDatenstandTagMax(table):
     for row in range(table.nrows):
@@ -255,6 +264,7 @@ def enhance(inputFile, destDir="."):
     newTable = addMeldeTagShift(table)
     newTable = addIncidences(newTable)
     newTable = add7DayAverages(newTable)
+    newTable = addCaseFatalityRates(newTable)
     newTable = addMoreMetrics(newTable)
 
     path = os.path.normpath(inputFile)
