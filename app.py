@@ -44,7 +44,7 @@ from enum import Enum
 # Import math Library
 import math
 
-versionStr="1.0.2.1"
+versionStr="1.0.2.2"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
@@ -255,7 +255,7 @@ def colWidthStr(pixels):
     #print("colWidth pixels=", pixels)
     return "{}px".format(colWidth(pixels))
 
-Selectable = True
+Selectable = WITH_GRPAH
 Deletable = False
 NotSelectable = False
 NotDeletable = False
@@ -835,6 +835,10 @@ tableHeight='90vh'
 #tableWidth= '2400px'
 tableWidth = totalWidthStr
 
+g_row_selectable="multi"
+if not WITH_GRPAH:
+    g_row_selectable = None
+
 h_table = dash_table.DataTable(
     id='table',
     columns=columns,
@@ -842,7 +846,7 @@ h_table = dash_table.DataTable(
     sort_action='native',
     filter_action='native',
     column_selectable="multi",
-    row_selectable="multi",
+    row_selectable=g_row_selectable,
 
     #filter_query='{Bundesland} = Berlin',
     page_size= 500,
@@ -1383,206 +1387,207 @@ chartDataFrame = getTimeSeries(fullTable,0,visualizeColumns).to_pandas()
 #
 #     return fig
 
-@app.callback(
-    Output("time-series-chart", "figure"),
-    Input('table', 'selected_columns'),
-    Input('table', 'selected_rows'),
-    Input('fig-width-slider', 'value'),
-    Input('fig-height-slider', 'value'),
-)
-def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
-    # print("---------------------->")
-    # print(selected_columns)
-    # print(selected_rows)
-    fig = go.Figure()
+if WITH_GRPAH:
+    @app.callback(
+        Output("time-series-chart", "figure"),
+        Input('table', 'selected_columns'),
+        Input('table', 'selected_rows'),
+        Input('fig-width-slider', 'value'),
+        Input('fig-height-slider', 'value'),
+    )
+    def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
+        # print("---------------------->")
+        # print(selected_columns)
+        # print(selected_rows)
+        fig = go.Figure()
 
-    #only do stuff if at least one columns and one row are selected
-    if not (selected_columns is None or selected_rows is None):
-        selected_columns = sorted(selected_columns)
-        selected_rows = sorted(selected_rows)
-        #print(table[selected_rows, visualizeColumns])
-        #print(table[selected_rows, "Landkreis"])
-        #print(table[selected_rows, "IdLandkreis"])
+        #only do stuff if at least one columns and one row are selected
+        if not (selected_columns is None or selected_rows is None):
+            selected_columns = sorted(selected_columns)
+            selected_rows = sorted(selected_rows)
+            #print(table[selected_rows, visualizeColumns])
+            #print(table[selected_rows, "Landkreis"])
+            #print(table[selected_rows, "IdLandkreis"])
 
-        regionNames = table[selected_rows, "Landkreis"].to_list()[0]
-        regionIDs = table[selected_rows, "IdLandkreis"].to_list()[0]
-        # print(regionNames)
-        # print(regionIDs)
+            regionNames = table[selected_rows, "Landkreis"].to_list()[0]
+            regionIDs = table[selected_rows, "IdLandkreis"].to_list()[0]
+            # print(regionNames)
+            # print(regionIDs)
 
-        fig.layout.height = int(fig_height)
-        fig.layout.width = int(fig_width)
-        legendMargin=500
-        fig.layout.margin.t = 20
-        # fig.layout.margin.l = 0
-        # fig.layout.margin.b = 0
-        fig.layout.margin.r = legendMargin # right margin for Legend
-        # fig.layout.margin.pad = 0
+            fig.layout.height = int(fig_height)
+            fig.layout.width = int(fig_width)
+            legendMargin=500
+            fig.layout.margin.t = 20
+            # fig.layout.margin.l = 0
+            # fig.layout.margin.b = 0
+            fig.layout.margin.r = legendMargin # right margin for Legend
+            # fig.layout.margin.pad = 0
 
-        # determine how many different types of y-axes we need and what kind
-        colType = {}
-        colTypeCount = {}
-        for col in selected_columns:
-            ct = classifyColumn(col)
-            colType[col] = ct
-            if ct in colTypeCount.keys():
-                colTypeCount[ct] = colTypeCount[ct] + 1
-            else:
-                colTypeCount[ct] = 1
-
-        numColTypes = len(colTypeCount)
-        print("colType", colType)
-        print("colTypeCount", colTypeCount)
-        print("numColTypes", numColTypes)
-
-        # layout the axis and the plot area
-        leftaxes = int((numColTypes+1)/2)
-        rightaxes = int(numColTypes/2)
-        print("leftaxes", leftaxes)
-        print("rightaxes", rightaxes)
-
-        widthAvailable = fig_width-legendMargin
-        widthAxis = 100
-        widthAxisInDomain = widthAxis / widthAvailable
-        leftAxesWidth = (leftaxes-1) * widthAxis
-        rightAxesWidth = rightaxes * widthAxis
-        xaxisDomainStart = leftAxesWidth / widthAvailable
-        xaxisDomainEnd = 1.0 - (rightAxesWidth / widthAvailable)
-
-        # compute the attribute names for each axis
-        # the names are None ,y2,y3 ...
-        # the attribute names are yaxis, yaxis2, yaxis3...
-        colTypeAxis = {}
-        colTypeAxisName = {}
-        colTypeAxisArg = {}
-        colTypeAxisTitle = {}
-
-        for j, ct in enumerate(colTypeCount.keys()):
-            colTypeAxis[ct] = j
-            #print("j={}, ct={}".format(j,ct))
-            colTypeAxisTitle[ct] = axisDescription[ct.name]
-            if j > 0:
-                colTypeAxisName[ct] = "y" + str(j + 1)
-                colTypeAxisArg[ct] = "yaxis" + str(j + 1)
-            else:
-                colTypeAxisName[ct] = None
-                colTypeAxisArg[ct] = "yaxis"
-
-        # print("colTypeAxis", colTypeAxis)
-        # print("colTypeAxisName", colTypeAxisName)
-        # print("colTypeAxisArg", colTypeAxisArg)
-
-        for i, regionid in enumerate(regionIDs):
-            #print("------> i: {} : col: {}".format(i, regionid))
-
-            regionTable = getTimeSeries(fullTable,regionid, ["DatenstandTag","Datum"]+selected_columns)
-            #print(IDs)
-            #print(lkTable)
-
-            dates = regionTable[:,"Datum"].to_list()[0]
-            days = regionTable[:,"DatenstandTag"].to_list()[0]
-            #print("dates",dates)
-            ##tables[id] = regionTable
-
+            # determine how many different types of y-axes we need and what kind
+            colType = {}
+            colTypeCount = {}
             for col in selected_columns:
-                print("col",col)
-                values = regionTable[:, col].to_list()[0]
-                #print("i {} regionNames {} col {}".format(i, regionNames, col))
-                name = regionNames[i]+":"+col
-                #print("adding scatter trace {} name {} col {}".format(i, name, col))
-
-                dateOffset = 0
-                if "_Vor8Tagen" in col:
-                    dateOffset = 7
-                # elif "Gestern_" in col:
-                #     dateOffset = 0
-                # elif not "MeldeTag_" in col:
-                #     dateOffset = 1
-
-                fullValues = [None]*(len(fullDayList))
-                #print(fullValues)
-                n = 0
-                for k, day in enumerate(days):
-                    if k >= dateOffset:
-                        if values[k] != None and not math.isnan(values[k]):
-                            #print("i={}, day={}, , indexOfday(day)={},indexOfday(day)={}, indexOfMeldeday(day)={}".format(
-                            #    i, day, indexOfday(day), day, indexOfMeldeday(day)))
-                            if "MeldeTag_" in col:
-                                fullValues[indexOfMeldeday(day-dateOffset-1)] = values[k]
-                            else:
-                                fullValues[indexOfday(day-dateOffset)] = values[k]
-                            #else:
-                                #fullValues[i] = None
-
-                #print(fullDateList)
-                #print(values)
-                if len(fullDayRange) != len(fullValues):
-                    print("Len mismatch, dates={}, values={}".format(dates,values))
+                ct = classifyColumn(col)
+                colType[col] = ct
+                if ct in colTypeCount.keys():
+                    colTypeCount[ct] = colTypeCount[ct] + 1
                 else:
-                    ct =colType[col]
-                    #print("ct",ct)
-                    ctAxisName = colTypeAxisName[ct]
-                    #print("ctAxisName",ctAxisName)
-                    if "MeldeTag_" in col:
-                        fig.add_trace(go.Scatter(x=fullMeldeDateList, y=fullValues, name=name, yaxis=ctAxisName, xaxis="x2"))
+                    colTypeCount[ct] = 1
+
+            numColTypes = len(colTypeCount)
+            print("colType", colType)
+            print("colTypeCount", colTypeCount)
+            print("numColTypes", numColTypes)
+
+            # layout the axis and the plot area
+            leftaxes = int((numColTypes+1)/2)
+            rightaxes = int(numColTypes/2)
+            print("leftaxes", leftaxes)
+            print("rightaxes", rightaxes)
+
+            widthAvailable = fig_width-legendMargin
+            widthAxis = 100
+            widthAxisInDomain = widthAxis / widthAvailable
+            leftAxesWidth = (leftaxes-1) * widthAxis
+            rightAxesWidth = rightaxes * widthAxis
+            xaxisDomainStart = leftAxesWidth / widthAvailable
+            xaxisDomainEnd = 1.0 - (rightAxesWidth / widthAvailable)
+
+            # compute the attribute names for each axis
+            # the names are None ,y2,y3 ...
+            # the attribute names are yaxis, yaxis2, yaxis3...
+            colTypeAxis = {}
+            colTypeAxisName = {}
+            colTypeAxisArg = {}
+            colTypeAxisTitle = {}
+
+            for j, ct in enumerate(colTypeCount.keys()):
+                colTypeAxis[ct] = j
+                #print("j={}, ct={}".format(j,ct))
+                colTypeAxisTitle[ct] = axisDescription[ct.name]
+                if j > 0:
+                    colTypeAxisName[ct] = "y" + str(j + 1)
+                    colTypeAxisArg[ct] = "yaxis" + str(j + 1)
+                else:
+                    colTypeAxisName[ct] = None
+                    colTypeAxisArg[ct] = "yaxis"
+
+            # print("colTypeAxis", colTypeAxis)
+            # print("colTypeAxisName", colTypeAxisName)
+            # print("colTypeAxisArg", colTypeAxisArg)
+
+            for i, regionid in enumerate(regionIDs):
+                #print("------> i: {} : col: {}".format(i, regionid))
+
+                regionTable = getTimeSeries(fullTable,regionid, ["DatenstandTag","Datum"]+selected_columns)
+                #print(IDs)
+                #print(lkTable)
+
+                dates = regionTable[:,"Datum"].to_list()[0]
+                days = regionTable[:,"DatenstandTag"].to_list()[0]
+                #print("dates",dates)
+                ##tables[id] = regionTable
+
+                for col in selected_columns:
+                    print("col",col)
+                    values = regionTable[:, col].to_list()[0]
+                    #print("i {} regionNames {} col {}".format(i, regionNames, col))
+                    name = regionNames[i]+":"+col
+                    #print("adding scatter trace {} name {} col {}".format(i, name, col))
+
+                    dateOffset = 0
+                    if "_Vor8Tagen" in col:
+                        dateOffset = 7
+                    # elif "Gestern_" in col:
+                    #     dateOffset = 0
+                    # elif not "MeldeTag_" in col:
+                    #     dateOffset = 1
+
+                    fullValues = [None]*(len(fullDayList))
+                    #print(fullValues)
+                    n = 0
+                    for k, day in enumerate(days):
+                        if k >= dateOffset:
+                            if values[k] != None and not math.isnan(values[k]):
+                                #print("i={}, day={}, , indexOfday(day)={},indexOfday(day)={}, indexOfMeldeday(day)={}".format(
+                                #    i, day, indexOfday(day), day, indexOfMeldeday(day)))
+                                if "MeldeTag_" in col:
+                                    fullValues[indexOfMeldeday(day-dateOffset-1)] = values[k]
+                                else:
+                                    fullValues[indexOfday(day-dateOffset)] = values[k]
+                                #else:
+                                    #fullValues[i] = None
+
+                    #print(fullDateList)
+                    #print(values)
+                    if len(fullDayRange) != len(fullValues):
+                        print("Len mismatch, dates={}, values={}".format(dates,values))
                     else:
-                        fig.add_trace(go.Scatter(x=fullDateList, y=fullValues, name=name, yaxis=ctAxisName))
+                        ct =colType[col]
+                        #print("ct",ct)
+                        ctAxisName = colTypeAxisName[ct]
+                        #print("ctAxisName",ctAxisName)
+                        if "MeldeTag_" in col:
+                            fig.add_trace(go.Scatter(x=fullMeldeDateList, y=fullValues, name=name, yaxis=ctAxisName, xaxis="x2"))
+                        else:
+                            fig.add_trace(go.Scatter(x=fullDateList, y=fullValues, name=name, yaxis=ctAxisName))
 
 
-        layoutArgs = {}
-        for k, axis in enumerate(colTypeAxisArg.keys()):
-            #print("axis arg {}:{}".format(k,axis.name))
+            layoutArgs = {}
+            for k, axis in enumerate(colTypeAxisArg.keys()):
+                #print("axis arg {}:{}".format(k,axis.name))
 
-            axisTitle = colTypeAxisTitle[axis]
-            #print("axisTitle", axisTitle)
+                axisTitle = colTypeAxisTitle[axis]
+                #print("axisTitle", axisTitle)
 
-            axisNamme = colTypeAxisName[axis]
-            #print("axisNamme", axisNamme)
+                axisNamme = colTypeAxisName[axis]
+                #print("axisNamme", axisNamme)
 
-            axisArg = colTypeAxisArg[axis]
-            #print("axisArg", axisArg)
+                axisArg = colTypeAxisArg[axis]
+                #print("axisArg", axisArg)
 
-            layoutArgs[axisArg] = {
-                "title": axisTitle,
+                layoutArgs[axisArg] = {
+                    "title": axisTitle,
+                }
+                if k > 0:
+                    #print("k",k)
+                    #print("k % 2",k % 2)
+                    layoutArgs[axisArg]["overlaying"] = "y"
+                    if k == 1:
+                        layoutArgs[axisArg]["anchor"] =  "x"
+                    else:
+                        layoutArgs[axisArg]["anchor"] =  "free"
+                        if k % 2 == 0:
+                            layoutArgs[axisArg]["position"] = widthAxisInDomain * int((k-2)/2)
+                        else:
+                            layoutArgs[axisArg]["position"] = xaxisDomainEnd + widthAxisInDomain * (k-1)/2
+
+
+
+                layoutArgs[axisArg]["side"] =   "left" if k%2==0 else "right"
+                #layoutArgs[axisArg]["side"] =   "left"
+
+            layoutArgs["xaxis"] = {
+                "domain": [xaxisDomainStart, xaxisDomainEnd],
+                'title': 'Publikationstag'
             }
-            if k > 0:
-                #print("k",k)
-                #print("k % 2",k % 2)
-                layoutArgs[axisArg]["overlaying"] = "y"
-                if k == 1:
-                    layoutArgs[axisArg]["anchor"] =  "x"
-                else:
-                    layoutArgs[axisArg]["anchor"] =  "free"
-                    if k % 2 == 0:
-                        layoutArgs[axisArg]["position"] = widthAxisInDomain * int((k-2)/2)
-                    else:
-                        layoutArgs[axisArg]["position"] = xaxisDomainEnd + widthAxisInDomain * (k-1)/2
+            layoutArgs["xaxis2"] = {
+                "domain": [xaxisDomainStart, xaxisDomainEnd],
+                'anchor': 'y',
+                'overlaying': 'x',
+                'side': 'top',
+                'title': 'Meldetag'
+            }
 
-
-
-            layoutArgs[axisArg]["side"] =   "left" if k%2==0 else "right"
-            #layoutArgs[axisArg]["side"] =   "left"
-
-        layoutArgs["xaxis"] = {
-            "domain": [xaxisDomainStart, xaxisDomainEnd],
-            'title': 'Publikationstag'
-        }
-        layoutArgs["xaxis2"] = {
-            "domain": [xaxisDomainStart, xaxisDomainEnd],
-            'anchor': 'y',
-            'overlaying': 'x',
-            'side': 'top',
-            'title': 'Meldetag'
-        }
-
-        print(pretty(layoutArgs))
-        fig.update_layout(layoutArgs)
-        #fig.update_layout(xaxis2={'anchor': 'y', 'overlaying': 'x', 'side': 'top'},
-        #                  yaxis_domain=[0, 0.94]);
-        #print(fullTable[selected_rows, visualizeColumns])
-        #chartDataFrame = fullTable[selected_rows, visualizeColumns].to_pandas()
-        #fig = px.line(chartDataFrame, x='Datum', y=selected_columns)
-        #fig.show()
-    return fig
+            print(pretty(layoutArgs))
+            fig.update_layout(layoutArgs)
+            #fig.update_layout(xaxis2={'anchor': 'y', 'overlaying': 'x', 'side': 'top'},
+            #                  yaxis_domain=[0, 0.94]);
+            #print(fullTable[selected_rows, visualizeColumns])
+            #chartDataFrame = fullTable[selected_rows, visualizeColumns].to_pandas()
+            #fig = px.line(chartDataFrame, x='Datum', y=selected_columns)
+            #fig.show()
+        return fig
 
 # @app.callback(
 #     Output('fig-height-slider', 'verticalHeight'),
@@ -1594,14 +1599,14 @@ def display_time_series(selected_columns,selected_rows, fig_width, fig_height):
 #     #print("adjust slider height to",figure["layout"]["height"])
 #     #return figure["layout"]["height"]
 #     return figure
-
-@app.callback(
-    Output('fig-height-slider', 'verticalHeight'),
-    Input('fig-height-slider', 'value'),
-)
-def adjustSliderHeight(fig_height):
-    print("adjust slider height to",fig_height)
-    return fig_height
+if WITH_GRPAH:
+    @app.callback(
+        Output('fig-height-slider', 'verticalHeight'),
+        Input('fig-height-slider', 'value'),
+    )
+    def adjustSliderHeight(fig_height):
+        print("adjust slider height to",fig_height)
+        return fig_height
 
 # app.clientside_callback(
 #     """
@@ -1613,28 +1618,29 @@ def adjustSliderHeight(fig_height):
 #     Input('fig-height-slider', 'value'),
 # )
 
-@app.callback(
-    Output("download", "data"),
-    Input("btn", "n_clicks"),
-    State('table', 'selected_columns'),
-    State('table', 'selected_rows'),
-)
-def triggerDownLoad(n_clicks,selected_columns,selected_rows):
-    print("triggerDownLoad: n_clicks,selected_columns,selected_rows",n_clicks,selected_columns,selected_rows)
-    if not (selected_columns is None or selected_rows is None):
+if WITH_GRPAH:
+    @app.callback(
+        Output("download", "data"),
+        Input("btn", "n_clicks"),
+        State('table', 'selected_columns'),
+        State('table', 'selected_rows'),
+    )
+    def triggerDownLoad(n_clicks,selected_columns,selected_rows):
+        print("triggerDownLoad: n_clicks,selected_columns,selected_rows",n_clicks,selected_columns,selected_rows)
+        if not (selected_columns is None or selected_rows is None):
 
-        regionNames = table[selected_rows, "Landkreis"].to_list()[0]
-        regionIDs = table[selected_rows, "IdLandkreis"].to_list()[0]
+            regionNames = table[selected_rows, "Landkreis"].to_list()[0]
+            regionIDs = table[selected_rows, "IdLandkreis"].to_list()[0]
 
-        exportTable = dt.Frame()
-        for i, regionid in enumerate(regionIDs):
-            regionTable = getTimeSeries(fullTable, regionid, ["DatenstandTag", "Datum", "Landkreis", "IdLandkreis","Bundesland"] + selected_columns)
-            exportTable.rbind(regionTable)
+            exportTable = dt.Frame()
+            for i, regionid in enumerate(regionIDs):
+                regionTable = getTimeSeries(fullTable, regionid, ["DatenstandTag", "Datum", "Landkreis", "IdLandkreis","Bundesland"] + selected_columns)
+                exportTable.rbind(regionTable)
 
-        #print("exportTable",exportTable)
-        result = exportTable.to_csv()
-        return dict(content=result, filename="graph-data.csv")
-    return None
+            #print("exportTable",exportTable)
+            result = exportTable.to_csv()
+            return dict(content=result, filename="graph-data.csv")
+        return None
 
 h_width_slider =  dcc.Slider(id='fig-width-slider', min=1000, max=3000, step=10, value=2000,
                marks={x: str(x) for x in [1000, 1200, 1400, 1800, 2000, 2200, 2400, 2600, 2800, 3000]})
@@ -1665,20 +1671,30 @@ h_graph = html.Table([
 
 app.title = appTitle
 
-app.layout = html.Div([
-    h_header,
-    betterExplanation,
-    h_graph,
-    h_table,
+if WITH_GRPAH:
+    app.layout = html.Div([
+        h_header,
+        betterExplanation,
+        h_graph,
+        h_table,
 
-    #html.P(html.H3(
-    #html.A(html.Span("An den Seitenanfang springen ⬆", className=introClass), href="#top", id="Benutzung"))),
+        #html.P(html.H3(
+        #html.A(html.Span("An den Seitenanfang springen ⬆", className=introClass), href="#top", id="Benutzung"))),
 
-    #html.P(html.H3(
-    html.P(html.H4(html.A(html.Span("Zu Absatz 'Benutzung' springen ⬆", className=introClass), href="#Benutzung")),style={'padding': '0px',
-           'backgroundColor': colors['background']}, id="bottom"),
+        #html.P(html.H3(
+        html.P(html.H4(html.A(html.Span("Zu Absatz 'Benutzung' springen ⬆", className=introClass), href="#Benutzung")),style={'padding': '0px',
+               'backgroundColor': colors['background']}, id="bottom"),
+    ])
+else:
+    app.layout = html.Div([
+        h_header,
+        betterExplanation,
+        h_table,
+        html.P(html.H4(html.A(html.Span("Zu Absatz 'Benutzung' springen ⬆", className=introClass), href="#Benutzung")),
+               style={'padding': '0px',
+                      'backgroundColor': colors['background']}, id="bottom"),
+    ])
 
-])
 debugFlag = True
 if __name__ == '__main__':
     if socket.gethostname() == 'westphal.uberspace.de':
