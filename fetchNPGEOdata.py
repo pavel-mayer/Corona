@@ -132,7 +132,7 @@ def retrieveAllRecords(args):
                     offset = offset + chunksize
                     retry = 0
                 else:
-                    if retry > 0 and lastReceived == newRecords and len(newRecords)>0:
+                    if retry > 0 and lastReceived == newRecords:# and len(newRecords)>0:
                         print("exceededTransferLimit flag still missing, but we got the same data twice, so it should be ok")
                         records = records + newRecords
                         break
@@ -229,7 +229,7 @@ def main():
         if not args.fetchcsv:
             allRecords = retrieveAllRecords(args)
             if allRecords is not None:
-                pmu.saveJson(dfn, allRecords)
+                #pmu.saveJson(dfn, allRecords)
                 if not os.path.isfile(afn) or  args.force:
                     pmu.saveJson(afn, allRecords)
                 if not os.path.isfile(cfn) or args.force:

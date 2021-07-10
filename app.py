@@ -48,8 +48,8 @@ versionStr="1.0.2.0"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
-WITH_GRPAH = True
-WITH_AG=True
+WITH_GRPAH = False
+WITH_AG=False
 
 pio.templates.default = "plotly_dark"
 
@@ -369,7 +369,7 @@ def makeColumns(withGender=False, withAges=False):
         ('LandkreisTyp', ['Region', 'Art'], 'text', Format(), colWidth(30), NotDeletable, NotSelectable),
         ('Einwohner', ['Region', 'Einwohner'], 'numeric', FormatInt, colWidth(90), Deletable, NotSelectable),
         ('InzidenzFallNeu_7TageSumme_Trend_Spezial', ['Publizierte Fälle', 'RwK'], 'numeric', FormatFixed2, colWidth(70), Deletable, Selectable),
-        ('InzidenzFallNeu_7TageSumme_R', ['Publizierte Fälle', 'R7'], 'numeric', FormatFixed2, colWidth(70), Deletable, Selectable),
+        ('InzidenzFallNeu_7TageSumme_R_Spezial', ['Publizierte Fälle', 'R7'], 'numeric', FormatFixed2, colWidth(70), Deletable, Selectable),
         ('AnzahlFallNeu_7TageSumme', ['Publizierte Fälle', 'letzte 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth), Deletable, Selectable),
         ('AnzahlFallNeu_7TageSumme_7_Tage_davor', ['Publizierte Fälle', 'vorl. 7 Tage'], 'numeric', FormatInt, colWidth(defaultColWidth), Deletable, Selectable),
         ('AnzahlFall', ['Publizierte Fälle', 'total'], 'numeric', FormatInt, colWidth(90), Deletable, Selectable),

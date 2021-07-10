@@ -62,7 +62,7 @@ def convertCensus(inFilename, outFilename):
 def makeNames(fromAge, includeAge, postfix):
     names = []
     age = fromAge
-    while age < includeAge:
+    while age <= includeAge:
         if age == 0:
             name = "unter 1 Jahr-{}".format(postfix)
             names.append(name)
@@ -78,13 +78,13 @@ def makeNames(fromAge, includeAge, postfix):
         else:
             name = "90 Jahre und mehr-{}".format(postfix)
             names.append(name)
-            age = includeAge
+            age = includeAge+1
     return names
 
 def makeBerlinNames(fromAge, includeAge, postfix):
     names = []
     age = fromAge
-    while age < includeAge:
+    while age <= includeAge:
         if age == 0:
             name = "unter 1-{}".format(postfix)
             names.append(name)
@@ -96,7 +96,7 @@ def makeBerlinNames(fromAge, includeAge, postfix):
         else:
             name = "95 und älter-{}".format(postfix)
             names.append(name)
-            age = includeAge
+            age = includeAge+1
     return names
 
 def makeRKIAgeGroups(outputFile):
@@ -181,7 +181,7 @@ def makeRKIAgeGroups(outputFile):
     print(check)
     check.to_csv(outputFile)
 
-#convertCensus("demographie/Census-ALL-clean-7.csv", "Census.csv")
-#convertCensus("demographie/Berlin-Bezirke-3.csv", "Census-Berlin.csv")
+convertCensus("demographie/Census-ALL-clean-7.csv", "Census.csv")
+convertCensus("demographie/Berlin-Bezirke-3.csv", "Census-Berlin.csv")
 
 makeRKIAgeGroups("CensusByRKIAgeGroups.csv")
