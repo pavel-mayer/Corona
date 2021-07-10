@@ -44,12 +44,12 @@ from enum import Enum
 # Import math Library
 import math
 
-versionStr="1.0.2.0"
+versionStr="1.0.2.1"
 
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
-WITH_GRPAH = False
-WITH_AG=False
+WITH_GRPAH = True
+WITH_AG=True
 
 pio.templates.default = "plotly_dark"
 
