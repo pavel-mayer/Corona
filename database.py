@@ -891,8 +891,9 @@ def updateOldTable(table, withTable):
             table.rbind(rowToAdd)
         table = table.sort("DatenstandTag")
     else:
-        print("updateOldTable: No rows to add")
-        exit(1)
+        print("#WARNING: updateOldTable: No rows to add")
+        return table
+        #exit(1)
 
     # check result
     tableDates = table[:,"DatenstandTag"].to_list()[0]

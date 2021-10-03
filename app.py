@@ -49,7 +49,7 @@ versionStr="1.0.2.2"
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
 WITH_GRPAH = True
-WITH_AG=True
+WITH_AG=False
 
 pio.templates.default = "plotly_dark"
 
@@ -189,23 +189,46 @@ def getTableForDay(fullTable, day):
     #print(yesterdayTable)
     todayTableById = todayTable.sort("IdLandkreis")
     yesterdayTableById = yesterdayTable.sort("IdLandkreis")
-    #print(todayTableById.nrows)
-    #print(yesterdayTableById.nrows)
+    print("todayTableById.nrows", todayTableById.nrows)
+    print("yesterdayTableById.nrows",yesterdayTableById.nrows)
 
     # check if all entries today and yesterday do match
-    for i in range(yesterdayTableById.nrows):
-        l_id = todayTableById[i, dt.f.IdLandkreis].to_list()[0][0]
-        l_name = todayTableById[i, dt.f.Landkreis].to_list()[0][0]
-        l_new_id = yesterdayTableById[i, dt.f.IdLandkreis].to_list()[0][0]
-        l_new_name = yesterdayTableById[i, dt.f.Landkreis].to_list()[0][0]
+    removed = 0
+    i = 0
+    while i < yesterdayTableById.nrows or i < todayTableById.nrows:
+        if i < todayTableById.nrows:
+            l_id = todayTableById[i, dt.f.IdLandkreis].to_list()[0][0]
+            l_name = todayTableById[i, dt.f.Landkreis].to_list()[0][0]
+        else:
+            l_id = 0
+            l_name ="today-out-of-bounds"
+        if i < yesterdayTableById.nrows:
+            l_new_id = yesterdayTableById[i, dt.f.IdLandkreis].to_list()[0][0]
+            l_new_name = yesterdayTableById[i, dt.f.Landkreis].to_list()[0][0]
+        else:
+            l_id = 0
+            l_name = "yesterday-out-of-bounds"
         #print("{}: ? {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
         if l_id != l_new_id:
-            print("missing id {} ({}) in today, was {} ({}) yesterday".format(l_id, l_name, l_new_id, l_new_name))
+            print("missing id {} ({}) in today at index {}, was {} ({}) yesterday".format(l_id, l_name, i,l_new_id, l_new_name))
             print("{}: BAD: {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
-            exit(1)
-        #else:
-        #    print("{}: ok : {} {} == {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
-
+            print("{}: Trying to fix: {} {} != {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
+            if l_id > l_new_id:
+                print("new is missing, copying from yesterday")
+                print("todayTableById.nrows before",todayTableById.nrows)
+                todayTableById.rbind(yesterdayTableById[i,:])
+                todayTableById = todayTableById.sort("IdLandkreis")
+                print("todayTableById.nrows after",todayTableById.nrows)
+            else:
+                print("new is missing, copying from today")
+                print("yesterdayTableById.nrows before",yesterdayTableById.nrows)
+                yesterdayTableById.rbind(todayTableById[i,:])
+                yesterdayTableById = yesterdayTableById.sort("IdLandkreis")
+                print("yesterdayTableById.nrows after",yesterdayTableById.nrows)
+                #exit(1)
+        else:
+            print("{}: ok : {} {} == {} {}".format(i, l_id, l_name, l_new_id, l_new_name))
+        i = i + 1
     todayTableById=todayTableById[:,dt.f[:].extend({"RangChange": 0})]
     rangChange = np.subtract(yesterdayTableById[:,"Rang"],todayTableById[:,"Rang"])
     todayTableById[:,"RangChange"] = rangChange
