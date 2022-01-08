@@ -49,7 +49,7 @@ versionStr="1.0.2.2"
 # = socket.gethostname().startswith('pavlator')
 debugFlag = False
 WITH_GRPAH = True
-WITH_AG=False
+WITH_AG=True
 
 pio.templates.default = "plotly_dark"
 

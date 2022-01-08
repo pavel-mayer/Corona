@@ -49,13 +49,14 @@ def convert(compressedJSONFile, destDir=".", force = False, skipchecks=False):
         else:
             print("No file for previous day {}".format(day-1))
 
-        allowedShrinkageDays = [33,68]
+        allowedShrinkageDays = [33,68,612]
         allowedSameDays = [33]
         allowedJumpDays = [46,66]
 
         if not force and os.path.isfile(newFile) and yesterDayRows >= 0:
             existingFrame = dt.fread(newFile)
             existingRows = existingFrame.nrows
+            print("existingRows",existingRows, "yesterDayRows",yesterDayRows)
             if existingRows < yesterDayRows:
                 if not day in allowedShrinkageDays:
                     print("Existing .csv file for day {} contains less rows ({}) than previous day file ({}), redoing".format(day,existingRows,yesterDayRows))
