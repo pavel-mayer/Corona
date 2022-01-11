@@ -874,9 +874,8 @@ h_table = dash_table.DataTable(
     #filter_query='{Bundesland} = Berlin',
     page_size= 500,
     style_table = {
-            'minWidth': tableWidth, 'width': tableWidth, 'maxWidth': tableWidth,
+            'minWidth': tableWidth,
             'minHeight': tableHeight, 'height': tableHeight, 'maxHeight': tableHeight,
-            'overflow-y': 'scroll',
 #            'tableLayout': 'auto'
             'table-layout': 'fixed'
     },
